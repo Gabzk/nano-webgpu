@@ -49,4 +49,8 @@ export class Color {
         );
     }
 
+    public toFloat32Array(): Float32Array {
+        return new Float32Array([this.r, this.g, this.b, this.a]);
+    }
+
 }
