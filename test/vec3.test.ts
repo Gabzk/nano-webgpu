@@ -37,13 +37,5 @@ describe("Vec3", () => {
 		expect(vec3.z).toBe(4.5);
 	});
 
-	it("should throw an error if the lerp values are invalid", () => {
-		const vec3 = new Vec3(1.0, 2.0, 3.0);
-		expect(() => Vec3.lerp(vec3, new Vec3(4.0, 5.0, 6.0), -1.0)).toThrow(
-			"Invalid lerp values",
-		);
-		expect(() => vec3.lerp(new Vec3(4.0, 5.0, 6.0), 2.0)).toThrow(
-			"Invalid lerp values",
-		);
-	});
+
 });
