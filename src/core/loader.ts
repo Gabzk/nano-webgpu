@@ -1,6 +1,20 @@
+/**
+ * @module Loader
+ * @description
+ * This module provides the loader.
+ */
 export class Loader {
+	/**
+	 * The GPUDevice used for creating resources (textures, shaders)
+	 * @private
+	 * @type {GPUDevice}
+	 */
 	private device: GPUDevice;
 
+	/**
+	 * Create a new loader
+	 * @param device The GPU device
+	 */
 	constructor(device: GPUDevice) {
 		this.device = device;
 	}
@@ -52,8 +66,8 @@ export class Loader {
 		const usage =
 			options.usage ??
 			GPUTextureUsage.TEXTURE_BINDING |
-				GPUTextureUsage.COPY_DST |
-				GPUTextureUsage.RENDER_ATTACHMENT;
+			GPUTextureUsage.COPY_DST |
+			GPUTextureUsage.RENDER_ATTACHMENT;
 
 		// Create texture on gpu device with the same size of image bitmap
 		const texture = this.device.createTexture({
@@ -88,6 +102,11 @@ export class Loader {
 		return this.parseOBJ(text);
 	}
 
+	/**
+	 * Parse an OBJ model
+	 * @param text The text of the model
+	 * @returns The model
+	 */
 	private parseOBJ(text: string) {
 		const vertices: number[] = [];
 		const normals: number[] = [];
