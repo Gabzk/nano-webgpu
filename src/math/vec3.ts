@@ -252,4 +252,20 @@ export class Vec3 {
 		}
 		return new Float32Array([this.x, this.y, this.z]);
 	}
+
+	/**
+	 * Creates a Vec3 from varying inputs.
+	 * @param {Vec3 | number[] | number} val - The input value.
+	 * @returns {Vec3} A new Vec3 instance.
+	 */
+	public static from(val: Vec3 | [number, number, number] | number[] | number): Vec3 {
+		if (val instanceof Vec3) {
+			return val.clone();
+		} else if (Array.isArray(val)) {
+			return new Vec3(val[0] || 0, val[1] || 0, val[2] || 0);
+		} else if (typeof val === "number") {
+			return new Vec3(val, val, val);
+		}
+		return new Vec3();
+	}
 }

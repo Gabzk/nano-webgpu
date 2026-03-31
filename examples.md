@@ -245,3 +245,61 @@ ctx.run((dt) => {
   scene.render();
 });
 ```
+
+## 6.Exemplo Melhorado
+
+Este exemplo ilustra a visão alvo para a biblioteca, com o máximo de abstração e o mínimo de configuração obrigatória.
+
+```typescript
+import { Context, Scene, Camera, DirectionalLight, PointLight } from "nano-webgpu";
+
+const ctx = await Context.init("#canvas");
+const scene = new Scene(ctx);
+
+// Câmera sem boilerplate (auto-descobre o canvas, fov padrão, aspect, etc)
+const camera = new Camera();
+camera.enableOrbitControls();
+scene.setCamera(camera);
+
+// Chão (O construtor aceita strings e resolve o carregamento interno)
+const floor = ctx.createPlane({ 
+  size: 10, 
+  texture: "./grass.jpg", 
+  position: [0, -1, 0] 
+});
+scene.add(floor);
+
+// Criação baseada em primivitivas direta no ctx
+const crate = ctx.createCube({ 
+  size: 1.0, 
+  texture: "./crate.png", 
+  position: [-2, 0, 0] 
+});
+scene.add(crate);
+
+// Carregamento de OBJ com textura abstrato e limpo
+const barrel = await ctx.loadMesh("./barrel.obj", { 
+  texture: "./barrel.png", 
+  position: [2, 0, 0], 
+  scale: 0.5 
+});
+scene.add(barrel);
+
+// Luzes com direções em array (Vec3 auto) e cores hexadecimais diretas
+scene.addLight(new DirectionalLight({ 
+  direction: [-1, -2, -1], 
+  color: "#ffd0b0", 
+  intensity: 0.8 
+}));
+
+scene.addLight(new PointLight({ 
+  position: [0, 3, 0], 
+  color: "#3498db" 
+}));
+
+// Animação muito mais natural usando propriedades de transformação
+ctx.run((dt, time) => {
+  crate.rotation.y = time; // Esconde a necessidade de "new Mat4()..setModel()"
+  scene.render();
+});
+```

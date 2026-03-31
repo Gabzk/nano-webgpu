@@ -266,6 +266,7 @@ export class Mat4 {
         const nf = 1 / (near - far);
         const v = this.values;
 
+        // WebGPU NDC Z is [0, 1]
         v[0] = f / aspect;
         v[1] = 0;
         v[2] = 0;
@@ -276,11 +277,11 @@ export class Mat4 {
         v[7] = 0;
         v[8] = 0;
         v[9] = 0;
-        v[10] = (far + near) * nf;
+        v[10] = far * nf;
         v[11] = -1;
         v[12] = 0;
         v[13] = 0;
-        v[14] = (2 * far * near) * nf;
+        v[14] = far * near * nf;
         v[15] = 0;
 
         return this;

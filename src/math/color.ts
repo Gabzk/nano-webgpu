@@ -111,4 +111,26 @@ export class Color {
     public toFloat32Array(): Float32Array {
         return new Float32Array([this.r, this.g, this.b, this.a]);
     }
+
+    /**
+     * Creates a Color from varying inputs.
+     * @param {Color | string | number[]} val - The input value.
+     * @returns {Color} A new Color instance.
+     */
+    public static from(val: Color | string | number[] | [number, number, number, number?]): Color {
+        if (val instanceof Color) {
+            return new Color(val.r, val.g, val.b, val.a);
+        } else if (typeof val === "string") {
+            return Color.fromHex(val);
+        } else if (Array.isArray(val)) {
+            // Assume 0.0 - 1.0 floats if all <= 1.0, else treat as bytes? 
+            // Better to assume normalized 0.0-1.0 floats for consistency with WebGPU.
+            const r = val[0] !== undefined ? val[0] : 0;
+            const g = val[1] !== undefined ? val[1] : 0;
+            const b = val[2] !== undefined ? val[2] : 0;
+            const a = val[3] !== undefined ? val[3] : 1.0;
+            return new Color(r, g, b, a);
+        }
+        return new Color();
+    }
 }

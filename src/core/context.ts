@@ -1,3 +1,9 @@
+import { Loader } from "./loader";
+import { Mesh } from "../graphics/mesh";
+import { Geometry } from "../graphics/geometry";
+import { createCubeGeometry, createPlaneGeometry, createSphereGeometry } from "../graphics/primitives";
+import { Vec3 } from "../math/vec3";
+
 /**
  * @module Context
  * @description
@@ -34,11 +40,31 @@ export class Context {
 	}
 
 	/**
+	 * Express initialization of a Context from a selector or canvas
+	 * @param {string | HTMLCanvasElement} selector
+	 * @returns {Promise<Context>} A fully initialized Context
+	 */
+	public static async init(selector: string | HTMLCanvasElement): Promise<Context> {
+		let canvas: HTMLCanvasElement;
+		if (typeof selector === "string") {
+			const el = document.querySelector(selector);
+			if (!el) throw new Error(`Canvas with selector '${selector}' not found.`);
+			canvas = el as HTMLCanvasElement;
+		} else {
+			canvas = selector;
+		}
+
+		const ctx = new Context();
+		await ctx.initCanvas(canvas);
+		return ctx;
+	}
+
+	/**
 	 * Initialize the WebGPU context
 	 * @param {HTMLCanvasElement} canvas
 	 * @returns {Promise<void>}
 	 */
-	public async init(canvas: HTMLCanvasElement): Promise<void> {
+	public async initCanvas(canvas: HTMLCanvasElement): Promise<void> {
 		// Verify if WebGPU is supported
 		if (!Context.isSupported()) {
 			throw new Error("WebGPU is not supported on this browser.");
@@ -62,5 +88,81 @@ export class Context {
 			format: this.format,
 			alphaMode: "premultiplied",
 		});
+	}
+
+	/**
+	 * Runs a render loop
+	 * @param loopFunction Callback function to be called each frame with delta time and total time in seconds.
+	 */
+	public run(loopFunction: (dt: number, time: number) => void): void {
+		let lastTime = performance.now();
+		let startTime = lastTime;
+		const frame = (t: number) => {
+			const dt = (t - lastTime) / 1000;
+			const time = (t - startTime) / 1000;
+			lastTime = t;
+			loopFunction(dt, time);
+			requestAnimationFrame(frame);
+		};
+		requestAnimationFrame(frame);
+	}
+
+	// ------------- Factory Methods for Primitives -------------
+	// Added to fulfill the 'nano' API abstraction requirements.
+	
+	// Basic geometry cache
+	private defaultGeometries: Record<string, any> = {};
+
+	public createCube(options: any): any {
+		if (!this.defaultGeometries["cube"]) {
+			this.defaultGeometries["cube"] = createCubeGeometry(this, options.size || 1.0);
+		}
+		
+		options.geometry = this.defaultGeometries["cube"];
+		const mesh = new Mesh(this, options);
+		if (options.position) mesh.position.copy(Vec3.from(options.position));
+		return mesh;
+	}
+
+	public createPlane(options: any): any {
+		if (!this.defaultGeometries["plane"]) {
+			this.defaultGeometries["plane"] = createPlaneGeometry(this, options.width || 1.0, options.height || 1.0);
+		}
+		
+		options.geometry = this.defaultGeometries["plane"];
+		const mesh = new Mesh(this, options);
+		if (options.position) mesh.position.copy(Vec3.from(options.position));
+		return mesh;
+	}
+
+	public createSphere(options: any): any {
+		if (!this.defaultGeometries["sphere"]) {
+			this.defaultGeometries["sphere"] = createSphereGeometry(this, options.radius || 1.0, options.segments || 16, options.segments || 16);
+		}
+		
+		options.geometry = this.defaultGeometries["sphere"];
+		const mesh = new Mesh(this, options);
+		if (options.position) mesh.position.copy(Vec3.from(options.position));
+		return mesh;
+	}
+
+	public async loadMesh(url: string, options: any): Promise<any> {
+		const loader = new Loader(this.device);
+		const modelData = await loader.loadModel(url);
+		
+		// Create a geometry from OBJ data
+		// modelData.vertices, modelData.normals, modelData.uvs
+		// OBJ Loader currently returns them un-interleaved. We need an interleaved format or adapt Geometry
+		// Assume we interleave them or Geometry handles it. For now, pass directly as stub
+		const geometry = new Geometry(this, new Float32Array(), new Uint16Array()); // Needs OBJ Interleaver
+
+		const mesh = new Mesh(this, { geometry, ...options });
+		if (options.position) mesh.position.copy(Vec3.from(options.position));
+		if (options.scale) {
+			if (typeof options.scale === "number") mesh.scale.set(options.scale, options.scale, options.scale);
+			else mesh.scale.copy(Vec3.from(options.scale));
+		}
+		
+		return mesh;
 	}
 }
