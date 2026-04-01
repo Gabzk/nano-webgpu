@@ -3,29 +3,36 @@ import { Context } from "../core/context";
 import { Texture } from "./texture";
 import { Geometry } from "./geometry";
 import { PipelineManager } from "./pipeline";
+import { Material } from "./materials/material";
+import { StandardMaterial } from "./materials/standard-material";
 
 export class Mesh extends Node3D {
     public ctx: Context;
     public geometry: Geometry;
-    public texture?: Texture;
+    public material: Material;
     
     public modelBuffer: GPUBuffer;
     public bindGroup!: GPUBindGroup;
 
-    constructor(ctx: Context, options: { geometry: Geometry; texture?: string | Texture }) {
+    constructor(ctx: Context, options: { geometry: Geometry; texture?: string | Texture; material?: Material }) {
         super();
         this.ctx = ctx;
         this.geometry = options.geometry;
 
-        if (options.texture) {
+        if (options.material) {
+            this.material = options.material;
+        } else if (options.texture) {
+            // Legacy shorthand approach: convert texture automatically to Standard Material
+            let tex: Texture;
             if (typeof options.texture === "string") {
-                this.texture = Texture.loadBackground(ctx, options.texture);
+                tex = Texture.loadBackground(ctx, options.texture);
             } else {
-                this.texture = options.texture;
+                tex = options.texture;
             }
+            this.material = new StandardMaterial({ albedoTexture: tex });
         } else {
-            // Give it a dummy white texture if none provided
-            this.texture = Texture.loadBackground(ctx, "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+ip1sAAAAASUVORK5CYII=");
+            // Default material
+            this.material = new StandardMaterial();
         }
 
         // 1. Create Model Uniform Buffer (mat4x4 = 16 floats * 4 bytes = 64 bytes)
@@ -35,34 +42,14 @@ export class Mesh extends Node3D {
             usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
         });
 
-        // 2. Create the Bind Group (Layout index 1)
-        const layouts = PipelineManager.getPipeline(ctx).layouts;
-        
-        // Setup Sampler
-        const sampler = ctx.device.createSampler({
-            minFilter: "linear",
-            magFilter: "linear",
+        // 2. Create the Bind Group strictly for Model Info (Layout index 1)
+        this.bindGroup = ctx.device.createBindGroup({
+            label: "Mesh_Model_BindGroup",
+            layout: PipelineManager.getModelBindGroupLayout(ctx),
+            entries: [
+                { binding: 0, resource: { buffer: this.modelBuffer } },
+            ],
         });
-
-        const createBindGroup = () => {
-             this.bindGroup = ctx.device.createBindGroup({
-                layout: layouts[1],
-                entries: [
-                    { binding: 0, resource: { buffer: this.modelBuffer } },
-                    { binding: 1, resource: sampler },
-                    { binding: 2, resource: this.texture!.gpuTexture.createView() },
-                ],
-            });
-        }
-        
-        createBindGroup();
-        
-        // If texture isn't fully loaded, recreate bind group when loaded
-        if (this.texture && !this.texture.isLoaded) {
-            this.texture.onUpdate(() => {
-                createBindGroup();
-            });
-        }
     }
 
     public draw(pass: GPURenderPassEncoder): void {
@@ -70,8 +57,11 @@ export class Mesh extends Node3D {
         // Update the Model uniform buffer in GPU memory
         this.ctx.device.queue.writeBuffer(this.modelBuffer, 0, this.worldMatrix.values as any);
 
-        // Bind resources and draw
+        // Bind Model
         pass.setBindGroup(1, this.bindGroup);
+        // Bind Material
+        pass.setBindGroup(2, this.material.getBindGroup(this.ctx));
+        
         pass.setVertexBuffer(0, this.geometry.vertexBuffer);
         pass.setIndexBuffer(this.geometry.indexBuffer, "uint16");
         pass.drawIndexed(this.geometry.indexCount);

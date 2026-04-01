@@ -53,4 +53,43 @@ export class Texture {
 
         return tex;
     }
+
+    public static getDummyWhite(ctx: Context): Texture {
+        const tex = new Texture();
+        tex.url = "dummy_white";
+        tex.gpuTexture = ctx.device.createTexture({
+            size: [1, 1, 1],
+            format: "rgba8unorm",
+            usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT,
+        });
+        const whitePixel = new Uint8Array([255, 255, 255, 255]);
+        ctx.device.queue.writeTexture(
+            { texture: tex.gpuTexture },
+            whitePixel,
+            { bytesPerRow: 4, rowsPerImage: 1 },
+            [1, 1, 1]
+        );
+        tex.isLoaded = true;
+        return tex;
+    }
+
+    // Normal maps treat RGB as XYZ vector mapping. (128, 128, 255) means straight Z.
+    public static getDummyNormal(ctx: Context): Texture {
+        const tex = new Texture();
+        tex.url = "dummy_normal";
+        tex.gpuTexture = ctx.device.createTexture({
+            size: [1, 1, 1],
+            format: "rgba8unorm",
+            usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT,
+        });
+        const normalPixel = new Uint8Array([128, 128, 255, 255]);
+        ctx.device.queue.writeTexture(
+            { texture: tex.gpuTexture },
+            normalPixel,
+            { bytesPerRow: 4, rowsPerImage: 1 },
+            [1, 1, 1]
+        );
+        tex.isLoaded = true;
+        return tex;
+    }
 }

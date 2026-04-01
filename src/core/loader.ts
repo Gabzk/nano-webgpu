@@ -108,10 +108,16 @@ export class Loader {
 	 * @returns The model
 	 */
 	private parseOBJ(text: string) {
-		const vertices: number[] = [];
-		const normals: number[] = [];
-		const uvs: number[] = [];
-		const indices: number[] = [];
+		const inputVertices: number[] = [];
+		const inputNormals: number[] = [];
+		const inputUVs: number[] = [];
+
+		const interleavedVertices: number[] = [];
+		const interleavedIndices: number[] = [];
+
+		// To avoid duplicating identical vertices, use a map of "v/vt/vn" to index
+		const indexMap = new Map<string, number>();
+		let nextIndex = 0;
 
 		const lines = text.split("\n");
 		for (let line of lines) {
@@ -125,33 +131,75 @@ export class Loader {
 
 			switch (type) {
 				case "v":
-					vertices.push(
+					inputVertices.push(
 						parseFloat(parts[1]),
 						parseFloat(parts[2]),
 						parseFloat(parts[3]),
 					);
 					break;
 				case "vn":
-					normals.push(
+					inputNormals.push(
 						parseFloat(parts[1]),
 						parseFloat(parts[2]),
 						parseFloat(parts[3]),
 					);
 					break;
 				case "vt":
-					uvs.push(parseFloat(parts[1]), parseFloat(parts[2]));
+					inputUVs.push(parseFloat(parts[1]), parseFloat(parts[2]));
 					break;
 				case "f": {
 					// Triangulate faces (supports triangulating quads)
 					const faceIndices = [];
 					for (let i = 1; i < parts.length; i++) {
-						const face = parts[i].split("/");
-						faceIndices.push(parseInt(face[0], 10) - 1);
+						const key = parts[i];
+						
+						if (indexMap.has(key)) {
+							faceIndices.push(indexMap.get(key)!);
+						} else {
+							// Parse face component: v/vt/vn
+							const indices = key.split("/");
+							
+							const vIdx = (parseInt(indices[0], 10) - 1) * 3;
+							const vtIdx = indices.length > 1 && indices[1] !== "" ? (parseInt(indices[1], 10) - 1) * 2 : -1;
+							const vnIdx = indices.length > 2 && indices[2] !== "" ? (parseInt(indices[2], 10) - 1) * 3 : -1;
+							
+							// 1. Push position
+							interleavedVertices.push(
+								inputVertices[vIdx] || 0,
+								inputVertices[vIdx + 1] || 0,
+								inputVertices[vIdx + 2] || 0
+							);
+							
+							// 2. Push normal
+							if (vnIdx >= 0 && inputNormals.length > vnIdx) {
+								interleavedVertices.push(
+									inputNormals[vnIdx],
+									inputNormals[vnIdx + 1],
+									inputNormals[vnIdx + 2]
+								);
+							} else {
+								interleavedVertices.push(0, 1, 0); // Default normal
+							}
+							
+							// 3. Push UV
+							if (vtIdx >= 0 && inputUVs.length > vtIdx) {
+								interleavedVertices.push(
+									inputUVs[vtIdx],
+									1.0 - inputUVs[vtIdx + 1] // Invert V for WebGPU
+								);
+							} else {
+								interleavedVertices.push(0, 0); // Default UV
+							}
+							
+							indexMap.set(key, nextIndex);
+							faceIndices.push(nextIndex);
+							nextIndex++;
+						}
 					}
 
 					// Simple convex triangulation (fan-style from the first vertex)
 					for (let i = 1; i < faceIndices.length - 1; i++) {
-						indices.push(faceIndices[0], faceIndices[i], faceIndices[i + 1]);
+						interleavedIndices.push(faceIndices[0], faceIndices[i], faceIndices[i + 1]);
 					}
 					break;
 				}
@@ -159,10 +207,8 @@ export class Loader {
 		}
 
 		return {
-			vertices,
-			normals,
-			uvs,
-			indices,
+			vertices: interleavedVertices,
+			indices: interleavedIndices,
 		};
 	}
 }

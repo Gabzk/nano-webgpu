@@ -92,16 +92,14 @@ export class Context {
 
 	/**
 	 * Runs a render loop
-	 * @param loopFunction Callback function to be called each frame with delta time and total time in seconds.
+	 * @param loopFunction Callback function to be called each frame with delta time.
 	 */
-	public run(loopFunction: (dt: number, time: number) => void): void {
+	public run(loopFunction: (dt: number) => void): void {
 		let lastTime = performance.now();
-		let startTime = lastTime;
 		const frame = (t: number) => {
 			const dt = (t - lastTime) / 1000;
-			const time = (t - startTime) / 1000;
 			lastTime = t;
-			loopFunction(dt, time);
+			loopFunction(dt);
 			requestAnimationFrame(frame);
 		};
 		requestAnimationFrame(frame);
@@ -150,11 +148,12 @@ export class Context {
 		const loader = new Loader(this.device);
 		const modelData = await loader.loadModel(url);
 		
-		// Create a geometry from OBJ data
-		// modelData.vertices, modelData.normals, modelData.uvs
-		// OBJ Loader currently returns them un-interleaved. We need an interleaved format or adapt Geometry
-		// Assume we interleave them or Geometry handles it. For now, pass directly as stub
-		const geometry = new Geometry(this, new Float32Array(), new Uint16Array()); // Needs OBJ Interleaver
+		const geometry = new Geometry(
+			this, 
+			new Float32Array(modelData.vertices), 
+			new Uint16Array(modelData.indices),
+			{ hasUVs: true, hasNormals: true }
+		);
 
 		const mesh = new Mesh(this, { geometry, ...options });
 		if (options.position) mesh.position.copy(Vec3.from(options.position));

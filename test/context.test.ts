@@ -41,7 +41,7 @@ describe("Context", () => {
 
 			expect(Context.isSupported()).toBe(false);
 
-			await expect(context.init(canvas)).rejects.toThrowError(
+			await expect(context.initCanvas(canvas)).rejects.toThrowError(
 				"WebGPU is not supported on this browser.",
 			);
 		});
@@ -60,7 +60,7 @@ describe("Context", () => {
 
 			expect(Context.isSupported()).toBe(true);
 
-			await expect(context.init(canvas)).rejects.toThrowError(
+			await expect(context.initCanvas(canvas)).rejects.toThrowError(
 				"Adapter not found",
 			);
 		});
@@ -98,7 +98,7 @@ describe("Context", () => {
 			expect(Context.isSupported()).toBe(true);
 
 			// Should resolve without errors
-			await expect(context.init(canvas)).resolves.toBeUndefined();
+			await expect(context.initCanvas(canvas)).resolves.toBeUndefined();
 
 			// Verify if the internal properties were set correctly
 			expect(context.device).toBe(mockDevice);

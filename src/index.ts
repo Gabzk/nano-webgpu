@@ -11,4 +11,9 @@ export { Color } from "./math/color";
 export { Vec2 } from "./math/vec2";
 export { Vec3 } from "./math/vec3";
 
+export { Texture } from "./graphics/texture";
+export { Material } from "./graphics/materials/material";
+export { StandardMaterial } from "./graphics/materials/standard-material";
+export { ShaderMaterial } from "./graphics/materials/shader-material";
+
 export const VERSION = "0.1.0";

@@ -15,8 +15,10 @@ export class Scene extends Node {
 
     private depthTexture!: GPUTexture;
     private lightsBuffer!: GPUBuffer;
-    private lightsBindGroup!: GPUBindGroup;
     private maxLights: number = 10;
+    
+    private globalsBindGroup!: GPUBindGroup;
+    private globalsBindGroupDirty: boolean = true;
 
     constructor(ctx: Context) {
         super();
@@ -32,11 +34,7 @@ export class Scene extends Node {
             usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
         });
 
-        const layouts = PipelineManager.getPipeline(ctx).layouts;
-        this.lightsBindGroup = ctx.device.createBindGroup({
-            layout: layouts[2],
-            entries: [{ binding: 0, resource: { buffer: this.lightsBuffer } }],
-        });
+        // We defer BindGroup creation until camera is attached and initialized
     }
 
     private resizeDepthTexture() {
@@ -50,6 +48,7 @@ export class Scene extends Node {
 
     public setCamera(camera: Camera): void {
         this.camera = camera;
+        this.globalsBindGroupDirty = true;
         if (!this.children.includes(camera)) {
             this.add(camera);
         }
@@ -137,13 +136,25 @@ export class Scene extends Node {
         const commandEncoder = this.ctx.device.createCommandEncoder();
         const passEncoder = commandEncoder.beginRenderPass(renderPassDescriptor);
 
-        const { pipeline } = PipelineManager.getPipeline(this.ctx);
-        passEncoder.setPipeline(pipeline);
+        if (this.globalsBindGroupDirty && this.camera.uniformBuffer) {
+            this.globalsBindGroup = this.ctx.device.createBindGroup({
+                label: "Scene_Globals_BindGroup",
+                layout: PipelineManager.getGlobalsBindGroupLayout(this.ctx),
+                entries: [
+                    { binding: 0, resource: { buffer: this.camera.uniformBuffer } },
+                    { binding: 1, resource: { buffer: this.lightsBuffer } },
+                ]
+            });
+            this.globalsBindGroupDirty = false;
+        }
 
-        passEncoder.setBindGroup(0, this.camera.bindGroup!);
-        passEncoder.setBindGroup(2, this.lightsBindGroup);
+        if (this.globalsBindGroup) {
+            passEncoder.setBindGroup(0, this.globalsBindGroup);
+        }
 
         for (const mesh of this.meshes) {
+            // By moving setPipeline here, Standard vs ShaderMaterials can toggle
+            passEncoder.setPipeline(mesh.material.getPipeline(this.ctx));
             mesh.draw(passEncoder); 
         }
 

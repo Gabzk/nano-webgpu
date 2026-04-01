@@ -1,49 +1,56 @@
-import { Context, Scene, Camera, DirectionalLight, PointLight } from "nano-webgpu";
+import { Context, Scene, Camera, DirectionalLight, PointLight, StandardMaterial, Color } from "nano-webgpu";
 
 const ctx = await Context.init("#canvas");
 const scene = new Scene(ctx);
 
-const camera = new Camera();
-camera.enableOrbitControls();
+const camera = new Camera({ position: [0, 1, 5] });
 scene.setCamera(camera);
 
-const floor = ctx.createPlane({
-    size: 1,
-    texture: "./grass.jpg",
-    position: [0, -1, 2]
-});
-scene.add(floor);
+// // 1. Primitive with Default White Material
+// const defaultCube = ctx.createCube({
+//     position: [-2, 0, 0],
+//     scale: 1.0,
+// });
+// scene.add(defaultCube);
 
-// Criação baseada em primivitivas direta no ctx
-const crate = ctx.createCube({
-    size: 1.0,
-    texture: "./grass.jpg",
-    position: [-2, 0, 0]
-});
-scene.add(crate);
+// 2. Primitive with PBR Shiny Red Material
+// const shinyRedMaterial = new StandardMaterial({
+//     albedoColor: "#ff0000",
+//     roughness: 0.8,
+//     metallic: 0.8
+// });
+// const shinyCube = ctx.createCube({
+//     position: [0, 0, 0],
+//     scale: 1.0,
+//     material: shinyRedMaterial
+// });
+// scene.add(shinyCube);
 
-const cube = ctx.createCube({
-    size: 1.0,
-    texture: "./grass.jpg",
-    position: [2, 0, 0]
+// 3. Loaded OBJ with Full PBR Material
+const crateMesh = await ctx.loadMesh(`./assets/crate/source/Wood_Box.obj`, {
+    material: new StandardMaterial({
+        albedoTexture: "./assets/crate/textures/Wood_Box_low_DefaultMaterial_BaseColor.png",
+        normalTexture: "./assets/crate/textures/Wood_Box_low_DefaultMaterial_Normal.png",
+        roughnessTexture: "./assets/crate/textures/Wood_Box_low_DefaultMaterial_Roughness.png",
+        metallicTexture: "./assets/crate/textures/Wood_Box_low_DefaultMaterial_Metallic.png"
+    }),
+    position: [0, 0, 0],
+    scale: 0.5,
 });
-scene.add(cube);
+scene.add(crateMesh);
 
-// Luzes com direções em array (Vec3 auto) e cores hexadecimais diretas
-scene.addLight(new DirectionalLight({
-    direction: [-1, -2, -1],
-    color: "#ffd0b0",
-    intensity: 1
-}));
 
 scene.addLight(new PointLight({
-    position: [0, 1, 0],
-    color: "#3498db"
+    position: [0, 2, 0],
+    color: "#ffffff",
+    intensity: 1.0
 }));
 
-// Animação muito mais natural usando propriedades de transformação
-ctx.run((dt, time) => {
-    crate.rotation.y = time;
-    cube.rotation.y = -time;
+ctx.run((dt) => {
+    // defaultCube.rotation.y += 0.5 * dt;
+    // shinyCube.rotation.y += 0.5 * dt;
+    // shinyCube.rotation.x += 0.3 * dt;
+    crateMesh.rotation.y += 0.5 * dt;
+    
     scene.render();
 });

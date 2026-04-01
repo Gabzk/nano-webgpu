@@ -48,12 +48,8 @@ export class Camera extends Node3D {
             size: 64, // mat4x4
             usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
         });
-
-        const layouts = PipelineManager.getPipeline(ctx).layouts;
-        this.bindGroup = ctx.device.createBindGroup({
-            layout: layouts[0],
-            entries: [{ binding: 0, resource: { buffer: this.uniformBuffer } }],
-        });
+        
+        // Note: BindGroup is now managed by Scene (Group 0: Globals) combining Camera + Lights
     }
 
     public updateProjection(): void {
