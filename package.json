@@ -12,7 +12,7 @@
 		}
 	},
 	"scripts": {
-		"dev": "vite",
+		"dev": "BROWSER=google-chrome vite",
 		"build": "rollup -c",
 		"test": "vitest",
 		"test:run": "vitest run",
