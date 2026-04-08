@@ -34,6 +34,43 @@ export class Node3D extends Node {
         this.isDirty = true;
     }
 
+    private _rotationDegreesProxy?: Vec3;
+
+    /**
+     * Godot-Style syntactic sugar! Gets or sets the rotation of the node in DEGREES (0 to 360).
+     */
+    get rotationDegrees(): Vec3 {
+        if (!this._rotationDegreesProxy) {
+            this._rotationDegreesProxy = new Proxy(new Vec3(), {
+                get: (target, prop, receiver) => {
+                    if (prop === 'x') return this._rotation.x * (180 / Math.PI);
+                    if (prop === 'y') return this._rotation.y * (180 / Math.PI);
+                    if (prop === 'z') return this._rotation.z * (180 / Math.PI);
+                    return Reflect.get(target, prop, receiver);
+                },
+                set: (target, prop, value, receiver) => {
+                    let dirty = false;
+                    if (prop === 'x') { this._rotation.x = value * (Math.PI / 180); dirty = true; }
+                    else if (prop === 'y') { this._rotation.y = value * (Math.PI / 180); dirty = true; }
+                    else if (prop === 'z') { this._rotation.z = value * (Math.PI / 180); dirty = true; }
+                    else { Reflect.set(target, prop, value, receiver); }
+                    
+                    if (dirty) this.isDirty = true;
+                    return true;
+                }
+            });
+        }
+        return this._rotationDegreesProxy;
+    }
+
+    set rotationDegrees(val: Vec3 | number[]) {
+        const v = Vec3.from(val as any);
+        this._rotation.x = v.x * (Math.PI / 180);
+        this._rotation.y = v.y * (Math.PI / 180);
+        this._rotation.z = v.z * (Math.PI / 180);
+        this.isDirty = true;
+    }
+
     /**
      * Gets or sets the scale of the node.
      */

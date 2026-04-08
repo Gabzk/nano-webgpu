@@ -8,10 +8,12 @@ export class Geometry {
     public hasUVs: boolean = false;
     public hasNormals: boolean = false;
 
+    public indexFormat: GPUIndexFormat = "uint16";
+
     constructor(
         ctx: Context,
         vertices: Float32Array,
-        indices: Uint16Array,
+        indices: Uint16Array | Uint32Array,
         options: { hasUVs?: boolean; hasNormals?: boolean } = {}
     ) {
         this.hasUVs = options.hasUVs ?? false;
@@ -24,6 +26,7 @@ export class Geometry {
         const stride = 3 + (this.hasUVs ? 2 : 0) + (this.hasNormals ? 3 : 0);
         this.vertexCount = vertices.length / stride;
         this.indexCount = indices.length;
+        this.indexFormat = (indices instanceof Uint32Array) ? "uint32" : "uint16";
 
         // Create Vertex Buffer
         this.vertexBuffer = ctx.device.createBuffer({

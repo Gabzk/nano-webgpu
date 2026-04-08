@@ -380,4 +380,21 @@ export class Mat4 {
 
         return this;
     }
+
+    /**
+     * Transforms a directional vector by this matrix (ignoring translation)
+     * @param {Vec3} dir - The direction vector to transform
+     * @param {Vec3} [out] - Optional vector to store the result
+     * @returns {Vec3} The transformed direction vector
+     */
+    public transformDirection(dir: Vec3, out: Vec3 = new Vec3()): Vec3 {
+        const x = dir.x, y = dir.y, z = dir.z;
+        const v = this.values;
+        
+        out.x = x * v[0] + y * v[4] + z * v[8];
+        out.y = x * v[1] + y * v[5] + z * v[9];
+        out.z = x * v[2] + y * v[6] + z * v[10];
+        
+        return out.normalize();
+    }
 }

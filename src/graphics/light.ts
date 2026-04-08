@@ -5,10 +5,12 @@ import { Color } from "../math/color";
 export interface LightOptions {
     color?: Color | string | number[];
     intensity?: number;
+    position?: Vec3 | number[];
+    rotation?: Vec3 | number[];
+    rotationDegrees?: Vec3 | number[];
 }
 
 export interface DirectionalLightOptions extends LightOptions {
-    direction?: Vec3 | number[];
 }
 
 export interface PointLightOptions extends LightOptions {
@@ -28,11 +30,8 @@ export class Light extends Node3D {
 }
 
 export class DirectionalLight extends Light {
-    public direction: Vec3;
-
     constructor(options: DirectionalLightOptions = {}) {
         super(options);
-        this.direction = Vec3.from(options.direction ?? [-1, -1, -1]).normalize();
     }
 }
 

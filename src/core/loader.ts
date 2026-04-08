@@ -97,9 +97,192 @@ export class Loader {
 		if (!response.ok) {
 			throw new Error(`Failed to load model: ${url} (HTTP ${response.status})`);
 		}
-		const text = await response.text();
 
-		return this.parseOBJ(text);
+		if (url.endsWith(".gltf") || url.endsWith(".glb")) {
+			return this.parseGLTF(url, response);
+		} else {
+			const text = await response.text();
+			return this.parseOBJ(text);
+		}
+	}
+
+	/**
+	 * Parse a GLTF/GLB model
+	 */
+	private async parseGLTF(url: string, response: Response) {
+		let jsonStr: string;
+		let binBuffer: ArrayBuffer | null = null;
+
+		if (url.endsWith(".glb")) {
+			const arrayBuffer = await response.arrayBuffer();
+			const dataView = new DataView(arrayBuffer);
+			const magic = dataView.getUint32(0, true);
+			if (magic !== 0x46546C67) throw new Error("Invalid GLB magic");
+			
+			const jsonChunkLength = dataView.getUint32(12, true);
+			const jsonBytes = new Uint8Array(arrayBuffer, 20, jsonChunkLength);
+			jsonStr = new TextDecoder().decode(jsonBytes);
+
+			const binOffset = 20 + jsonChunkLength;
+			if (arrayBuffer.byteLength > binOffset) {
+				const binChunkLength = dataView.getUint32(binOffset, true);
+				binBuffer = arrayBuffer.slice(binOffset + 8, binOffset + 8 + binChunkLength);
+			}
+		} else {
+			jsonStr = await response.text();
+		}
+
+		const gltf = JSON.parse(jsonStr);
+		const baseUrl = url.substring(0, url.lastIndexOf("/") + 1);
+
+		// Load external buffers
+		const buffers: ArrayBuffer[] = [];
+		if (gltf.buffers) {
+			for (let i = 0; i < gltf.buffers.length; i++) {
+				if (i === 0 && binBuffer) {
+					buffers.push(binBuffer);
+					continue;
+				}
+				const b = gltf.buffers[i];
+				if (b.uri && !b.uri.startsWith("data:")) {
+					buffers.push(await (await fetch(baseUrl + b.uri)).arrayBuffer());
+				} else if (b.uri && b.uri.startsWith("data:")) {
+					const data = b.uri.split(",")[1];
+					const binary = atob(data);
+					const ab = new ArrayBuffer(binary.length);
+					const view = new Uint8Array(ab);
+					for (let j = 0; j < binary.length; j++) {
+						view[j] = binary.charCodeAt(j);
+					}
+					buffers.push(ab);
+				}
+			}
+		}
+
+		// Helper to extract typed arrays handling byteStride
+		const getAccessorData = (accessorIdx: number) => {
+			const accessor = gltf.accessors[accessorIdx];
+			const bufferView = gltf.bufferViews[accessor.bufferView];
+			const buffer = buffers[bufferView.buffer];
+			const byteOffset = (bufferView.byteOffset || 0) + (accessor.byteOffset || 0);
+			const stride = bufferView.byteStride || 0;
+			
+			let numComponents = 1;
+			if (accessor.type === "VEC2") numComponents = 2;
+			else if (accessor.type === "VEC3") numComponents = 3;
+			else if (accessor.type === "VEC4") numComponents = 4;
+			
+			const dataView = new DataView(buffer);
+			const count = accessor.count;
+			const output = new Float32Array(count * numComponents);
+			
+			let elementSize = 4; // default Float32
+			if (accessor.componentType === 5123) elementSize = 2;
+
+			const effectiveStride = stride > 0 ? stride : numComponents * elementSize;
+
+			for (let i = 0; i < count; i++) {
+				for (let c = 0; c < numComponents; c++) {
+					const offset = byteOffset + i * effectiveStride + c * elementSize;
+					if (accessor.componentType === 5126) {
+						output[i * numComponents + c] = dataView.getFloat32(offset, true);
+					} else if (accessor.componentType === 5123) {
+						output[i * numComponents + c] = dataView.getUint16(offset, true);
+					} else if (accessor.componentType === 5125) {
+						// Using Float32Array as output container so downcast
+						output[i * numComponents + c] = dataView.getUint32(offset, true);
+					}
+				}
+			}
+			return { array: output, count };
+		};
+
+		const outVertices: number[] = [];
+		const outIndices: number[] = [];
+		let indexOffset = 0;
+
+		for (const mesh of (gltf.meshes || [])) {
+			for (const prim of mesh.primitives) {
+				if (prim.attributes.POSITION === undefined) continue;
+
+				const posData = getAccessorData(prim.attributes.POSITION);
+				let normData = prim.attributes.NORMAL !== undefined ? getAccessorData(prim.attributes.NORMAL) : null;
+				let uvData = prim.attributes.TEXCOORD_0 !== undefined ? getAccessorData(prim.attributes.TEXCOORD_0) : null;
+				
+				for (let i = 0; i < posData.count; i++) {
+					outVertices.push(posData.array[i * 3], posData.array[i * 3 + 1], posData.array[i * 3 + 2]);
+					
+					if (normData) {
+						outVertices.push(normData.array[i * 3], normData.array[i * 3 + 1], normData.array[i * 3 + 2]);
+					} else outVertices.push(0, 1, 0);
+
+					if (uvData) {
+						outVertices.push(uvData.array[i * 2], uvData.array[i * 2 + 1]);
+					} else outVertices.push(0, 0);
+				}
+
+				if (prim.indices !== undefined) {
+					const indData = getAccessorData(prim.indices);
+					for (let i = 0; i < indData.count; i++) {
+						outIndices.push(indData.array[i] + indexOffset);
+					}
+				} else {
+					for (let i = 0; i < posData.count; i++) outIndices.push(i + indexOffset);
+				}
+				
+				indexOffset += posData.count;
+			}
+		}
+
+		// Material extraction
+		let parsedMaterial: any = null;
+		if (gltf.materials && gltf.materials.length > 0) {
+			const mat = gltf.materials[0];
+			parsedMaterial = {};
+			
+			const getTexUri = (texRef: any) => {
+				if (texRef === undefined) return null;
+				const texture = gltf.textures[texRef.index];
+				if (!texture) return null;
+				const image = gltf.images[texture.source];
+				
+				if (image.uri) return baseUrl + image.uri;
+                
+				if (image.bufferView !== undefined) {
+					const bv = gltf.bufferViews[image.bufferView];
+					const buffer = buffers[bv.buffer];
+					const byteOffset = bv.byteOffset || 0;
+					const byteLength = bv.byteLength;
+					const slice = buffer.slice(byteOffset, byteOffset + byteLength);
+					const blob = new Blob([slice], { type: image.mimeType || 'image/png' });
+					return URL.createObjectURL(blob);
+				}
+				
+				return null;
+			};
+
+			if (mat.pbrMetallicRoughness) {
+				const bc = getTexUri(mat.pbrMetallicRoughness.baseColorTexture);
+				if (bc) parsedMaterial.albedoTexture = bc;
+				
+				const mr = getTexUri(mat.pbrMetallicRoughness.metallicRoughnessTexture);
+				if (mr) {
+					parsedMaterial.metallicTexture = mr;
+					parsedMaterial.roughnessTexture = mr;
+				}
+			}
+			const norm = getTexUri(mat.normalTexture);
+			if (norm) parsedMaterial.normalTexture = norm;
+			
+			const occ = getTexUri(mat.occlusionTexture);
+			if (occ) parsedMaterial.aoTexture = occ;
+		}
+
+		return {
+			vertices: outVertices,
+			indices: outIndices,
+			materialOptions: parsedMaterial
+		};
 	}
 
 	/**
@@ -209,6 +392,7 @@ export class Loader {
 		return {
 			vertices: interleavedVertices,
 			indices: interleavedIndices,
+            materialOptions: undefined
 		};
 	}
 }

@@ -20,7 +20,11 @@ export class Mesh extends Node3D {
         this.geometry = options.geometry;
 
         if (options.material) {
-            this.material = options.material;
+            if (options.material instanceof Material) {
+                this.material = options.material;
+            } else {
+                this.material = new StandardMaterial(options.material as any);
+            }
         } else if (options.texture) {
             // Legacy shorthand approach: convert texture automatically to Standard Material
             let tex: Texture;
@@ -63,7 +67,7 @@ export class Mesh extends Node3D {
         pass.setBindGroup(2, this.material.getBindGroup(this.ctx));
         
         pass.setVertexBuffer(0, this.geometry.vertexBuffer);
-        pass.setIndexBuffer(this.geometry.indexBuffer, "uint16");
+        pass.setIndexBuffer(this.geometry.indexBuffer, this.geometry.indexFormat);
         pass.drawIndexed(this.geometry.indexCount);
     }
 }

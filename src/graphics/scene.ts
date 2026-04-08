@@ -5,6 +5,9 @@ import { Mesh } from "./mesh";
 import { Context } from "../core/context";
 import { Color } from "../math/color";
 import { PipelineManager } from "./pipeline";
+import { Material } from "./materials/material";
+import { StandardMaterial } from "./materials/standard-material";
+import { Vec3 } from "../math/vec3";
 
 export class Scene extends Node {
     public ctx: Context;
@@ -19,6 +22,7 @@ export class Scene extends Node {
     
     private globalsBindGroup!: GPUBindGroup;
     private globalsBindGroupDirty: boolean = true;
+    public defaultDir: string = "";
 
     constructor(ctx: Context) {
         super();
@@ -46,18 +50,110 @@ export class Scene extends Node {
         });
     }
 
-    public setCamera(camera: Camera): void {
-        this.camera = camera;
-        this.globalsBindGroupDirty = true;
-        if (!this.children.includes(camera)) {
-            this.add(camera);
+    public static async init(selector: string | HTMLCanvasElement): Promise<Scene> {
+        const ctx = await Context.init(selector);
+        return new Scene(ctx);
+    }
+
+    public setDefaultDir(dir: string): void {
+        this.defaultDir = dir;
+        if (this.defaultDir && !this.defaultDir.endsWith('/')) {
+            this.defaultDir += '/';
         }
     }
 
-    public addLight(light: Light): void {
+    public setCamera(cameraOrOptions: Camera | any): Camera {
+        if (cameraOrOptions instanceof Camera) {
+            this.camera = cameraOrOptions;
+        } else {
+            this.camera = new Camera(cameraOrOptions);
+            if (cameraOrOptions.position) this.camera.position.set(cameraOrOptions.position[0], cameraOrOptions.position[1], cameraOrOptions.position[2]);
+        }
+        
+        this.globalsBindGroupDirty = true;
+        if (!this.children.includes(this.camera)) {
+            this.add(this.camera);
+        }
+        return this.camera;
+    }
+
+    public addLight(options: any | Light): Light {
+        let light: Light;
+        if (options instanceof Light) {
+            light = options;
+        } else {
+            if (options.type === 'point') {
+                light = new PointLight();
+            } else {
+                light = new DirectionalLight();
+            }
+            if (options.color) light.color = Color.fromHex(options.color);
+            if (options.intensity !== undefined) light.intensity = options.intensity;
+            if (options.position) light.position.set(options.position[0], options.position[1], options.position[2]);
+            if (options.rotation) light.rotation.copy(Vec3.from(options.rotation));
+            if (options.rotationDegrees) light.rotationDegrees = options.rotationDegrees;
+        }
         this.lights.push(light);
         this.add(light);
+        return light;
     }
+
+    private parseMaterialOptions(options: any): any {
+        if (!options) return options;
+        
+        let parsedOptions = { ...options };
+        
+        if (parsedOptions.color && !parsedOptions.material) {
+            parsedOptions.material = { albedoColor: parsedOptions.color };
+        }
+
+        if (parsedOptions.material && !(parsedOptions.material instanceof Material)) {
+            let matProps = { ...parsedOptions.material };
+            if (this.defaultDir) {
+                if (typeof matProps.albedoTexture === 'string') matProps.albedoTexture = this.defaultDir + matProps.albedoTexture;
+                if (typeof matProps.normalTexture === 'string') matProps.normalTexture = this.defaultDir + matProps.normalTexture;
+                if (typeof matProps.roughnessTexture === 'string') matProps.roughnessTexture = this.defaultDir + matProps.roughnessTexture;
+                if (typeof matProps.metallicTexture === 'string') matProps.metallicTexture = this.defaultDir + matProps.metallicTexture;
+                if (typeof matProps.aoTexture === 'string') matProps.aoTexture = this.defaultDir + matProps.aoTexture;
+                if (typeof matProps.ormTexture === 'string') matProps.ormTexture = this.defaultDir + matProps.ormTexture;
+            }
+            parsedOptions.material = new StandardMaterial(matProps);
+        }
+        
+        return parsedOptions;
+    }
+
+    public async addMesh(url: string, options: any = {}): Promise<Mesh> {
+        let finalUrl = this.defaultDir ? this.defaultDir + url : url;
+        let parsedOptions = this.parseMaterialOptions(options);
+        
+        const mesh = await this.ctx.loadMesh(finalUrl, parsedOptions);
+        this.add(mesh);
+        return mesh;
+    }
+
+    public addCube(options: any = {}): Mesh {
+        let parsedOptions = this.parseMaterialOptions(options);
+        const mesh = this.ctx.createCube(parsedOptions);
+        this.add(mesh);
+        return mesh;
+    }
+
+    public addSphere(options: any = {}): Mesh {
+        let parsedOptions = this.parseMaterialOptions(options);
+        const mesh = this.ctx.createSphere(parsedOptions);
+        this.add(mesh);
+        return mesh;
+    }
+
+    public addPlane(options: any = {}): Mesh {
+        let parsedOptions = this.parseMaterialOptions(options);
+        const mesh = this.ctx.createPlane(parsedOptions);
+        this.add(mesh);
+        return mesh;
+    }
+
+
 
     public override add(node: Node): void {
         super.add(node);
@@ -78,9 +174,13 @@ export class Scene extends Node {
             const offset = 4 + (i * 8);
             
             if (light instanceof DirectionalLight) {
-                floatData[offset + 0] = light.direction.x;
-                floatData[offset + 1] = light.direction.y;
-                floatData[offset + 2] = light.direction.z;
+                // Na Godot, luzes direcionais projetam sombra para trás de sua "frente" (Eixo local -Z)
+                const baseLocalAxis = new Vec3(0, 0, -1);
+                const finalDirection = light.worldMatrix.transformDirection(baseLocalAxis);
+                
+                floatData[offset + 0] = finalDirection.x;
+                floatData[offset + 1] = finalDirection.y;
+                floatData[offset + 2] = finalDirection.z;
                 floatData[offset + 3] = 0.0; // 0.0 = Directional
             } else if (light instanceof PointLight) {
                 const pos = light.worldMatrix.values; // Translation is at 12, 13, 14
@@ -100,7 +200,18 @@ export class Scene extends Node {
         this.ctx.device.queue.writeBuffer(this.lightsBuffer, 0, floatData);
     }
 
-    public render(): void {
+    public render(loopCallback?: (dt: number) => void): void {
+        if (loopCallback) {
+            this.ctx.run((dt) => {
+                loopCallback(dt);
+                this._renderFrame();
+            });
+        } else {
+            this._renderFrame();
+        }
+    }
+
+    private _renderFrame(): void {
         if (!this.camera) return;
 
         // Ensure camera buffers exist before matrices are calculated

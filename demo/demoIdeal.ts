@@ -1,37 +1,32 @@
-import { Context, Scene, Camera, DirectionalLight, PointLight, StandardMaterial, Color } from "nano-webgpu";
+import { Scene } from "nano-webgpu";
 
-// Tentar esconder o Context dentro do scene
-const scene = new Scene("#canvas");
+// Inicializando o WebGPU e a Scene de uma vez só (mantive o await para evitar engasgos no runtime)
+const scene = await Scene.init("#canvas");
 
-// Tentar configurar a camera direto na scene mas mantendo a opção de setar ela por fora e depois mandar pra cena
-const camera = scene.setCamera({ position: [0, 1, 5] });
+// Configurando a câmera com atributos simples
+const camera = scene.setCamera({ position: [0, 2, 5] });
 
-// Ver se tem como definir um diretorio pros assets da scene para diminuir o tamanho da importação
-scene.setDefaultDir("./assets/crate/")
+// scene.setDefaultDir("./assets/shiba");
 
-// Ver se existe algum jeito de esconder o Await
-const crateMesh = await scene.addMesh(`source/Wood_Box.obj`, {
-    // shaderMaterial: "./shaders/shaderCustomizado.wgsl", Infere shaderMaterial
-    material: { // Infere o standardMaterial
-        albedoTexture: "textures/Wood_Box_low_DefaultMaterial_BaseColor.png",
-        normalTexture: "textures/Wood_Box_low_DefaultMaterial_Normal.png",
-        roughnessTexture: "textures/Wood_Box_low_DefaultMaterial_Roughness.png",
-        metallicTexture: "textures/Wood_Box_low_DefaultMaterial_Metallic.png"
-    },
+scene.addPlane({
+    position: [0, -1.5, -3],
+    scale: 10,
+    color: "#453232",
+})
+
+// Adicionando Mesh do GLTF nativamente (Materiais serão auto-inferidos visualmente)
+const shiba = await scene.addMesh(`./assets/shiba.glb`, {
     position: [0, 0, 0],
-    scale: 0.5,
+    scale: 1,
+    rotation: [-1.5, 0.5, 0] // em radianos
 });
 
-// Adicionar formas primitivas direto na cena recebendo interface SphereOptions ou algo do tipo.
-const sphere = scene.addSphere({ position: [0, 0, 0], scale: 0.5 });
+// Adicionando luzes via opções fáceis
+const dirLight = scene.addLight({ type: 'directional', rotationDegrees: [-45, 45, 0], color: "#ffffff", intensity: 1 });
+scene.addLight({ type: 'point', position: [2, 1, 0], color: "#ffffff", intensity: 1 });
 
-// Mesma coisa aqui só que padronizando o scene.addSomething e passando o tipo de luz no Options
-scene.addLight({ type: 'directional', direction: [1, -2, 0], color: "#ffffff", intensity: 0.5 });
-
-// Simplificar de ctx.run((dt) => {scene.render()}) para isso.
+// Loop de renderização totalmente gerenciado pela Scene
 scene.render((dt) => {
-    // defaultCube.rotation.y += 0.5 * dt;
-    // shinyCube.rotation.y += 0.5 * dt;
-    // shinyCube.rotation.x += 0.3 * dt;
-    // crateMesh.rotation.y += 0.5 * dt;
+    // Agora giramos a luz igual fazemos no Node3D da Godot Engine!
+    dirLight.rotationDegrees.y += 90 * dt; 
 });
