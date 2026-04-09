@@ -1,8 +1,12 @@
-import { Loader } from "./loader";
-import { Mesh } from "../graphics/mesh";
 import { Geometry } from "../graphics/geometry";
-import { createCubeGeometry, createPlaneGeometry, createSphereGeometry } from "../graphics/primitives";
+import { Mesh } from "../graphics/mesh";
+import {
+	createCubeGeometry,
+	createPlaneGeometry,
+	createSphereGeometry,
+} from "../graphics/primitives";
 import { Vec3 } from "../math/vec3";
+import { Loader } from "./loader";
 
 /**
  * @module Context
@@ -44,7 +48,9 @@ export class Context {
 	 * @param {string | HTMLCanvasElement} selector
 	 * @returns {Promise<Context>} A fully initialized Context
 	 */
-	public static async init(selector: string | HTMLCanvasElement): Promise<Context> {
+	public static async init(
+		selector: string | HTMLCanvasElement,
+	): Promise<Context> {
 		let canvas: HTMLCanvasElement;
 		if (typeof selector === "string") {
 			const el = document.querySelector(selector);
@@ -97,24 +103,25 @@ export class Context {
 	public run(loopFunction: (dt: number) => void): void {
 		let lastTime = performance.now();
 		const frame = (t: number) => {
+			requestAnimationFrame(frame);
 			const dt = (t - lastTime) / 1000;
 			lastTime = t;
 			loopFunction(dt);
-			requestAnimationFrame(frame);
 		};
 		requestAnimationFrame(frame);
 	}
 
 	// ------------- Factory Methods for Primitives -------------
 	// Added to fulfill the 'nano' API abstraction requirements.
-	
+
 	// Basic geometry cache
 	private defaultGeometries: Record<string, any> = {};
 
 	private applyTransformOptions(mesh: Mesh, options: any) {
 		if (options.position) mesh.position.copy(Vec3.from(options.position));
 		if (options.scale !== undefined) {
-			if (typeof options.scale === "number") mesh.scale.set(options.scale, options.scale, options.scale);
+			if (typeof options.scale === "number")
+				mesh.scale.set(options.scale, options.scale, options.scale);
 			else mesh.scale.copy(Vec3.from(options.scale));
 		}
 		if (options.rotation) mesh.rotation.copy(Vec3.from(options.rotation));
@@ -123,9 +130,12 @@ export class Context {
 
 	public createCube(options: any): any {
 		if (!this.defaultGeometries["cube"]) {
-			this.defaultGeometries["cube"] = createCubeGeometry(this, options.size || 1.0);
+			this.defaultGeometries["cube"] = createCubeGeometry(
+				this,
+				options.size || 1.0,
+			);
 		}
-		
+
 		options.geometry = this.defaultGeometries["cube"];
 		const mesh = new Mesh(this, options);
 		this.applyTransformOptions(mesh, options);
@@ -134,9 +144,13 @@ export class Context {
 
 	public createPlane(options: any): any {
 		if (!this.defaultGeometries["plane"]) {
-			this.defaultGeometries["plane"] = createPlaneGeometry(this, options.width || 1.0, options.height || 1.0);
+			this.defaultGeometries["plane"] = createPlaneGeometry(
+				this,
+				options.width || 1.0,
+				options.height || 1.0,
+			);
 		}
-		
+
 		options.geometry = this.defaultGeometries["plane"];
 		const mesh = new Mesh(this, options);
 		this.applyTransformOptions(mesh, options);
@@ -145,9 +159,14 @@ export class Context {
 
 	public createSphere(options: any): any {
 		if (!this.defaultGeometries["sphere"]) {
-			this.defaultGeometries["sphere"] = createSphereGeometry(this, options.radius || 1.0, options.segments || 16, options.segments || 16);
+			this.defaultGeometries["sphere"] = createSphereGeometry(
+				this,
+				options.radius || 1.0,
+				options.segments || 16,
+				options.segments || 16,
+			);
 		}
-		
+
 		options.geometry = this.defaultGeometries["sphere"];
 		const mesh = new Mesh(this, options);
 		this.applyTransformOptions(mesh, options);
@@ -157,34 +176,38 @@ export class Context {
 	public async loadMesh(url: string, options: any): Promise<any> {
 		const loader = new Loader(this.device);
 		const modelData = await loader.loadModel(url);
-		
+
 		const vertexCount = modelData.vertices.length / 8; // 8 floats per vertex (pos: 3, norm: 3, uv: 2)
-		const optimalIndicesArray = vertexCount > 65535 
-			? new Uint32Array(modelData.indices) 
-			: new Uint16Array(modelData.indices);
+		const optimalIndicesArray =
+			vertexCount > 65535
+				? new Uint32Array(modelData.indices)
+				: new Uint16Array(modelData.indices);
 
 		const geometry = new Geometry(
-			this, 
-			new Float32Array(modelData.vertices), 
+			this,
+			new Float32Array(modelData.vertices),
 			optimalIndicesArray,
-			{ hasUVs: true, hasNormals: true }
+			{ hasUVs: true, hasNormals: true },
 		);
 
-		let finalOptions = { ...options };
+		const finalOptions = { ...options };
 		if (!finalOptions.material && modelData.materialOptions) {
 			finalOptions.material = modelData.materialOptions; // Scene already parses this to StandardMaterial if handled through Scene
-            // Wait, Context.loadMesh could be called directly and users expect Mesh.material to be set or StandardMaterial directly.
-            // Let's ensure it's a StandardMaterial if it's not handled by scene:
-            if (typeof finalOptions.material !== 'object' || !(finalOptions.material as any).isMaterial) {
-                // To avoid importing StandardMaterial here, scene actually already parses the object into StandardMaterial correctly if called from Scene.
-                // But if they call ctx.loadMesh directly, it should be parsed. Let's just assign it and Mesh constructor handles it.
+			// Wait, Context.loadMesh could be called directly and users expect Mesh.material to be set or StandardMaterial directly.
+			// Let's ensure it's a StandardMaterial if it's not handled by scene:
+			if (
+				typeof finalOptions.material !== "object" ||
+				!(finalOptions.material as any).isMaterial
+			) {
+				// To avoid importing StandardMaterial here, scene actually already parses the object into StandardMaterial correctly if called from Scene.
+				// But if they call ctx.loadMesh directly, it should be parsed. Let's just assign it and Mesh constructor handles it.
 				// Wait! Mesh constructor currently creates basic standard material if not provided!
-            }
+			}
 		}
 
 		const mesh = new Mesh(this, { geometry, ...finalOptions });
 		this.applyTransformOptions(mesh, finalOptions);
-		
+
 		return mesh;
 	}
 }

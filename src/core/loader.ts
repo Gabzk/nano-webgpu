@@ -66,8 +66,8 @@ export class Loader {
 		const usage =
 			options.usage ??
 			GPUTextureUsage.TEXTURE_BINDING |
-			GPUTextureUsage.COPY_DST |
-			GPUTextureUsage.RENDER_ATTACHMENT;
+				GPUTextureUsage.COPY_DST |
+				GPUTextureUsage.RENDER_ATTACHMENT;
 
 		// Create texture on gpu device with the same size of image bitmap
 		const texture = this.device.createTexture({
@@ -117,8 +117,8 @@ export class Loader {
 			const arrayBuffer = await response.arrayBuffer();
 			const dataView = new DataView(arrayBuffer);
 			const magic = dataView.getUint32(0, true);
-			if (magic !== 0x46546C67) throw new Error("Invalid GLB magic");
-			
+			if (magic !== 0x46546c67) throw new Error("Invalid GLB magic");
+
 			const jsonChunkLength = dataView.getUint32(12, true);
 			const jsonBytes = new Uint8Array(arrayBuffer, 20, jsonChunkLength);
 			jsonStr = new TextDecoder().decode(jsonBytes);
@@ -126,7 +126,10 @@ export class Loader {
 			const binOffset = 20 + jsonChunkLength;
 			if (arrayBuffer.byteLength > binOffset) {
 				const binChunkLength = dataView.getUint32(binOffset, true);
-				binBuffer = arrayBuffer.slice(binOffset + 8, binOffset + 8 + binChunkLength);
+				binBuffer = arrayBuffer.slice(
+					binOffset + 8,
+					binOffset + 8 + binChunkLength,
+				);
 			}
 		} else {
 			jsonStr = await response.text();
@@ -164,18 +167,19 @@ export class Loader {
 			const accessor = gltf.accessors[accessorIdx];
 			const bufferView = gltf.bufferViews[accessor.bufferView];
 			const buffer = buffers[bufferView.buffer];
-			const byteOffset = (bufferView.byteOffset || 0) + (accessor.byteOffset || 0);
+			const byteOffset =
+				(bufferView.byteOffset || 0) + (accessor.byteOffset || 0);
 			const stride = bufferView.byteStride || 0;
-			
+
 			let numComponents = 1;
 			if (accessor.type === "VEC2") numComponents = 2;
 			else if (accessor.type === "VEC3") numComponents = 3;
 			else if (accessor.type === "VEC4") numComponents = 4;
-			
+
 			const dataView = new DataView(buffer);
 			const count = accessor.count;
 			const output = new Float32Array(count * numComponents);
-			
+
 			let elementSize = 4; // default Float32
 			if (accessor.componentType === 5123) elementSize = 2;
 
@@ -201,19 +205,33 @@ export class Loader {
 		const outIndices: number[] = [];
 		let indexOffset = 0;
 
-		for (const mesh of (gltf.meshes || [])) {
+		for (const mesh of gltf.meshes || []) {
 			for (const prim of mesh.primitives) {
 				if (prim.attributes.POSITION === undefined) continue;
 
 				const posData = getAccessorData(prim.attributes.POSITION);
-				let normData = prim.attributes.NORMAL !== undefined ? getAccessorData(prim.attributes.NORMAL) : null;
-				let uvData = prim.attributes.TEXCOORD_0 !== undefined ? getAccessorData(prim.attributes.TEXCOORD_0) : null;
-				
+				const normData =
+					prim.attributes.NORMAL !== undefined
+						? getAccessorData(prim.attributes.NORMAL)
+						: null;
+				const uvData =
+					prim.attributes.TEXCOORD_0 !== undefined
+						? getAccessorData(prim.attributes.TEXCOORD_0)
+						: null;
+
 				for (let i = 0; i < posData.count; i++) {
-					outVertices.push(posData.array[i * 3], posData.array[i * 3 + 1], posData.array[i * 3 + 2]);
-					
+					outVertices.push(
+						posData.array[i * 3],
+						posData.array[i * 3 + 1],
+						posData.array[i * 3 + 2],
+					);
+
 					if (normData) {
-						outVertices.push(normData.array[i * 3], normData.array[i * 3 + 1], normData.array[i * 3 + 2]);
+						outVertices.push(
+							normData.array[i * 3],
+							normData.array[i * 3 + 1],
+							normData.array[i * 3 + 2],
+						);
 					} else outVertices.push(0, 1, 0);
 
 					if (uvData) {
@@ -227,9 +245,10 @@ export class Loader {
 						outIndices.push(indData.array[i] + indexOffset);
 					}
 				} else {
-					for (let i = 0; i < posData.count; i++) outIndices.push(i + indexOffset);
+					for (let i = 0; i < posData.count; i++)
+						outIndices.push(i + indexOffset);
 				}
-				
+
 				indexOffset += posData.count;
 			}
 		}
@@ -239,32 +258,34 @@ export class Loader {
 		if (gltf.materials && gltf.materials.length > 0) {
 			const mat = gltf.materials[0];
 			parsedMaterial = {};
-			
+
 			const getTexUri = (texRef: any) => {
 				if (texRef === undefined) return null;
 				const texture = gltf.textures[texRef.index];
 				if (!texture) return null;
 				const image = gltf.images[texture.source];
-				
+
 				if (image.uri) return baseUrl + image.uri;
-                
+
 				if (image.bufferView !== undefined) {
 					const bv = gltf.bufferViews[image.bufferView];
 					const buffer = buffers[bv.buffer];
 					const byteOffset = bv.byteOffset || 0;
 					const byteLength = bv.byteLength;
 					const slice = buffer.slice(byteOffset, byteOffset + byteLength);
-					const blob = new Blob([slice], { type: image.mimeType || 'image/png' });
+					const blob = new Blob([slice], {
+						type: image.mimeType || "image/png",
+					});
 					return URL.createObjectURL(blob);
 				}
-				
+
 				return null;
 			};
 
 			if (mat.pbrMetallicRoughness) {
 				const bc = getTexUri(mat.pbrMetallicRoughness.baseColorTexture);
 				if (bc) parsedMaterial.albedoTexture = bc;
-				
+
 				const mr = getTexUri(mat.pbrMetallicRoughness.metallicRoughnessTexture);
 				if (mr) {
 					parsedMaterial.metallicTexture = mr;
@@ -273,7 +294,7 @@ export class Loader {
 			}
 			const norm = getTexUri(mat.normalTexture);
 			if (norm) parsedMaterial.normalTexture = norm;
-			
+
 			const occ = getTexUri(mat.occlusionTexture);
 			if (occ) parsedMaterial.aoTexture = occ;
 		}
@@ -281,7 +302,7 @@ export class Loader {
 		return {
 			vertices: outVertices,
 			indices: outIndices,
-			materialOptions: parsedMaterial
+			materialOptions: parsedMaterial,
 		};
 	}
 
@@ -335,45 +356,51 @@ export class Loader {
 					const faceIndices = [];
 					for (let i = 1; i < parts.length; i++) {
 						const key = parts[i];
-						
+
 						if (indexMap.has(key)) {
 							faceIndices.push(indexMap.get(key)!);
 						} else {
 							// Parse face component: v/vt/vn
 							const indices = key.split("/");
-							
+
 							const vIdx = (parseInt(indices[0], 10) - 1) * 3;
-							const vtIdx = indices.length > 1 && indices[1] !== "" ? (parseInt(indices[1], 10) - 1) * 2 : -1;
-							const vnIdx = indices.length > 2 && indices[2] !== "" ? (parseInt(indices[2], 10) - 1) * 3 : -1;
-							
+							const vtIdx =
+								indices.length > 1 && indices[1] !== ""
+									? (parseInt(indices[1], 10) - 1) * 2
+									: -1;
+							const vnIdx =
+								indices.length > 2 && indices[2] !== ""
+									? (parseInt(indices[2], 10) - 1) * 3
+									: -1;
+
 							// 1. Push position
 							interleavedVertices.push(
 								inputVertices[vIdx] || 0,
 								inputVertices[vIdx + 1] || 0,
-								inputVertices[vIdx + 2] || 0
+								inputVertices[vIdx + 2] || 0,
 							);
-							
+
 							// 2. Push normal
 							if (vnIdx >= 0 && inputNormals.length > vnIdx) {
 								interleavedVertices.push(
 									inputNormals[vnIdx],
 									inputNormals[vnIdx + 1],
-									inputNormals[vnIdx + 2]
+									inputNormals[vnIdx + 2],
 								);
 							} else {
 								interleavedVertices.push(0, 1, 0); // Default normal
 							}
-							
+
 							// 3. Push UV
 							if (vtIdx >= 0 && inputUVs.length > vtIdx) {
 								interleavedVertices.push(
 									inputUVs[vtIdx],
-									1.0 - inputUVs[vtIdx + 1] // Invert V for WebGPU
+									1.0 - inputUVs[vtIdx + 1], // Invert V for WebGPU
 								);
 							} else {
 								interleavedVertices.push(0, 0); // Default UV
 							}
-							
+
 							indexMap.set(key, nextIndex);
 							faceIndices.push(nextIndex);
 							nextIndex++;
@@ -382,7 +409,11 @@ export class Loader {
 
 					// Simple convex triangulation (fan-style from the first vertex)
 					for (let i = 1; i < faceIndices.length - 1; i++) {
-						interleavedIndices.push(faceIndices[0], faceIndices[i], faceIndices[i + 1]);
+						interleavedIndices.push(
+							faceIndices[0],
+							faceIndices[i],
+							faceIndices[i + 1],
+						);
 					}
 					break;
 				}
@@ -392,7 +423,7 @@ export class Loader {
 		return {
 			vertices: interleavedVertices,
 			indices: interleavedIndices,
-            materialOptions: undefined
+			materialOptions: undefined,
 		};
 	}
 }

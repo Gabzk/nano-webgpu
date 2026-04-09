@@ -161,9 +161,7 @@ f 1/1/1 2/2/1 3/3/1
 
 			// Interleaved format: Pos(3), Norm(3), UV(2)
 			expect(result.vertices).toEqual([
-				0, 0, 0, 0, 0, 1, 0, 1,
-				1, 0, 0, 0, 0, 1, 1, 1,
-				0, 1, 0, 0, 0, 1, 0, 0
+				0, 0, 0, 0, 0, 1, 0, 1, 1, 0, 0, 0, 0, 1, 1, 1, 0, 1, 0, 0, 0, 1, 0, 0,
 			]);
 			expect(result.indices).toEqual([0, 1, 2]); // Using 0-based indexing
 		});
@@ -188,10 +186,8 @@ f  1/1/1   2/2/1   3/3/1   4/4/1
 
 			// Interleaved format: default normal 0,1,0 and default UV 0,0 since vn/vt were absent
 			expect(result.vertices).toEqual([
-				0, 0, 0, 0, 1, 0, 0, 0,
-				1, 0, 0, 0, 1, 0, 0, 0,
-				1, 1, 0, 0, 1, 0, 0, 0,
-				0, 1, 0, 0, 1, 0, 0, 0
+				0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 0, 0, 1, 0, 0, 0,
+				0, 1, 0, 0, 1, 0, 0, 0,
 			]);
 			expect(result.indices).toEqual([0, 1, 2, 0, 2, 3]); // Triangulated quad
 		});

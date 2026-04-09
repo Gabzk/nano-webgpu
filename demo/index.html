@@ -21,7 +21,6 @@
             background: #000;
             border: 1px solid #333;
             border-radius: 8px;
-
         }
 
         .status {
@@ -43,7 +42,10 @@
 <body>
     <h1>Nano WebGPU</h1>
     <canvas id="canvas" width="1280" height="720"></canvas>
-    <script type="module" src="./demoIdeal.ts"></script>
+    <script type="module" src="./demo.ts"></script>
+    <div id="fps">
+        FPS: <span id="fps-value">0</span>
+    </div>
 </body>
 
 </html>

@@ -36,6 +36,4 @@ describe("Vec3", () => {
 		expect(vec3.y).toBe(3.5);
 		expect(vec3.z).toBe(4.5);
 	});
-
-
 });

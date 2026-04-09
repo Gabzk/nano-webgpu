@@ -1,56 +1,46 @@
-import { Context, Scene, Camera, DirectionalLight, PointLight, StandardMaterial, Color } from "nano-webgpu";
+import { Scene } from "nano-webgpu";
 
-const ctx = await Context.init("#canvas");
-const scene = new Scene(ctx);
+// Inicializando o WebGPU e a Scene de uma vez só (mantive o await para evitar engasgos no runtime)
+const scene = await Scene.init("#canvas");
 
-const camera = new Camera({ position: [0, 1, 5] });
-scene.setCamera(camera);
+// Configurando a câmera com atributos simples
+const camera = scene.setCamera({ position: [0, 2, 5] });
 
-// // 1. Primitive with Default White Material
-// const defaultCube = ctx.createCube({
-//     position: [-2, 0, 0],
-//     scale: 1.0,
-// });
-// scene.add(defaultCube);
+// scene.setDefaultDir("./assets/shiba");
 
-// 2. Primitive with PBR Shiny Red Material
-// const shinyRedMaterial = new StandardMaterial({
-//     albedoColor: "#ff0000",
-//     roughness: 0.8,
-//     metallic: 0.8
-// });
-// const shinyCube = ctx.createCube({
-//     position: [0, 0, 0],
-//     scale: 1.0,
-//     material: shinyRedMaterial
-// });
-// scene.add(shinyCube);
-
-// 3. Loaded OBJ with Full PBR Material
-const crateMesh = await ctx.loadMesh(`./assets/crate/source/Wood_Box.obj`, {
-    material: new StandardMaterial({
-        albedoTexture: "./assets/crate/textures/Wood_Box_low_DefaultMaterial_BaseColor.png",
-        normalTexture: "./assets/crate/textures/Wood_Box_low_DefaultMaterial_Normal.png",
-        roughnessTexture: "./assets/crate/textures/Wood_Box_low_DefaultMaterial_Roughness.png",
-        metallicTexture: "./assets/crate/textures/Wood_Box_low_DefaultMaterial_Metallic.png"
-    }),
-    position: [0, 0, 0],
-    scale: 0.5,
+scene.addPlane({
+	position: [0, -1.5, -3],
+	scale: 10,
+	color: "#453232",
 });
-scene.add(crateMesh);
 
+// Adicionando Mesh do GLTF nativamente (Materiais serão auto-inferidos visualmente)
+const shiba = await scene.addMesh(`./assets/shiba.glb`, {
+	position: [0, 0, 0],
+	scale: 1,
+	rotation: [-1.5, 0.5, 0], // em radianos
+});
 
-scene.addLight(new PointLight({
-    position: [0, 2, 0],
-    color: "#ffffff",
-    intensity: 1.0
-}));
+// Adicionando luzes via opções fáceis
+const dirLight = scene.addLight({
+	type: "directional",
+	rotationDegrees: [-45, 45, 0],
+	color: "#ffffff",
+	intensity: 1,
+});
+scene.addLight({
+	type: "point",
+	position: [2, 1, 0],
+	color: "#ffffff",
+	intensity: 1,
+});
 
-ctx.run((dt) => {
-    // defaultCube.rotation.y += 0.5 * dt;
-    // shinyCube.rotation.y += 0.5 * dt;
-    // shinyCube.rotation.x += 0.3 * dt;
-    crateMesh.rotation.y += 0.5 * dt;
-    
-    scene.render();
+let fpsElement = document.getElementById("fps-value");
+
+// Loop de renderização totalmente gerenciado pela Scene
+scene.render((dt) => {
+	let fps = 1 / dt;
+	fpsElement.textContent = fps.toFixed(0);
+	// Agora giramos a luz igual fazemos no Node3D da Godot Engine!
+	dirLight.rotationDegrees.y += 90 * dt;
 });

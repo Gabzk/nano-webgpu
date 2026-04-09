@@ -120,8 +120,12 @@ export class Vec3 {
 	 * @returns {this} The current vector (for chaining)
 	 */
 	public cross(v: Vec3): this {
-		const ax = this.x, ay = this.y, az = this.z;
-		const bx = v.x, by = v.y, bz = v.z;
+		const ax = this.x,
+			ay = this.y,
+			az = this.z;
+		const bx = v.x,
+			by = v.y,
+			bz = v.z;
 		this.x = ay * bz - az * by;
 		this.y = az * bx - ax * bz;
 		this.z = ax * by - ay * bx;
@@ -136,8 +140,12 @@ export class Vec3 {
 	 * @returns {Vec3} The vector resulting from the cross product
 	 */
 	public static cross(v1: Vec3, v2: Vec3, out: Vec3 = new Vec3()): Vec3 {
-		const ax = v1.x, ay = v1.y, az = v1.z;
-		const bx = v2.x, by = v2.y, bz = v2.z;
+		const ax = v1.x,
+			ay = v1.y,
+			az = v1.z;
+		const bx = v2.x,
+			by = v2.y,
+			bz = v2.z;
 		out.x = ay * bz - az * by;
 		out.y = az * bx - ax * bz;
 		out.z = ax * by - ay * bx;
@@ -258,7 +266,9 @@ export class Vec3 {
 	 * @param {Vec3 | number[] | number} val - The input value.
 	 * @returns {Vec3} A new Vec3 instance.
 	 */
-	public static from(val: Vec3 | [number, number, number] | number[] | number): Vec3 {
+	public static from(
+		val: Vec3 | [number, number, number] | number[] | number,
+	): Vec3 {
 		if (val instanceof Vec3) {
 			return val.clone();
 		} else if (Array.isArray(val)) {
