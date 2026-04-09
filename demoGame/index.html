@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cube Runner — nano-webgpu</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;700;900&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            background: #050510;
+            color: #fff;
+            overflow: hidden;
+            width: 100vw;
+            height: 100vh;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* ====== HUD Overlay ====== */
+        #hud {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        #hud-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px 32px;
+        }
+
+        #hud-title {
+            font-size: 14px;
+            font-weight: 400;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            color: rgba(255, 255, 255, 0.4);
+        }
+
+        #score-container {
+            display: flex;
+            align-items: baseline;
+            gap: 8px;
+        }
+
+        #score-label {
+            font-size: 12px;
+            font-weight: 400;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            color: rgba(255, 255, 255, 0.4);
+        }
+
+        #score {
+            font-size: 32px;
+            font-weight: 900;
+            background: linear-gradient(135deg, #00e5ff, #4488ff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        /* ====== Controls hint ====== */
+        #controls-hint {
+            position: fixed;
+            bottom: 24px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 13px;
+            letter-spacing: 1px;
+            color: rgba(255, 255, 255, 0.25);
+            z-index: 10;
+            pointer-events: none;
+            transition: opacity 2s ease;
+        }
+
+        #controls-hint kbd {
+            display: inline-block;
+            padding: 2px 8px;
+            margin: 0 2px;
+            border-radius: 4px;
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            font-family: 'Outfit', sans-serif;
+            font-size: 12px;
+        }
+
+        /* ====== Game Over ====== */
+        #game-over {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 20;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            background: radial-gradient(ellipse at center, rgba(10, 5, 30, 0.85) 0%, rgba(5, 5, 16, 0.95) 100%);
+            backdrop-filter: blur(4px);
+            pointer-events: all;
+        }
+
+        #game-over h1 {
+            font-size: 64px;
+            font-weight: 900;
+            letter-spacing: 6px;
+            text-transform: uppercase;
+            background: linear-gradient(135deg, #e74c3c, #e91e63);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 16px;
+        }
+
+        #game-over .final-score-box {
+            font-size: 18px;
+            color: rgba(255, 255, 255, 0.6);
+            margin-bottom: 32px;
+        }
+
+        #game-over .final-score-box span {
+            font-size: 48px;
+            font-weight: 900;
+            color: #fff;
+            display: block;
+            margin-top: 4px;
+        }
+
+        #game-over .restart-hint {
+            font-size: 14px;
+            letter-spacing: 2px;
+            color: rgba(255, 255, 255, 0.35);
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        #game-over .restart-hint kbd {
+            display: inline-block;
+            padding: 3px 12px;
+            border-radius: 4px;
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            font-family: 'Outfit', sans-serif;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 0.4; }
+            50% { opacity: 1; }
+        }
+    </style>
+</head>
+
+<body>
+    <canvas id="canvas" width="1280" height="720"></canvas>
+
+    <!-- HUD -->
+    <div id="hud">
+        <div id="hud-top">
+            <div id="hud-title">Cube Runner</div>
+            <div id="fps">
+                <span id="fps-label">FPS</span>
+                <span id="fps-value">0</span>
+            </div>
+            <div id="score-container">
+                <span id="score-label">Score</span>
+                <span id="score">0</span>
+            </div>
+
+
+        </div>
+    </div>
+
+    <!-- Controls Hint -->
+    <div id="controls-hint">
+        <kbd>A</kbd> / <kbd>D</kbd> ou <kbd>←</kbd> / <kbd>→</kbd> para mover
+    </div>
+
+    <!-- Game Over -->
+    <div id="game-over">
+        <h1>Game Over</h1>
+        <div class="final-score-box">
+            Pontuação
+            <span id="final-score">0</span>
+        </div>
+        <div class="restart-hint">Pressione <kbd>ESPAÇO</kbd> para reiniciar</div>
+    </div>
+
+    <script type="module" src="./game.ts"></script>
+</body>
+
+</html>

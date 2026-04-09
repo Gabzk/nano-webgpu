@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html>
+<head><title>rAF Diagnostic</title></head>
+<body style="background:#111;color:#fff;font:20px monospace;padding:20px">
+<div>FPS: <span id="fps" style="color:#0f0;font-size:48px">-</span></div>
+<div>Meshes: <span id="meshcount">0</span></div>
+<br>
+<button onclick="addCubes(1)" style="font-size:16px;padding:8px 16px;margin:4px">+ 1 cubo</button>
+<button onclick="addCubes(5)" style="font-size:16px;padding:8px 16px;margin:4px">+ 5 cubos</button>
+<button onclick="addCubes(10)" style="font-size:16px;padding:8px 16px;margin:4px">+ 10 cubos</button>
+<button onclick="addCubes(50)" style="font-size:16px;padding:8px 16px;margin:4px">+ 50 cubos</button>
+<br><br>
+<canvas id="canvas" width="1280" height="720" style="display:block;width:80%;border:1px solid #333"></canvas>
+<script type="module">
+import { Scene, StandardMaterial } from "nano-webgpu";
+
+const scene = await Scene.init("#canvas");
+scene.setCamera({ position: [0, 4, 12], target: [0, 0, 0] });
+scene.addLight({ type: 'directional', rotationDegrees: [-50, 30, 0], color: "#ffeedd", intensity: 0.8 });
+scene.addLight({ type: 'point', position: [0, 3, 0], color: "#4488ff", intensity: 1.5 });
+
+// Cenário base
+scene.addPlane({ scale: 30, position: [0, -0.5, 0], material: new StandardMaterial({ albedoColor: "#1a1a2e" }) });
+
+const colors = ["#e74c3c","#e67e22","#9b59b6","#e91e63","#ff5722","#3498db","#2ecc71","#f1c40f"];
+let meshCount = 4; // plane + 2 lights + camera (cameras são nodes mas não meshes... anyway)
+
+window.addCubes = function(n) {
+    for (let i = 0; i < n; i++) {
+        const color = colors[Math.floor(Math.random() * colors.length)];
+        scene.addCube({
+            position: [(Math.random()-0.5)*20, 0.5 + Math.random()*2, (Math.random()-0.5)*20],
+            scale: 0.5 + Math.random() * 0.8,
+            material: new StandardMaterial({ albedoColor: color, roughness: 0.3, metallic: 0.5 }),
+        });
+    }
+    meshCount = scene.meshes.length;
+    document.getElementById('meshcount').textContent = meshCount;
+};
+
+// Começa com 1 cubo
+window.addCubes(1);
+
+let count = 0, lastTime = performance.now();
+scene.render((dt) => {
+    count++;
+    const now = performance.now();
+    if (now - lastTime >= 1000) {
+        document.getElementById('fps').textContent = count;
+        count = 0;
+        lastTime = now;
+    }
+
+    // Rotaciona todos os cubos
+    for (const mesh of scene.meshes) {
+        mesh.rotation.y += dt * 0.5;
+        mesh.isDirty = true;
+    }
+});
+</script>
+</body>
+</html>
