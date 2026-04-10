@@ -16,9 +16,15 @@ export class Node3D extends Node {
 		this._rotation = new Vec3(0, 0, 0);
 		this._scale = new Vec3(1, 1, 1);
 
-		this._position.onChange = () => { this.isDirty = true; };
-		this._rotation.onChange = () => { this.isDirty = true; };
-		this._scale.onChange = () => { this.isDirty = true; };
+		this._position.onChange = () => {
+			this.isDirty = true;
+		};
+		this._rotation.onChange = () => {
+			this.isDirty = true;
+		};
+		this._scale.onChange = () => {
+			this.isDirty = true;
+		};
 	}
 
 	/**

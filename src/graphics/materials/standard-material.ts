@@ -41,24 +41,48 @@ export class StandardMaterial extends Material {
 
 	public ormTexture: Texture | null = null;
 
-	get albedoColor(): Color { return this._albedoColor; }
+	get albedoColor(): Color {
+		return this._albedoColor;
+	}
 	set albedoColor(val: Color) {
 		this._albedoColor = val;
-		this._albedoColor.onChange = () => { this.isDirty = true; };
+		this._albedoColor.onChange = () => {
+			this.isDirty = true;
+		};
 		this.isDirty = true;
 	}
 
-	get normalScale(): number { return this._normalScale; }
-	set normalScale(val: number) { this._normalScale = val; this.isDirty = true; }
+	get normalScale(): number {
+		return this._normalScale;
+	}
+	set normalScale(val: number) {
+		this._normalScale = val;
+		this.isDirty = true;
+	}
 
-	get roughness(): number { return this._roughness; }
-	set roughness(val: number) { this._roughness = val; this.isDirty = true; }
+	get roughness(): number {
+		return this._roughness;
+	}
+	set roughness(val: number) {
+		this._roughness = val;
+		this.isDirty = true;
+	}
 
-	get metallic(): number { return this._metallic; }
-	set metallic(val: number) { this._metallic = val; this.isDirty = true; }
+	get metallic(): number {
+		return this._metallic;
+	}
+	set metallic(val: number) {
+		this._metallic = val;
+		this.isDirty = true;
+	}
 
-	get aoIntensity(): number { return this._aoIntensity; }
-	set aoIntensity(val: number) { this._aoIntensity = val; this.isDirty = true; }
+	get aoIntensity(): number {
+		return this._aoIntensity;
+	}
+	set aoIntensity(val: number) {
+		this._aoIntensity = val;
+		this.isDirty = true;
+	}
 
 	private pendingTextures: { [key: string]: string } = {};
 
@@ -79,7 +103,9 @@ export class StandardMaterial extends Material {
 			initialColor = Color.fromHex("#ffffff");
 		}
 		this._albedoColor = initialColor;
-		this._albedoColor.onChange = () => { this.isDirty = true; };
+		this._albedoColor.onChange = () => {
+			this.isDirty = true;
+		};
 
 		if (options.albedoTexture instanceof Texture)
 			this.albedoTexture = options.albedoTexture;

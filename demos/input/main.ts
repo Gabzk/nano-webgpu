@@ -1,4 +1,11 @@
-import { Camera, Context, Scene, StandardMaterial, Color, Input } from "../../src/index";
+import {
+	Camera,
+	Context,
+	Scene,
+	StandardMaterial,
+	Color,
+	Input,
+} from "../../src/index";
 
 async function main() {
 	// Config
@@ -6,7 +13,6 @@ async function main() {
 	const scene = await Scene.init(canvas);
 	const gravity = 25;
 
-	
 	// Input
 	Input.addAction("ui_up", ["KeyW", "ArrowUp"]);
 	Input.addAction("ui_down", ["KeyS", "ArrowDown"]);
@@ -28,7 +34,7 @@ async function main() {
 	const cube = scene.addCube({
 		position: [0, 0, 0],
 		scale: 1,
-		material: cubeMaterial
+		material: cubeMaterial,
 	});
 
 	// Light
@@ -71,7 +77,6 @@ async function main() {
 			velocityY = 10;
 			isGrounded = false;
 			// Juice effect squash and stretch
-			
 		}
 
 		// Gravity

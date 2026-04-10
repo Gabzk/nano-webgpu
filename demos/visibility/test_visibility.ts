@@ -52,9 +52,9 @@ let time = 0;
 
 scene.render((dt) => {
 	if (canvas.width != innerWidth || canvas.height != innerHeight) {
-			canvas.width = innerWidth;
-			canvas.height = innerHeight;
-		}
+		canvas.width = innerWidth;
+		canvas.height = innerHeight;
+	}
 
 	time += dt;
 
