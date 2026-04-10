@@ -6,9 +6,20 @@ import { Node } from "./node";
  * A 3D Node with position, rotation, and scale properties.
  */
 export class Node3D extends Node {
-	private _position: Vec3 = new Vec3(0, 0, 0);
-	private _rotation: Vec3 = new Vec3(0, 0, 0);
-	private _scale: Vec3 = new Vec3(1, 1, 1);
+	private _position: Vec3;
+	private _rotation: Vec3;
+	private _scale: Vec3;
+
+	constructor() {
+		super();
+		this._position = new Vec3(0, 0, 0);
+		this._rotation = new Vec3(0, 0, 0);
+		this._scale = new Vec3(1, 1, 1);
+
+		this._position.onChange = () => { this.isDirty = true; };
+		this._rotation.onChange = () => { this.isDirty = true; };
+		this._scale.onChange = () => { this.isDirty = true; };
+	}
 
 	/**
 	 * Gets or sets the position of the node.
@@ -49,21 +60,15 @@ export class Node3D extends Node {
 					return Reflect.get(target, prop, receiver);
 				},
 				set: (target, prop, value, receiver) => {
-					let dirty = false;
 					if (prop === "x") {
-						this._rotation.x = value * (Math.PI / 180);
-						dirty = true;
+						this._rotation.x = (value as number) * (Math.PI / 180);
 					} else if (prop === "y") {
-						this._rotation.y = value * (Math.PI / 180);
-						dirty = true;
+						this._rotation.y = (value as number) * (Math.PI / 180);
 					} else if (prop === "z") {
-						this._rotation.z = value * (Math.PI / 180);
-						dirty = true;
+						this._rotation.z = (value as number) * (Math.PI / 180);
 					} else {
 						Reflect.set(target, prop, value, receiver);
 					}
-
-					if (dirty) this.isDirty = true;
 					return true;
 				},
 			});

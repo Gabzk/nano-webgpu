@@ -57,8 +57,6 @@ scene.render((dt) => {
 					"#" + Math.floor(Math.random() * 16777215).toString(16),
 				),
 			});
-			// We set static objects, so they won't have isDirty re-evaluated every frame
-			// This is testing the P0 "Dirty-only update"
 			spawnedCubes.push(cube);
 		}
 		phase = 1;

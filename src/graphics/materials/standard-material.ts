@@ -24,22 +24,41 @@ export interface StandardMaterialOptions {
 }
 
 export class StandardMaterial extends Material {
-	public albedoColor: Color;
+	private _albedoColor: Color = new Color();
 	public albedoTexture: Texture | null = null;
 
 	public normalTexture: Texture | null = null;
-	public normalScale: number;
+	private _normalScale: number = 1.0;
 
-	public roughness: number;
+	private _roughness: number = 0.5;
 	public roughnessTexture: Texture | null = null;
 
-	public metallic: number;
+	private _metallic: number = 0.0;
 	public metallicTexture: Texture | null = null;
 
 	public aoTexture: Texture | null = null;
-	public aoIntensity: number;
+	private _aoIntensity: number = 1.0;
 
 	public ormTexture: Texture | null = null;
+
+	get albedoColor(): Color { return this._albedoColor; }
+	set albedoColor(val: Color) {
+		this._albedoColor = val;
+		this._albedoColor.onChange = () => { this.isDirty = true; };
+		this.isDirty = true;
+	}
+
+	get normalScale(): number { return this._normalScale; }
+	set normalScale(val: number) { this._normalScale = val; this.isDirty = true; }
+
+	get roughness(): number { return this._roughness; }
+	set roughness(val: number) { this._roughness = val; this.isDirty = true; }
+
+	get metallic(): number { return this._metallic; }
+	set metallic(val: number) { this._metallic = val; this.isDirty = true; }
+
+	get aoIntensity(): number { return this._aoIntensity; }
+	set aoIntensity(val: number) { this._aoIntensity = val; this.isDirty = true; }
 
 	private pendingTextures: { [key: string]: string } = {};
 
@@ -51,13 +70,16 @@ export class StandardMaterial extends Material {
 		super();
 		this.type = "StandardMaterial";
 
+		let initialColor: Color;
 		if (options.albedoColor instanceof Color) {
-			this.albedoColor = options.albedoColor;
+			initialColor = options.albedoColor;
 		} else if (typeof options.albedoColor === "string") {
-			this.albedoColor = Color.fromHex(options.albedoColor);
+			initialColor = Color.fromHex(options.albedoColor);
 		} else {
-			this.albedoColor = Color.fromHex("#ffffff");
+			initialColor = Color.fromHex("#ffffff");
 		}
+		this._albedoColor = initialColor;
+		this._albedoColor.onChange = () => { this.isDirty = true; };
 
 		if (options.albedoTexture instanceof Texture)
 			this.albedoTexture = options.albedoTexture;
@@ -89,10 +111,10 @@ export class StandardMaterial extends Material {
 		else if (typeof options.ormTexture === "string")
 			this.pendingTextures.orm = options.ormTexture;
 
-		this.roughness = options.roughness ?? 0.5;
-		this.metallic = options.metallic ?? 0.0;
-		this.normalScale = options.normalScale ?? 1.0;
-		this.aoIntensity = options.aoIntensity ?? 1.0;
+		this._roughness = options.roughness ?? 0.5;
+		this._metallic = options.metallic ?? 0.0;
+		this._normalScale = options.normalScale ?? 1.0;
+		this._aoIntensity = options.aoIntensity ?? 1.0;
 
 		// 16 floats (64 bytes)
 		this.bufferData = new Float32Array(16);

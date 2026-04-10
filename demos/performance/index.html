@@ -54,7 +54,6 @@ scene.render((dt) => {
     // Rotaciona todos os cubos
     for (const mesh of scene.meshes) {
         mesh.rotation.y += dt * 0.5;
-        mesh.isDirty = true;
     }
 });
 </script>

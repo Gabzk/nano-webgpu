@@ -4,14 +4,49 @@
  * This module provides a Color representation for WebGPU (RGBA floats 0.0 - 1.0).
  */
 export class Color {
-	/** @public Red channel (0.0 - 1.0) */
-	public r: number;
-	/** @public Green channel (0.0 - 1.0) */
-	public g: number;
-	/** @public Blue channel (0.0 - 1.0) */
-	public b: number;
-	/** @public Alpha channel (0.0 - 1.0) */
-	public a: number;
+	private _r: number;
+	private _g: number;
+	private _b: number;
+	private _a: number;
+
+	/** @public Callback triggered when any component changes */
+	public onChange?: () => void;
+
+	get r(): number {
+		return this._r;
+	}
+	set r(val: number) {
+		if (this._r === val) return;
+		this._r = val;
+		if (this.onChange) this.onChange();
+	}
+
+	get g(): number {
+		return this._g;
+	}
+	set g(val: number) {
+		if (this._g === val) return;
+		this._g = val;
+		if (this.onChange) this.onChange();
+	}
+
+	get b(): number {
+		return this._b;
+	}
+	set b(val: number) {
+		if (this._b === val) return;
+		this._b = val;
+		if (this.onChange) this.onChange();
+	}
+
+	get a(): number {
+		return this._a;
+	}
+	set a(val: number) {
+		if (this._a === val) return;
+		this._a = val;
+		if (this.onChange) this.onChange();
+	}
 
 	/**
 	 * Create a new Color
@@ -29,10 +64,10 @@ export class Color {
 		if (r < 0 || r > 1 || g < 0 || g > 1 || b < 0 || b > 1 || a < 0 || a > 1) {
 			throw new Error("Invalid floats");
 		}
-		this.r = r;
-		this.g = g;
-		this.b = b;
-		this.a = a;
+		this._r = r;
+		this._g = g;
+		this._b = b;
+		this._a = a;
 	}
 
 	/**
@@ -109,7 +144,7 @@ export class Color {
 	 * @returns {Float32Array} The color as an array of floats
 	 */
 	public toFloat32Array(): Float32Array {
-		return new Float32Array([this.r, this.g, this.b, this.a]);
+		return new Float32Array([this._r, this._g, this._b, this._a]);
 	}
 
 	/**
@@ -125,8 +160,6 @@ export class Color {
 		} else if (typeof val === "string") {
 			return Color.fromHex(val);
 		} else if (Array.isArray(val)) {
-			// Assume 0.0 - 1.0 floats if all <= 1.0, else treat as bytes?
-			// Better to assume normalized 0.0-1.0 floats for consistency with WebGPU.
 			const r = val[0] !== undefined ? val[0] : 0;
 			const g = val[1] !== undefined ? val[1] : 0;
 			const b = val[2] !== undefined ? val[2] : 0;

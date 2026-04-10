@@ -1,4 +1,5 @@
 export { Context } from "./core/context";
+export { Input } from "./core/input";
 export { Loader } from "./core/loader";
 export { Node } from "./core/node";
 export { Node3D } from "./core/node3d";

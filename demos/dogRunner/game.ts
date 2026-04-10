@@ -86,7 +86,7 @@ const rightWall = scene.addCube({
 
 // ===================== JOGADOR =====================
 
-const player = await scene.addMesh("../demo/assets/shiba.glb", {
+const player = await scene.addMesh("../render/assets/shiba.glb", {
 	position: [0, 0, 2],
 	scale: 0.5,
 	rotation: [-1.5, 0, 0],
@@ -222,7 +222,6 @@ function restartGame() {
 	gameOver = false;
 	player.position.set(0, 0, 3);
 	player.rotation.set(0, 0, 0);
-	player.isDirty = true;
 	updateHUD();
 }
 
@@ -242,7 +241,6 @@ scene.render((dt) => {
 			3,
 			Math.cos(gameTime * 0.5) * 5,
 		);
-		orbLight.isDirty = true;
 		gameTime += dt;
 		return;
 	}
@@ -258,7 +256,6 @@ scene.render((dt) => {
 
 	const px = player.position.x + moveX * PLAYER_SPEED * dt;
 	player.position.x = Math.max(LANE_MIN, Math.min(LANE_MAX, px));
-	player.isDirty = true;
 
 	// Rotação visual do shiba (inclina na direção do movimento)
 	player.rotation.y = Math.PI; // Shiba olha para frente (em direção aos cubos)
@@ -283,7 +280,6 @@ scene.render((dt) => {
 		obs.mesh.position.z += obs.speed * dt;
 		obs.mesh.rotation.y += dt * 2;
 		obs.mesh.rotation.x += dt * 1.5;
-		obs.mesh.isDirty = true;
 
 		// Colisão por distância (Gap #5: sem AABB/colisão na lib, usando Vec3.distance manual)
 		const dist = Math.sqrt(
@@ -315,7 +311,6 @@ scene.render((dt) => {
 		2 + Math.sin(gameTime * 3) * 0.5,
 		player.position.z + Math.cos(gameTime * 2) * 4,
 	);
-	orbLight.isDirty = true;
 
 	// --- HUD ---
 	updateHUD();

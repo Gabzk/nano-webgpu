@@ -7,6 +7,7 @@ import {
 } from "../graphics/primitives";
 import { Vec3 } from "../math/vec3";
 import { Loader } from "./loader";
+import { Input } from "./input";
 
 /**
  * @module Context
@@ -94,6 +95,8 @@ export class Context {
 			format: this.format,
 			alphaMode: "premultiplied",
 		});
+
+		Input.init();
 	}
 
 	/**
@@ -107,6 +110,7 @@ export class Context {
 			const dt = (t - lastTime) / 1000;
 			lastTime = t;
 			loopFunction(dt);
+			Input.update();
 		};
 		requestAnimationFrame(frame);
 	}

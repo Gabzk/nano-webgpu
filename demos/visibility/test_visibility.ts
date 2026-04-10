@@ -1,6 +1,7 @@
 import { Scene, Color } from "nano-webgpu";
 
-const scene = await Scene.init("#canvas");
+const canvas = document.getElementById("canvas") as HTMLCanvasElement;
+const scene = await Scene.init(canvas);
 
 scene.setCamera({ position: [0, 2, 8], target: [0, 0, 0] });
 scene.backgroundColor = Color.fromHex("#1a1a2e");
@@ -50,6 +51,11 @@ btn.addEventListener("click", () => {
 let time = 0;
 
 scene.render((dt) => {
+	if (canvas.width != innerWidth || canvas.height != innerHeight) {
+			canvas.width = innerWidth;
+			canvas.height = innerHeight;
+		}
+
 	time += dt;
 
 	// Nós fazemos o cubo orbitar e rodar o tempo todo, mesmo quando orbitingCube.visible == false.

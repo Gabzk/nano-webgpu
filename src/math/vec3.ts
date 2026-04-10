@@ -4,12 +4,39 @@
  * This module provides a 3D vector representation.
  */
 export class Vec3 {
-	/** @public X component */
-	public x: number;
-	/** @public Y component */
-	public y: number;
-	/** @public Z component */
-	public z: number;
+	private _x: number;
+	private _y: number;
+	private _z: number;
+
+	/** @public Callback triggered when any component changes */
+	public onChange?: () => void;
+
+	get x(): number {
+		return this._x;
+	}
+	set x(val: number) {
+		if (this._x === val) return;
+		this._x = val;
+		if (this.onChange) this.onChange();
+	}
+
+	get y(): number {
+		return this._y;
+	}
+	set y(val: number) {
+		if (this._y === val) return;
+		this._y = val;
+		if (this.onChange) this.onChange();
+	}
+
+	get z(): number {
+		return this._z;
+	}
+	set z(val: number) {
+		if (this._z === val) return;
+		this._z = val;
+		if (this.onChange) this.onChange();
+	}
 
 	/**
 	 * Create a new Vec3
@@ -18,9 +45,9 @@ export class Vec3 {
 	 * @param {number} [z=0] - Z component
 	 */
 	constructor(x: number = 0, y: number = 0, z: number = 0) {
-		this.x = x;
-		this.y = y;
-		this.z = z;
+		this._x = x;
+		this._y = y;
+		this._z = z;
 	}
 
 	/**
@@ -31,9 +58,12 @@ export class Vec3 {
 	 * @returns {this} The current vector (for chaining)
 	 */
 	public set(x: number, y: number, z: number): this {
-		this.x = x;
-		this.y = y;
-		this.z = z;
+		if (this._x !== x || this._y !== y || this._z !== z) {
+			this._x = x;
+			this._y = y;
+			this._z = z;
+			if (this.onChange) this.onChange();
+		}
 		return this;
 	}
 
@@ -43,9 +73,12 @@ export class Vec3 {
 	 * @returns {this} The current vector (for chaining)
 	 */
 	public copy(v: Vec3): this {
-		this.x = v.x;
-		this.y = v.y;
-		this.z = v.z;
+		if (this._x !== v.x || this._y !== v.y || this._z !== v.z) {
+			this._x = v.x;
+			this._y = v.y;
+			this._z = v.z;
+			if (this.onChange) this.onChange();
+		}
 		return this;
 	}
 
@@ -54,7 +87,7 @@ export class Vec3 {
 	 * @returns {Vec3} A new vector with the same x, y, and z values
 	 */
 	public clone(): Vec3 {
-		return new Vec3(this.x, this.y, this.z);
+		return new Vec3(this._x, this._y, this._z);
 	}
 
 	/**
@@ -63,9 +96,10 @@ export class Vec3 {
 	 * @returns {this} The current vector (for chaining)
 	 */
 	public add(v: Vec3): this {
-		this.x += v.x;
-		this.y += v.y;
-		this.z += v.z;
+		this._x += v.x;
+		this._y += v.y;
+		this._z += v.z;
+		if (this.onChange) this.onChange();
 		return this;
 	}
 
@@ -75,9 +109,10 @@ export class Vec3 {
 	 * @returns {this} The current vector (for chaining)
 	 */
 	public sub(v: Vec3): this {
-		this.x -= v.x;
-		this.y -= v.y;
-		this.z -= v.z;
+		this._x -= v.x;
+		this._y -= v.y;
+		this._z -= v.z;
+		if (this.onChange) this.onChange();
 		return this;
 	}
 
@@ -87,9 +122,10 @@ export class Vec3 {
 	 * @returns {this} The current vector (for chaining)
 	 */
 	public multiply(v: Vec3): this {
-		this.x *= v.x;
-		this.y *= v.y;
-		this.z *= v.z;
+		this._x *= v.x;
+		this._y *= v.y;
+		this._z *= v.z;
+		if (this.onChange) this.onChange();
 		return this;
 	}
 
@@ -99,9 +135,10 @@ export class Vec3 {
 	 * @returns {this} The current vector (for chaining)
 	 */
 	public scale(n: number): this {
-		this.x *= n;
-		this.y *= n;
-		this.z *= n;
+		this._x *= n;
+		this._y *= n;
+		this._z *= n;
+		if (this.onChange) this.onChange();
 		return this;
 	}
 
@@ -111,7 +148,7 @@ export class Vec3 {
 	 * @returns {number} The dot product
 	 */
 	public dot(v: Vec3): number {
-		return this.x * v.x + this.y * v.y + this.z * v.z;
+		return this._x * v.x + this._y * v.y + this._z * v.z;
 	}
 
 	/**
@@ -120,15 +157,16 @@ export class Vec3 {
 	 * @returns {this} The current vector (for chaining)
 	 */
 	public cross(v: Vec3): this {
-		const ax = this.x,
-			ay = this.y,
-			az = this.z;
+		const ax = this._x,
+			ay = this._y,
+			az = this._z;
 		const bx = v.x,
 			by = v.y,
 			bz = v.z;
-		this.x = ay * bz - az * by;
-		this.y = az * bx - ax * bz;
-		this.z = ax * by - ay * bx;
+		this._x = ay * bz - az * by;
+		this._y = az * bx - ax * bz;
+		this._z = ax * by - ay * bx;
+		if (this.onChange) this.onChange();
 		return this;
 	}
 
@@ -146,9 +184,7 @@ export class Vec3 {
 		const bx = v2.x,
 			by = v2.y,
 			bz = v2.z;
-		out.x = ay * bz - az * by;
-		out.y = az * bx - ax * bz;
-		out.z = ax * by - ay * bx;
+		out.set(ay * bz - az * by, az * bx - ax * bz, ax * by - ay * bx);
 		return out;
 	}
 
@@ -157,7 +193,7 @@ export class Vec3 {
 	 * @returns {number} The squared length
 	 */
 	public lengthSquared(): number {
-		return this.x * this.x + this.y * this.y + this.z * this.z;
+		return this._x * this._x + this._y * this._y + this._z * this._z;
 	}
 
 	/**
@@ -175,9 +211,10 @@ export class Vec3 {
 	public normalize(): this {
 		const len = this.length();
 		if (len > 0) {
-			this.x /= len;
-			this.y /= len;
-			this.z /= len;
+			this._x /= len;
+			this._y /= len;
+			this._z /= len;
+			if (this.onChange) this.onChange();
 		}
 		return this;
 	}
@@ -197,9 +234,9 @@ export class Vec3 {
 	 * @returns {number} The squared distance
 	 */
 	public distanceSquared(v: Vec3): number {
-		const dx = v.x - this.x;
-		const dy = v.y - this.y;
-		const dz = v.z - this.z;
+		const dx = v.x - this._x;
+		const dy = v.y - this._y;
+		const dz = v.z - this._z;
 		return dx * dx + dy * dy + dz * dz;
 	}
 
@@ -209,7 +246,7 @@ export class Vec3 {
 	 * @returns {boolean} True if the components are exactly equal
 	 */
 	public equals(v: Vec3): boolean {
-		return this.x === v.x && this.y === v.y && this.z === v.z;
+		return this._x === v.x && this._y === v.y && this._z === v.z;
 	}
 
 	/**
@@ -219,9 +256,10 @@ export class Vec3 {
 	 * @returns {this} The current vector (for chaining)
 	 */
 	public lerp(target: Vec3, t: number): this {
-		this.x += (target.x - this.x) * t;
-		this.y += (target.y - this.y) * t;
-		this.z += (target.z - this.z) * t;
+		this._x += (target.x - this._x) * t;
+		this._y += (target.y - this._y) * t;
+		this._z += (target.z - this._z) * t;
+		if (this.onChange) this.onChange();
 		return this;
 	}
 
@@ -239,9 +277,11 @@ export class Vec3 {
 		t: number,
 		out: Vec3 = new Vec3(),
 	): Vec3 {
-		out.x = v1.x + (v2.x - v1.x) * t;
-		out.y = v1.y + (v2.y - v1.y) * t;
-		out.z = v1.z + (v2.z - v1.z) * t;
+		out.set(
+			v1.x + (v2.x - v1.x) * t,
+			v1.y + (v2.y - v1.y) * t,
+			v1.z + (v2.z - v1.z) * t,
+		);
 		return out;
 	}
 
@@ -253,12 +293,12 @@ export class Vec3 {
 	 */
 	public toFloat32Array(out?: Float32Array, offset: number = 0): Float32Array {
 		if (out) {
-			out[offset] = this.x;
-			out[offset + 1] = this.y;
-			out[offset + 2] = this.z;
+			out[offset] = this._x;
+			out[offset + 1] = this._y;
+			out[offset + 2] = this._z;
 			return out;
 		}
-		return new Float32Array([this.x, this.y, this.z]);
+		return new Float32Array([this._x, this._y, this._z]);
 	}
 
 	/**
