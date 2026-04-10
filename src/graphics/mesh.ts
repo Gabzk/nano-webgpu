@@ -62,7 +62,6 @@ export class Mesh extends Node3D {
 	}
 
 	public draw(pass: GPURenderPassEncoder): void {
-		super.updateWorldMatrix();
 		// Update the Model uniform buffer in GPU memory
 		this.ctx.device.queue.writeBuffer(
 			this.modelBuffer,
@@ -78,5 +77,27 @@ export class Mesh extends Node3D {
 		pass.setVertexBuffer(0, this.geometry.vertexBuffer);
 		pass.setIndexBuffer(this.geometry.indexBuffer, this.geometry.indexFormat);
 		pass.drawIndexed(this.geometry.indexCount);
+	}
+
+	/**
+	 * Removes the mesh from its parent (and consequently from the scene)
+	 * and frees its inner uniform buffers. Similar to Godot's queue_free().
+	 * @param destroyGeometry Should we also destroy the shared geometry? Defaults to false to avoid accidentally breaking instanced copies.
+	 */
+	public destroy(destroyGeometry: boolean = false): void {
+		// 1. Remove from Scene Graph
+		if (this.parent) {
+			this.parent.remove(this);
+		}
+
+		// 2. Destroy GPU memory for this mesh
+		if (this.modelBuffer) {
+			this.modelBuffer.destroy();
+		}
+
+		// 3. Optionally destroy the geometry (e.g., if this was uniquely created for this object)
+		if (destroyGeometry && this.geometry) {
+			this.geometry.destroy();
+		}
 	}
 }

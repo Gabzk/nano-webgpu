@@ -10,6 +10,7 @@ export class Node {
 	public localMatrix: Mat4 = new Mat4();
 	public worldMatrix: Mat4 = new Mat4();
 	public isDirty: boolean = true;
+	public visible: boolean = true;
 
 	/**
 	 * Adds a child node to this node.

@@ -187,6 +187,16 @@ export class Scene extends Node {
 		}
 	}
 
+	public override remove(node: Node): void {
+		super.remove(node);
+		if (node instanceof Mesh) {
+			const index = this.meshes.indexOf(node);
+			if (index !== -1) {
+				this.meshes.splice(index, 1);
+			}
+		}
+	}
+
 	private updateLightsBuffer(): void {
 		const floatData = new Float32Array(4 + this.lights.length * 8);
 		const limit = Math.min(this.lights.length, this.maxLights);
@@ -255,7 +265,7 @@ export class Scene extends Node {
 		}
 
 		// Now calculate matrices so it will write to the initialized uniformBuffer
-		this.updateWorldMatrix(true);
+		this.updateWorldMatrix(false); // Only update nodes that are explicitly marked as isDirty
 		this.updateLightsBuffer();
 
 		const textureView = this.ctx.context.getCurrentTexture().createView();
@@ -296,6 +306,7 @@ export class Scene extends Node {
 		}
 
 		for (const mesh of this.meshes) {
+			if (!mesh.visible) continue;
 			// By moving setPipeline here, Standard vs ShaderMaterials can toggle
 			passEncoder.setPipeline(mesh.material.getPipeline(this.ctx));
 			mesh.draw(passEncoder);

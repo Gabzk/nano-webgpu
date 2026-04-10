@@ -288,7 +288,7 @@ scene.render((dt) => {
 		// Colisão por distância (Gap #5: sem AABB/colisão na lib, usando Vec3.distance manual)
 		const dist = Math.sqrt(
 			(obs.mesh.position.x - player.position.x) ** 2 +
-			(obs.mesh.position.z - player.position.z) ** 2,
+				(obs.mesh.position.z - player.position.z) ** 2,
 		);
 
 		if (dist < COLLISION_DISTANCE) {

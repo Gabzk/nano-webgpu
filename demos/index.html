@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nano WebGPU — Demo Hub</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;700;900&display=swap" rel="stylesheet">
+    <style>
+        body {
+            background: #0d0d1a;
+            color: #fff;
+            font-family: 'Outfit', sans-serif;
+            margin: 0;
+            padding: 40px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        h1 {
+            font-size: 3rem;
+            margin-bottom: 10px;
+            background: linear-gradient(135deg, #00e5ff, #8a2be2);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        p.subtitle {
+            color: #a0a0b0;
+            margin-bottom: 40px;
+            font-size: 1.2rem;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            width: 100%;
+            max-width: 1000px;
+        }
+
+        .card {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 24px;
+            text-decoration: none;
+            color: #fff;
+            transition: all 0.3s ease;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            background: rgba(255, 255, 255, 0.1);
+            border-color: #00e5ff;
+            box-shadow: 0 10px 30px rgba(0, 229, 255, 0.1);
+        }
+
+        .card h2 {
+            margin: 0 0 10px 0;
+            font-size: 1.5rem;
+            color: #fff;
+        }
+
+        .card p {
+            color: #a0a0b0;
+            line-height: 1.5;
+            flex-grow: 1;
+            margin: 0;
+        }
+
+        .tag {
+            display: inline-block;
+            background: rgba(0, 229, 255, 0.2);
+            color: #00e5ff;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            margin-bottom: 10px;
+            font-weight: bold;
+            width: fit-content;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Nano WebGPU Hub</h1>
+    <p class="subtitle">Selecione uma demonstração para carregar os módulos da placa de vídeo.</p>
+
+    <div class="grid">
+        <a href="./dogRunner/index.html" class="card">
+            <span class="tag">Minigame</span>
+            <h2>Cube Runner 🎮</h2>
+            <p>Um jogo completo mostrando movimentação frame a frame, input capturado na CPU e remoção de obstáculos.
+            </p>
+        </a>
+
+        <a href="./test_p0/index.html" class="card">
+            <span class="tag">Stress Test / Memória</span>
+            <h2>Prova Real: P0 (Destroy)</h2>
+            <p>Spawna centenas de cubos em caches estáticos e realiza um teste exaustivo comprovando a destruição de
+                Buffer limpa na memória da placa de vídeo.</p>
+        </a>
+
+        <a href="./visibility/index.html" class="card">
+            <span class="tag">Nova Feature</span>
+            <h2>Teste de Visibilidade 👁️</h2>
+            <p>Interaja com nodos na cena para testar a renderização com "visible = false", ocultando objetos sem
+                destruí-los na memória.</p>
+        </a>
+
+        <a href="./performance/index.html" class="card">
+            <span class="tag">Diagnostic</span>
+            <h2>Baseline FPS Test</h2>
+            <p>Testes progressivos para medir overhead da API WebGPU vs CPU bruta iterando com requestAnimationFrame.
+            </p>
+        </a>
+    </div>
+</body>
+
+</html>

@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste de Visibilidade • Nano WebGPU</title>
+    <style>
+        body {
+            margin: 0;
+            background: #222;
+            color: white;
+            font-family: sans-serif;
+            overflow: hidden;
+        }
+
+        canvas {
+            display: block;
+            width: 100vw;
+            height: 100vh;
+        }
+
+        #ui {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 20px;
+            border-radius: 12px;
+            border: 1px solid #444;
+            max-width: 300px;
+            z-index: 10;
+        }
+
+        h3 {
+            margin-top: 0;
+            color: #00e5ff;
+        }
+
+        button {
+            background: #00e5ff;
+            border: none;
+            color: #000;
+            padding: 10px 15px;
+            font-weight: bold;
+            border-radius: 6px;
+            cursor: pointer;
+            width: 100%;
+            margin-top: 10px;
+        }
+
+        button:hover {
+            background: #00b3cc;
+        }
+
+        .info {
+            color: #aaa;
+            font-size: 14px;
+            margin-top: 15px;
+        }
+
+        .back {
+            display: inline-block;
+            margin-bottom: 10px;
+            color: #888;
+            text-decoration: none;
+            font-size: 14px;
+        }
+
+        .back:hover {
+            color: #fff;
+            text-decoration: underline;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="ui">
+        <a href="./index.html" class="back">← Voltar ao Hub</a>
+        <h3>Visibilidade (Node.visible)</h3>
+        <p>Abaixo temos um cubo orbitando o centro.</p>
+        <button id="toggle-btn">Ocultar Cubo</button>
+        <div class="info">
+            Mesmo invisível, o cubo continua recebendo matematicamente a rotação do updateWorldMatrix() por baixo dos
+            panos na CPU, mas poupando draw calls da Placa de Vídeo. Ao reaparecer, você notará que ele não parou no
+            tempo!
+        </div>
+    </div>
+
+    <canvas id="canvas"></canvas>
+
+    <script type="module" src="./test_visibility.ts"></script>
+</body>
+
+</html>

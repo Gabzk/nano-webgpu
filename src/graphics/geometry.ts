@@ -44,4 +44,13 @@ export class Geometry {
 		});
 		ctx.device.queue.writeBuffer(this.indexBuffer, 0, indices as any);
 	}
+
+	/**
+	 * Frees the GPU buffers associated with this geometry.
+	 * Be careful: only destroy a geometry if no other meshes are sharing it.
+	 */
+	public destroy(): void {
+		if (this.vertexBuffer) this.vertexBuffer.destroy();
+		if (this.indexBuffer) this.indexBuffer.destroy();
+	}
 }

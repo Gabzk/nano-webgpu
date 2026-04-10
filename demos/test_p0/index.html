@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>P0 Proof - Nano WebGPU</title>
+    <style>
+        body { margin: 0; background: #111; color: white; font-family: monospace; overflow: hidden; }
+        canvas { display: block; width: 100vw; height: 100vh; }
+        #hud { position: fixed; top: 10px; left: 10px; background: rgba(0,0,0,0.8); padding: 15px; border-radius: 8px; font-size: 14px; pointer-events: none;}
+        h3 { margin: 0 0 10px 0; color: #00ffcc; }
+        li { margin-bottom: 5px; }
+        .success { color: #00ff00; font-weight: bold; }
+        .waiting { color: #ffcc00; }
+    </style>
+</head>
+<body>
+    <div id="hud">
+        <h3>Prova Real (P0)</h3>
+        <div id="info">
+            Meshes in Scene Graph: <span id="mesh-count">0</span><br>
+            FPS: <span id="fps">0</span><br><br>
+            <b>Testing Routine:</b>
+            <ol>
+                <li id="step1" class="waiting">Spawning 100 cubes...</li>
+                <li id="step2">Waiting 3 seconds...</li>
+                <li id="step3">Calling mesh.destroy() on all...</li>
+                <li id="step4">Verifying scene graph dropped to 0</li>
+            </ol>
+        </div>
+    </div>
+    <canvas id="canvas" width="1280" height="720"></canvas>
+    <script type="module" src="./test_p0.ts"></script>
+</body>
+</html>
