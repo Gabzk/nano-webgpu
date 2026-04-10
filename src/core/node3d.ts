@@ -1,5 +1,7 @@
+import { AABB } from "../math/aabb";
 import { Mat4 } from "../math/mat4";
 import { Vec3 } from "../math/vec3";
+import { CollisionShape } from "./collision-shape";
 import { Node } from "./node";
 
 /**
@@ -9,6 +11,13 @@ export class Node3D extends Node {
 	private _position: Vec3;
 	private _rotation: Vec3;
 	private _scale: Vec3;
+
+	/**
+	 * Optional collision shape used for overlap/intersection detection.
+	 * Set this to enable collision queries via `intersects()` and `getWorldAABB()`.
+	 * Inspired by Godot's CollisionShape3D.
+	 */
+	public collisionShape: CollisionShape | null = null;
 
 	constructor() {
 		super();
@@ -144,5 +153,26 @@ export class Node3D extends Node {
 		if (this._scale.x !== 1 || this._scale.y !== 1 || this._scale.z !== 1) {
 			this.localMatrix.scale(this._scale);
 		}
+	}
+	/**
+	 * Returns the world-space AABB for this node based on its collisionShape and worldMatrix.
+	 * Returns null if no collisionShape is assigned.
+	 */
+	public getWorldAABB(): AABB | null {
+		if (!this.collisionShape) return null;
+		const localAABB = this.collisionShape.getLocalAABB();
+		return localAABB.transformed(this.worldMatrix);
+	}
+
+	/**
+	 * Tests if this node's collision shape overlaps with another node's collision shape.
+	 * Both nodes must have a collisionShape assigned; returns false otherwise.
+	 * Inspired by Godot's Area3D.overlaps_body() / body.get_overlapping_bodies().
+	 */
+	public intersects(other: Node3D): boolean {
+		const a = this.getWorldAABB();
+		const b = other.getWorldAABB();
+		if (!a || !b) return false;
+		return a.intersects(b);
 	}
 }

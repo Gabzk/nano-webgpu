@@ -18,13 +18,35 @@ export interface PointLightOptions extends LightOptions {
 }
 
 export class Light extends Node3D {
-	public color: Color;
-	public intensity: number;
+	private _color: Color;
+	private _intensity: number;
+
+	get color(): Color {
+		return this._color;
+	}
+	set color(val: Color) {
+		this._color = val;
+		this._color.onChange = () => {
+			this.isDirty = true;
+		};
+		this.isDirty = true;
+	}
+
+	get intensity(): number {
+		return this._intensity;
+	}
+	set intensity(val: number) {
+		this._intensity = val;
+		this.isDirty = true;
+	}
 
 	constructor(options: LightOptions = {}) {
 		super();
-		this.color = Color.from(options.color ?? "#ffffff");
-		this.intensity = options.intensity ?? 1.0;
+		this._color = Color.from(options.color ?? "#ffffff");
+		this._color.onChange = () => {
+			this.isDirty = true;
+		};
+		this._intensity = options.intensity ?? 1.0;
 	}
 }
 

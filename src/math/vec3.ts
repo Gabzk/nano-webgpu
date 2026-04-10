@@ -143,6 +143,16 @@ export class Vec3 {
 	}
 
 	/**
+	 * Returns a new Vec3 scaled by a scalar value (non-mutating).
+	 * Use this instead of scale() when you don't want to modify the original vector.
+	 * @param {number} n - The scalar value
+	 * @returns {Vec3} A new scaled vector
+	 */
+	public scaled(n: number): Vec3 {
+		return new Vec3(this._x * n, this._y * n, this._z * n);
+	}
+
+	/**
 	 * Calculates the dot product of this vector and another
 	 * @param {Vec3} v - The other vector
 	 * @returns {number} The dot product

@@ -5,9 +5,11 @@ import {
 	createPlaneGeometry,
 	createSphereGeometry,
 } from "../graphics/primitives";
+import { AABB } from "../math/aabb";
 import { Vec3 } from "../math/vec3";
-import { Loader } from "./loader";
+import { CollisionShape } from "./collision-shape";
 import { Input } from "./input";
+import { Loader } from "./loader";
 
 /**
  * @module Context
@@ -143,6 +145,11 @@ export class Context {
 		options.geometry = this.defaultGeometries["cube"];
 		const mesh = new Mesh(this, options);
 		this.applyTransformOptions(mesh, options);
+
+		// Auto-assign box collision shape matching the cube size (respects scale)
+		const size = options.size || 1.0;
+		mesh.collisionShape = CollisionShape.box(size);
+
 		return mesh;
 	}
 
@@ -174,6 +181,11 @@ export class Context {
 		options.geometry = this.defaultGeometries["sphere"];
 		const mesh = new Mesh(this, options);
 		this.applyTransformOptions(mesh, options);
+
+		// Auto-assign sphere collision shape
+		const radius = options.radius || 1.0;
+		mesh.collisionShape = CollisionShape.sphere(radius);
+
 		return mesh;
 	}
 
@@ -211,6 +223,13 @@ export class Context {
 
 		const mesh = new Mesh(this, { geometry, ...finalOptions });
 		this.applyTransformOptions(mesh, finalOptions);
+
+		// Auto-compute AABB from the raw vertex data (positions at every 8th float: pos+norm+uv)
+		const localAABB = AABB.fromVertices(modelData.vertices, 8);
+		const halfExtents = localAABB.getHalfExtents();
+		mesh.collisionShape = CollisionShape.box(
+			new Vec3(halfExtents.x * 2, halfExtents.y * 2, halfExtents.z * 2),
+		);
 
 		return mesh;
 	}

@@ -17,6 +17,7 @@ import {
 	Camera,
 	Color,
 	DirectionalLight,
+	Input,
 	type Mesh,
 	type PointLight,
 	Scene,
@@ -111,7 +112,6 @@ let difficulty = 1;
 const LANE_MIN = -4.5;
 const LANE_MAX = 4.5;
 const PLAYER_SPEED = 8.0;
-const COLLISION_DISTANCE = 1.0;
 const SPAWN_Z = -35; // de onde vêm os cubos
 const DESPAWN_Z = 6; // onde somem (atrás do jogador)
 
@@ -144,17 +144,11 @@ const obstacleMaterials = [
 	}),
 ];
 
-// ===================== INPUT MANUAL =====================
-// (Aqui vemos a gap #1: sem Input Manager na lib)
+// ===================== INPUT =====================
 
-const keys: Record<string, boolean> = {};
-window.addEventListener("keydown", (e) => {
-	keys[e.key] = true;
-	if (e.key === " " && gameOver) restartGame();
-});
-window.addEventListener("keyup", (e) => {
-	keys[e.key] = false;
-});
+Input.addAction("left", ["KeyA", "ArrowLeft"]);
+Input.addAction("right", ["KeyD", "ArrowRight"]);
+Input.addAction("confirm", ["Space"]);
 
 // ===================== HUD (DOM) =====================
 // (Gap #2: sem sistema de UI/Texto na lib)
@@ -220,8 +214,8 @@ function restartGame() {
 	spawnTimer = 0;
 	difficulty = 1;
 	gameOver = false;
-	player.position.set(0, 0, 3);
-	player.rotation.set(0, 0, 0);
+	player.position.set(0, 0, 2);
+	player.rotation.set(-1.5, 0, 0);
 	updateHUD();
 }
 
@@ -242,6 +236,11 @@ scene.render((dt) => {
 			Math.cos(gameTime * 0.5) * 5,
 		);
 		gameTime += dt;
+
+		if (Input.isActionJustPressed("confirm")) {
+			restartGame();
+		}
+
 		return;
 	}
 
@@ -251,8 +250,8 @@ scene.render((dt) => {
 
 	// --- Input do jogador ---
 	let moveX = 0;
-	if (keys["a"] || keys["A"] || keys["ArrowLeft"]) moveX -= 1;
-	if (keys["d"] || keys["D"] || keys["ArrowRight"]) moveX += 1;
+	if (Input.isActionPressed("left")) moveX -= 1;
+	if (Input.isActionPressed("right")) moveX += 1;
 
 	const px = player.position.x + moveX * PLAYER_SPEED * dt;
 	player.position.x = Math.max(LANE_MIN, Math.min(LANE_MAX, px));
@@ -281,13 +280,8 @@ scene.render((dt) => {
 		obs.mesh.rotation.y += dt * 2;
 		obs.mesh.rotation.x += dt * 1.5;
 
-		// Colisão por distância (Gap #5: sem AABB/colisão na lib, usando Vec3.distance manual)
-		const dist = Math.sqrt(
-			(obs.mesh.position.x - player.position.x) ** 2 +
-				(obs.mesh.position.z - player.position.z) ** 2,
-		);
-
-		if (dist < COLLISION_DISTANCE) {
+		// Colisão via AABB (nano-webgpu CollisionShape — sem mais Math.sqrt manual!)
+		if (player.intersects(obs.mesh)) {
 			gameOver = true;
 			updateHUD();
 			return;

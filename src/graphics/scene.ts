@@ -1,5 +1,6 @@
 import { Context } from "../core/context";
 import { Node } from "../core/node";
+import { Node3D } from "../core/node3d";
 import { Color } from "../math/color";
 import { Vec3 } from "../math/vec3";
 import { Camera } from "./camera";
@@ -197,6 +198,27 @@ export class Scene extends Node {
 		}
 	}
 
+	/**
+	 * Returns all visible meshes in the scene whose AABB overlaps with the given node's AABB.
+	 * Inspired by Godot's Area3D.get_overlapping_bodies().
+	 * O(n) brute-force — sufficient for scenes with < 200 dynamic objects.
+	 * @param node - The node to test against all meshes.
+	 */
+	public getOverlappingBodies(node: Node3D): Mesh[] {
+		const aabb = node.getWorldAABB();
+		if (!aabb) return [];
+		const result: Mesh[] = [];
+		for (const mesh of this.meshes) {
+			if ((mesh as unknown) === node) continue;
+			if (!mesh.visible) continue;
+			const other = mesh.getWorldAABB();
+			if (other && aabb.intersects(other)) {
+				result.push(mesh);
+			}
+		}
+		return result;
+	}
+
 	private updateLightsBuffer(): void {
 		const floatData = new Float32Array(4 + this.lights.length * 8);
 		const limit = Math.min(this.lights.length, this.maxLights);
@@ -240,18 +262,23 @@ export class Scene extends Node {
 		if (loopCallback) {
 			this.ctx.run((dt) => {
 				loopCallback(dt);
-				this._renderFrame();
+				this._renderFrame(dt);
 			});
 		} else {
-			this._renderFrame();
+			this._renderFrame(0);
 		}
 	}
 
-	private _renderFrame(): void {
+	private _renderFrame(dt: number): void {
 		if (!this.camera) return;
 
 		// Ensure camera buffers exist before matrices are calculated
 		if (!this.camera.uniformBuffer) this.camera.initWebGPU(this.ctx);
+
+		// Update camera controller (third-person, first-person, orbit) before matrices
+		if (this.camera.controller) {
+			this.camera.controller.update(dt);
+		}
 
 		// Auto-fix resizing aspect before updating matrices
 		if (

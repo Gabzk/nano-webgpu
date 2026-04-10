@@ -1,11 +1,4 @@
-import {
-	Camera,
-	Context,
-	Scene,
-	StandardMaterial,
-	Color,
-	Input,
-} from "../../src/index";
+import { Scene, StandardMaterial, Color, Input } from "../../src/index";
 
 async function main() {
 	// Config
@@ -19,13 +12,20 @@ async function main() {
 	Input.addAction("ui_left", ["KeyA", "ArrowLeft"]);
 	Input.addAction("ui_right", ["KeyD", "ArrowRight"]);
 	Input.addAction("ui_jump", ["Space"]);
+	Input.setMouseMode("captured");
 
-	// Camera
+	// Camera — 2 linhas para terceira pessoa!
 	const camera = scene.setCamera({ position: [0, 5, 10] });
 
 	// Materials
 	const cubeMaterial = new StandardMaterial({
 		albedoColor: new Color(1.0, 1.0, 1.0, 1.0),
+		metallic: 0.1,
+		roughness: 0.4,
+	});
+
+	const groundMaterial = new StandardMaterial({
+		albedoColor: new Color(0.2, 0.2, 0.2, 1.0),
 		metallic: 0.1,
 		roughness: 0.4,
 	});
@@ -37,12 +37,25 @@ async function main() {
 		material: cubeMaterial,
 	});
 
+	const ground = scene.addCube({
+		position: [0, -1, 0],
+		scale: [10, 1, 10],
+		material: groundMaterial,
+	});
+
 	// Light
 	scene.addLight({
 		type: "directional",
 		rotationDegrees: [-45, 45, 0],
 		color: "#ffffff",
 		intensity: 1,
+	});
+
+	// Controller — câmera em 3ª pessoa automática!
+	const ctrl = camera.addController("orbit", {
+		center: [0, 0, 0],
+		distance: 10,
+		sensitivity: 0.003,
 	});
 
 	// Variables
@@ -58,25 +71,42 @@ async function main() {
 			canvas.height = innerHeight;
 		}
 
-		// Movement input
-		if (Input.isActionPressed("ui_left")) {
-			cube.position.x -= speed * dt;
-		}
-		if (Input.isActionPressed("ui_right")) {
-			cube.position.x += speed * dt;
-		}
+		// --- Movement input (relativo à câmera — ZERO trigonometria!) ---
+		const forward = ctrl.getForward();
+		const right = ctrl.getRight();
+
+		let moveX = 0,
+			moveZ = 0;
 		if (Input.isActionPressed("ui_up")) {
-			cube.position.z -= speed * dt;
+			moveX += forward.x;
+			moveZ += forward.z;
 		}
 		if (Input.isActionPressed("ui_down")) {
-			cube.position.z += speed * dt;
+			moveX -= forward.x;
+			moveZ -= forward.z;
+		}
+		if (Input.isActionPressed("ui_left")) {
+			moveX += right.x;
+			moveZ += right.z;
+		}
+		if (Input.isActionPressed("ui_right")) {
+			moveX -= right.x;
+			moveZ -= right.z;
+		}
+
+		// Normaliza diagonal para não andar mais rápido
+		const len = Math.sqrt(moveX * moveX + moveZ * moveZ);
+		if (len > 0) {
+			cube.position.x += (moveX / len) * speed * dt;
+			cube.position.z += (moveZ / len) * speed * dt;
+			// Cubo vira na direção do movimento
+			cube.rotation.y = Math.atan2(moveX, moveZ);
 		}
 
 		// Jump logic
 		if (Input.isActionJustPressed("ui_jump") && isGrounded) {
 			velocityY = 10;
 			isGrounded = false;
-			// Juice effect squash and stretch
 		}
 
 		// Gravity
@@ -93,15 +123,10 @@ async function main() {
 
 		// Change color while mouse left button is held
 		if (Input.isMouseButtonPressed(0)) {
-			// Pulse color
 			const time = performance.now() / 1000;
 			cubeMaterial.albedoColor.r = (Math.sin(time * 5) + 1) / 2;
 			cubeMaterial.albedoColor.g = (Math.cos(time * 3) + 1) / 2;
 		}
-
-		// Mouse movement rotation
-		cube.rotationDegrees.y += Input.mouseMovement.x * 0.5;
-		cube.rotationDegrees.x += Input.mouseMovement.y * 0.5;
 	});
 }
 
