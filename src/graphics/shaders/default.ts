@@ -21,10 +21,7 @@ struct SceneLights {
 
 
 // --- MODEL (@group(1)) ---
-struct ModelUniform {
-    modelMatrix: mat4x4<f32>,
-}
-@group(1) @binding(0) var<uniform> modelInfo: ModelUniform;
+@group(1) @binding(0) var<storage, read> models: array<mat4x4<f32>>;
 
 
 // --- MATERIAL (@group(2)) ---
@@ -69,12 +66,13 @@ struct VertexOutput {
 }
 
 @vertex
-fn vs_main(in: VertexInput) -> VertexOutput {
+fn vs_main(@builtin(instance_index) instanceIdx: u32, in: VertexInput) -> VertexOutput {
     var out: VertexOutput;
-    let world_pos = modelInfo.modelMatrix * vec4<f32>(in.position, 1.0);
+    let modelMatrix = models[instanceIdx];
+    let world_pos = modelMatrix * vec4<f32>(in.position, 1.0);
     out.frag_pos = world_pos.xyz;
     
-    out.normal = (modelInfo.modelMatrix * vec4<f32>(in.normal, 0.0)).xyz;
+    out.normal = (modelMatrix * vec4<f32>(in.normal, 0.0)).xyz;
     out.uv = in.uv;
     
     out.clip_position = camera.viewProj * world_pos;

@@ -1,7 +1,6 @@
 import type { Context } from "../../core/context";
 import { VRAMTracker } from "../../debug/vram-tracker";
 import { Color } from "../../math/color";
-import { PipelineManager } from "../pipeline";
 import { Texture } from "../texture";
 import { Material } from "./material";
 
@@ -170,7 +169,7 @@ export class StandardMaterial extends Material {
 	}
 
 	public getPipeline(ctx: Context): GPURenderPipeline {
-		return PipelineManager.getStandardPipeline(ctx);
+		return ctx.pipelineManager.getStandardPipeline();
 	}
 
 	public getBindGroup(ctx: Context): GPUBindGroup {
@@ -208,7 +207,13 @@ export class StandardMaterial extends Material {
 				size: 64, // 16 floats * 4 bytes
 				usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
 			});
-			VRAMTracker.register(this.uniformBuffer, "buffer", `StandardMaterial_${this.id}_Buffer`, 64, "StandardMaterial");
+			VRAMTracker.register(
+				this.uniformBuffer,
+				"buffer",
+				`StandardMaterial_${this.id}_Buffer`,
+				64,
+				"StandardMaterial",
+			);
 			this.isDirty = true;
 		}
 
@@ -249,7 +254,7 @@ export class StandardMaterial extends Material {
 			if (this.bindGroup) return; // Prevent double trigger
 			this.bindGroup = ctx.device.createBindGroup({
 				label: `StandardMaterial_${this.id}_BindGroup`,
-				layout: PipelineManager.getStandardPipeline(ctx).getBindGroupLayout(2),
+				layout: ctx.pipelineManager.getStandardPipeline().getBindGroupLayout(2),
 				entries: [
 					{ binding: 0, resource: { buffer: this.uniformBuffer } },
 					{ binding: 1, resource: sampler },

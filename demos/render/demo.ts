@@ -42,6 +42,5 @@ scene.enableDebug({
 
 // Loop de renderização totalmente gerenciado pela Scene
 scene.render((dt) => {
-
 	dirLight.rotationDegrees.y += 90 * dt;
 });

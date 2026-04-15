@@ -103,7 +103,13 @@ export class Camera extends Node3D {
 			size: 64, // mat4x4
 			usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
 		});
-		VRAMTracker.register(this.uniformBuffer, "buffer", "Camera Uniform Buffer", 64, "Camera");
+		VRAMTracker.register(
+			this.uniformBuffer,
+			"buffer",
+			"Camera Uniform Buffer",
+			64,
+			"Camera",
+		);
 
 		// Note: BindGroup is now managed by Scene (Group 0: Globals) combining Camera + Lights
 	}

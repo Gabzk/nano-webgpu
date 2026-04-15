@@ -23,4 +23,3 @@ export { Vec2 } from "./math/vec2";
 export { Vec3 } from "./math/vec3";
 
 export const VERSION = "0.1.0";
-

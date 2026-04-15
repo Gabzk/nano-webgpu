@@ -80,9 +80,10 @@ export class DebugPanel {
 		if (!this.visible) return;
 
 		const now = performance.now();
-		const interval = this.activeTab === "monitors"
-			? this.updateIntervalMs
-			: this.slowUpdateIntervalMs;
+		const interval =
+			this.activeTab === "monitors"
+				? this.updateIntervalMs
+				: this.slowUpdateIntervalMs;
 
 		if (now - this.lastUpdateTime < interval) return;
 		this.lastUpdateTime = now;
@@ -122,10 +123,7 @@ export class DebugPanel {
 
 	// ─── DOM Construction ─────────────────────────────────────────
 
-	private createDOM(
-		canvas: HTMLCanvasElement,
-		position: string,
-	): void {
+	private createDOM(canvas: HTMLCanvasElement, position: string): void {
 		// Ensure parent is positioned
 		const parent = canvas.parentElement || document.body;
 		const parentPos = getComputedStyle(parent).position;
@@ -136,7 +134,7 @@ export class DebugPanel {
 		this.container = document.createElement("div");
 		this.container.id = "nano-debug-panel";
 		this.container.style.cssText = this.getContainerStyle(position);
-		
+
 		// TRICK: Move the CSS resize handle to the bottom-left if the panel is on the right edge.
 		if (position.includes("right")) {
 			this.container.style.direction = "rtl";
@@ -321,7 +319,9 @@ export class DebugPanel {
 		const summary = VRAMTracker.getSummary();
 
 		// Preserve scroll position so it doesn't jump to top on update
-		const scrollContainer = this.tabContentEl.querySelector('.vram-scroll-container');
+		const scrollContainer = this.tabContentEl.querySelector(
+			".vram-scroll-container",
+		);
 		const currentScroll = scrollContainer ? scrollContainer.scrollTop : 0;
 
 		let tableRows = "";
@@ -360,9 +360,11 @@ export class DebugPanel {
 				</table>
 			</div>
 		`;
-		
+
 		// Restore scroll position
-		const newScrollContainer = this.tabContentEl.querySelector('.vram-scroll-container');
+		const newScrollContainer = this.tabContentEl.querySelector(
+			".vram-scroll-container",
+		);
 		if (newScrollContainer) {
 			newScrollContainer.scrollTop = currentScroll;
 		}

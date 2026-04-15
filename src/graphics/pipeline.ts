@@ -2,107 +2,110 @@ import type { Context } from "../core/context";
 import { defaultShaderWGSL } from "./shaders/default";
 
 export class PipelineManager {
-	private static standardPipeline: GPURenderPipeline | null = null;
-	private static standardPipelineLayout: GPUPipelineLayout | null = null;
+	private ctx: Context;
 
-	private static customPipelines: Map<string, GPURenderPipeline> = new Map();
-	private static customPipelineLayout: GPUPipelineLayout | null = null;
+	private standardPipeline: GPURenderPipeline | null = null;
+	private standardPipelineLayout: GPUPipelineLayout | null = null;
 
-	private static bindGroupLayout0_Globals: GPUBindGroupLayout | null = null;
-	private static bindGroupLayout1_Model: GPUBindGroupLayout | null = null;
-	private static bindGroupLayout2_Material: GPUBindGroupLayout | null = null;
-	private static bindGroupLayout3_Custom: GPUBindGroupLayout | null = null;
+	private customPipelines: Map<string, GPURenderPipeline> = new Map();
+	private customPipelineLayout: GPUPipelineLayout | null = null;
 
-	private static buildBindGroupLayouts(ctx: Context) {
-		if (PipelineManager.bindGroupLayout0_Globals) return;
+	private bindGroupLayout0_Globals: GPUBindGroupLayout | null = null;
+	private bindGroupLayout1_Model: GPUBindGroupLayout | null = null;
+	private bindGroupLayout2_Material: GPUBindGroupLayout | null = null;
+	private bindGroupLayout3_Custom: GPUBindGroupLayout | null = null;
+
+	constructor(ctx: Context) {
+		this.ctx = ctx;
+	}
+
+	private buildBindGroupLayouts() {
+		if (this.bindGroupLayout0_Globals) return;
 
 		// Group 0: Globals (Camera & Lights)
-		PipelineManager.bindGroupLayout0_Globals = ctx.device.createBindGroupLayout(
-			{
-				label: "Globals Bind Group Layout",
-				entries: [
-					{
-						binding: 0,
-						visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT,
-						buffer: { type: "uniform" }, // Camera
-					},
-					{
-						binding: 1,
-						visibility: GPUShaderStage.FRAGMENT,
-						buffer: { type: "read-only-storage" }, // Lights
-					},
-				],
-			},
-		);
+		this.bindGroupLayout0_Globals = this.ctx.device.createBindGroupLayout({
+			label: "Globals Bind Group Layout",
+			entries: [
+				{
+					binding: 0,
+					visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT,
+					buffer: { type: "uniform" }, // Camera
+				},
+				{
+					binding: 1,
+					visibility: GPUShaderStage.FRAGMENT,
+					buffer: { type: "read-only-storage" }, // Lights
+				},
+			],
+		});
 
-		// Group 1: Model
-		PipelineManager.bindGroupLayout1_Model = ctx.device.createBindGroupLayout({
+		// Group 1: Model (Storage buffer for instanced matrices)
+		this.bindGroupLayout1_Model = this.ctx.device.createBindGroupLayout({
 			label: "Model Bind Group Layout",
 			entries: [
 				{
 					binding: 0,
 					visibility: GPUShaderStage.VERTEX,
-					buffer: { type: "uniform" },
+					buffer: { type: "read-only-storage" },
 				},
 			],
 		});
 
 		// Group 2: Material
-		PipelineManager.bindGroupLayout2_Material =
-			ctx.device.createBindGroupLayout({
-				label: "Material Bind Group Layout",
-				entries: [
-					{
-						binding: 0,
-						visibility: GPUShaderStage.FRAGMENT,
-						buffer: { type: "uniform" },
-					},
-					{
-						binding: 1,
-						visibility: GPUShaderStage.FRAGMENT,
-						sampler: { type: "filtering" },
-					},
-					{
-						binding: 2,
-						visibility: GPUShaderStage.FRAGMENT,
-						texture: { sampleType: "float", viewDimension: "2d" },
-					}, // Albedo
-					{
-						binding: 3,
-						visibility: GPUShaderStage.FRAGMENT,
-						texture: { sampleType: "float", viewDimension: "2d" },
-					}, // Normal
-					{
-						binding: 4,
-						visibility: GPUShaderStage.FRAGMENT,
-						texture: { sampleType: "float", viewDimension: "2d" },
-					}, // Roughness
-					{
-						binding: 5,
-						visibility: GPUShaderStage.FRAGMENT,
-						texture: { sampleType: "float", viewDimension: "2d" },
-					}, // Metallic
-					{
-						binding: 6,
-						visibility: GPUShaderStage.FRAGMENT,
-						texture: { sampleType: "float", viewDimension: "2d" },
-					}, // AO
-					{
-						binding: 7,
-						visibility: GPUShaderStage.FRAGMENT,
-						texture: { sampleType: "float", viewDimension: "2d" },
-					}, // ORM
-				],
-			});
+		this.bindGroupLayout2_Material = this.ctx.device.createBindGroupLayout({
+			label: "Material Bind Group Layout",
+			entries: [
+				{
+					binding: 0,
+					visibility: GPUShaderStage.FRAGMENT,
+					buffer: { type: "uniform" },
+				},
+				{
+					binding: 1,
+					visibility: GPUShaderStage.FRAGMENT,
+					sampler: { type: "filtering" },
+				},
+				{
+					binding: 2,
+					visibility: GPUShaderStage.FRAGMENT,
+					texture: { sampleType: "float", viewDimension: "2d" },
+				}, // Albedo
+				{
+					binding: 3,
+					visibility: GPUShaderStage.FRAGMENT,
+					texture: { sampleType: "float", viewDimension: "2d" },
+				}, // Normal
+				{
+					binding: 4,
+					visibility: GPUShaderStage.FRAGMENT,
+					texture: { sampleType: "float", viewDimension: "2d" },
+				}, // Roughness
+				{
+					binding: 5,
+					visibility: GPUShaderStage.FRAGMENT,
+					texture: { sampleType: "float", viewDimension: "2d" },
+				}, // Metallic
+				{
+					binding: 6,
+					visibility: GPUShaderStage.FRAGMENT,
+					texture: { sampleType: "float", viewDimension: "2d" },
+				}, // AO
+				{
+					binding: 7,
+					visibility: GPUShaderStage.FRAGMENT,
+					texture: { sampleType: "float", viewDimension: "2d" },
+				}, // ORM
+			],
+		});
 
 		// Group 3: Empty Custom for advanced Shaders
-		PipelineManager.bindGroupLayout3_Custom = ctx.device.createBindGroupLayout({
+		this.bindGroupLayout3_Custom = this.ctx.device.createBindGroupLayout({
 			label: "Custom Empty Bind Group Layout",
 			entries: [], // Can be customized later by advanced users via reflection, for now empty
 		});
 	}
 
-	private static getVertexBuffers(): GPUVertexBufferLayout[] {
+	private getVertexBuffers(): GPUVertexBufferLayout[] {
 		return [
 			{
 				attributes: [
@@ -116,41 +119,41 @@ export class PipelineManager {
 		];
 	}
 
-	public static getStandardPipelineLayout(ctx: Context): GPUPipelineLayout {
-		if (!PipelineManager.standardPipelineLayout) {
-			PipelineManager.buildBindGroupLayouts(ctx);
-			PipelineManager.standardPipelineLayout = ctx.device.createPipelineLayout({
+	public getStandardPipelineLayout(): GPUPipelineLayout {
+		if (!this.standardPipelineLayout) {
+			this.buildBindGroupLayouts();
+			this.standardPipelineLayout = this.ctx.device.createPipelineLayout({
 				bindGroupLayouts: [
-					PipelineManager.bindGroupLayout0_Globals!,
-					PipelineManager.bindGroupLayout1_Model!,
-					PipelineManager.bindGroupLayout2_Material!,
+					this.bindGroupLayout0_Globals!,
+					this.bindGroupLayout1_Model!,
+					this.bindGroupLayout2_Material!,
 				],
 			});
 		}
-		return PipelineManager.standardPipelineLayout;
+		return this.standardPipelineLayout;
 	}
 
-	public static getStandardPipeline(ctx: Context): GPURenderPipeline {
-		if (!PipelineManager.standardPipeline) {
-			const shaderModule = ctx.device.createShaderModule({
+	public getStandardPipeline(): GPURenderPipeline {
+		if (!this.standardPipeline) {
+			const shaderModule = this.ctx.device.createShaderModule({
 				label: "Standard Pipeline Shader",
 				code: defaultShaderWGSL,
 			});
 
-			PipelineManager.standardPipeline = ctx.device.createRenderPipeline({
+			this.standardPipeline = this.ctx.device.createRenderPipeline({
 				label: "Standard Render Pipeline",
-				layout: PipelineManager.getStandardPipelineLayout(ctx),
+				layout: this.getStandardPipelineLayout(),
 				vertex: {
 					module: shaderModule,
 					entryPoint: "vs_main",
-					buffers: PipelineManager.getVertexBuffers(),
+					buffers: this.getVertexBuffers(),
 				},
 				fragment: {
 					module: shaderModule,
 					entryPoint: "fs_main",
 					targets: [
 						{
-							format: ctx.format,
+							format: this.ctx.format,
 							blend: {
 								color: {
 									srcFactor: "src-alpha",
@@ -174,53 +177,50 @@ export class PipelineManager {
 				},
 			});
 		}
-		return PipelineManager.standardPipeline;
+		return this.standardPipeline;
 	}
 
-	public static getCustomPipelineLayout(ctx: Context): GPUPipelineLayout {
-		if (!PipelineManager.customPipelineLayout) {
-			PipelineManager.buildBindGroupLayouts(ctx);
+	public getCustomPipelineLayout(): GPUPipelineLayout {
+		if (!this.customPipelineLayout) {
+			this.buildBindGroupLayouts();
 			// Custom supports group 3
-			PipelineManager.customPipelineLayout = ctx.device.createPipelineLayout({
+			this.customPipelineLayout = this.ctx.device.createPipelineLayout({
 				bindGroupLayouts: [
-					PipelineManager.bindGroupLayout0_Globals!,
-					PipelineManager.bindGroupLayout1_Model!,
-					PipelineManager.bindGroupLayout2_Material!,
-					PipelineManager.bindGroupLayout3_Custom!,
+					this.bindGroupLayout0_Globals!,
+					this.bindGroupLayout1_Model!,
+					this.bindGroupLayout2_Material!,
+					this.bindGroupLayout3_Custom!,
 				],
 			});
 		}
-		return PipelineManager.customPipelineLayout;
+		return this.customPipelineLayout;
 	}
 
-	public static getCustomPipeline(
-		ctx: Context,
-		shaderCode: string,
-	): GPURenderPipeline {
+	public getCustomPipeline(shaderCode: string): GPURenderPipeline {
 		// Simple hash via whole string
-		if (PipelineManager.customPipelines.has(shaderCode)) {
-			return PipelineManager.customPipelines.get(shaderCode)!;
+		if (this.customPipelines.has(shaderCode)) {
+			return this.customPipelines.get(shaderCode)!;
 		}
 
-		const shaderModule = ctx.device.createShaderModule({
+		const shaderModule = this.ctx.device.createShaderModule({
 			label: "Custom Pipeline Shader",
 			code: shaderCode,
 		});
 
-		const pipeline = ctx.device.createRenderPipeline({
+		const pipeline = this.ctx.device.createRenderPipeline({
 			label: "Custom Render Pipeline",
-			layout: PipelineManager.getCustomPipelineLayout(ctx),
+			layout: this.getCustomPipelineLayout(),
 			vertex: {
 				module: shaderModule,
 				entryPoint: "vs_main",
-				buffers: PipelineManager.getVertexBuffers(),
+				buffers: this.getVertexBuffers(),
 			},
 			fragment: {
 				module: shaderModule,
 				entryPoint: "fs_main",
 				targets: [
 					{
-						format: ctx.format,
+						format: this.ctx.format,
 						blend: {
 							color: {
 								srcFactor: "src-alpha",
@@ -244,17 +244,17 @@ export class PipelineManager {
 			},
 		});
 
-		PipelineManager.customPipelines.set(shaderCode, pipeline);
+		this.customPipelines.set(shaderCode, pipeline);
 		return pipeline;
 	}
 
-	public static getGlobalsBindGroupLayout(ctx: Context): GPUBindGroupLayout {
-		PipelineManager.buildBindGroupLayouts(ctx);
-		return PipelineManager.bindGroupLayout0_Globals!;
+	public getGlobalsBindGroupLayout(): GPUBindGroupLayout {
+		this.buildBindGroupLayouts();
+		return this.bindGroupLayout0_Globals!;
 	}
 
-	public static getModelBindGroupLayout(ctx: Context): GPUBindGroupLayout {
-		PipelineManager.buildBindGroupLayouts(ctx);
-		return PipelineManager.bindGroupLayout1_Model!;
+	public getModelBindGroupLayout(): GPUBindGroupLayout {
+		this.buildBindGroupLayouts();
+		return this.bindGroupLayout1_Model!;
 	}
 }

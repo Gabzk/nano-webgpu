@@ -40,7 +40,13 @@ export class Texture {
 				GPUTextureUsage.COPY_DST |
 				GPUTextureUsage.RENDER_ATTACHMENT,
 		});
-		VRAMTracker.register(tex.gpuTexture, "texture", `Tex dummy: ${url}`, 4, "Texture");
+		VRAMTracker.register(
+			tex.gpuTexture,
+			"texture",
+			`Tex dummy: ${url}`,
+			4,
+			"Texture",
+		);
 		const whitePixel = new Uint8Array([255, 255, 255, 255]);
 		ctx.device.queue.writeTexture(
 			{ texture: tex.gpuTexture },
@@ -59,7 +65,13 @@ export class Texture {
 				tex.gpuTexture = gpuTex;
 				const w = gpuTex.width || 1;
 				const h = gpuTex.height || 1;
-				VRAMTracker.register(gpuTex, "texture", `Tex: ${url}`, w * h * 4, "Texture");
+				VRAMTracker.register(
+					gpuTex,
+					"texture",
+					`Tex: ${url}`,
+					w * h * 4,
+					"Texture",
+				);
 				tex.isLoaded = true;
 				for (const cb of tex.listeners) cb();
 			})
@@ -86,7 +98,13 @@ export class Texture {
 				GPUTextureUsage.COPY_DST |
 				GPUTextureUsage.RENDER_ATTACHMENT,
 		});
-		VRAMTracker.register(tex.gpuTexture, "texture", "Dummy White", 4, "Texture");
+		VRAMTracker.register(
+			tex.gpuTexture,
+			"texture",
+			"Dummy White",
+			4,
+			"Texture",
+		);
 		const whitePixel = new Uint8Array([255, 255, 255, 255]);
 		ctx.device.queue.writeTexture(
 			{ texture: tex.gpuTexture },
@@ -116,7 +134,13 @@ export class Texture {
 				GPUTextureUsage.COPY_DST |
 				GPUTextureUsage.RENDER_ATTACHMENT,
 		});
-		VRAMTracker.register(tex.gpuTexture, "texture", "Dummy Normal", 4, "Texture");
+		VRAMTracker.register(
+			tex.gpuTexture,
+			"texture",
+			"Dummy Normal",
+			4,
+			"Texture",
+		);
 		const normalPixel = new Uint8Array([128, 128, 255, 255]);
 		ctx.device.queue.writeTexture(
 			{ texture: tex.gpuTexture },

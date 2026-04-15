@@ -2,6 +2,9 @@ import type { Context } from "../core/context";
 import { VRAMTracker } from "../debug/vram-tracker";
 
 export class Geometry {
+	private static _nextId = 0;
+	public readonly id: number;
+
 	public vertexBuffer!: GPUBuffer;
 	public indexBuffer!: GPUBuffer;
 	public vertexCount: number = 0;
@@ -17,6 +20,7 @@ export class Geometry {
 		indices: Uint16Array | Uint32Array,
 		options: { hasUVs?: boolean; hasNormals?: boolean } = {},
 	) {
+		this.id = Geometry._nextId++;
 		this.hasUVs = options.hasUVs ?? false;
 		this.hasNormals = options.hasNormals ?? false;
 
@@ -36,7 +40,13 @@ export class Geometry {
 			usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
 		});
 		ctx.device.queue.writeBuffer(this.vertexBuffer, 0, vertices as any);
-		VRAMTracker.register(this.vertexBuffer, "buffer", "Geometry Vertex Buffer", vertices.byteLength, "Geometry");
+		VRAMTracker.register(
+			this.vertexBuffer,
+			"buffer",
+			"Geometry Vertex Buffer",
+			vertices.byteLength,
+			"Geometry",
+		);
 
 		// Create Index Buffer
 		this.indexBuffer = ctx.device.createBuffer({
@@ -45,7 +55,13 @@ export class Geometry {
 			usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST,
 		});
 		ctx.device.queue.writeBuffer(this.indexBuffer, 0, indices as any);
-		VRAMTracker.register(this.indexBuffer, "buffer", "Geometry Index Buffer", indices.byteLength, "Geometry");
+		VRAMTracker.register(
+			this.indexBuffer,
+			"buffer",
+			"Geometry Index Buffer",
+			indices.byteLength,
+			"Geometry",
+		);
 	}
 
 	/**

@@ -87,7 +87,7 @@ export class PerformanceTracker {
 		if (now - this.lastFpsUpdate >= this.fpsUpdateInterval) {
 			const elapsedMs = now - this.lastFpsUpdate;
 			this.smoothFps = (this.frameCount / elapsedMs) * 1000;
-			this.fps = Math.round(this.smoothFps);			
+			this.fps = Math.round(this.smoothFps);
 			this.frameCount = 0;
 			this.lastFpsUpdate = now;
 		}

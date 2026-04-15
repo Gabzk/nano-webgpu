@@ -1,5 +1,6 @@
 import { Geometry } from "../graphics/geometry";
 import { Mesh } from "../graphics/mesh";
+import { PipelineManager } from "../graphics/pipeline";
 import {
 	createCubeGeometry,
 	createPlaneGeometry,
@@ -37,6 +38,11 @@ export class Context {
 	 * @type {GPUTextureFormat}
 	 */
 	public format!: GPUTextureFormat;
+
+	/**
+	 * Per-context pipeline manager (non-static, supports multiple canvases)
+	 */
+	public pipelineManager!: PipelineManager;
 
 	/**
 	 * Check if WebGPU is supported
@@ -98,6 +104,9 @@ export class Context {
 			alphaMode: "premultiplied",
 		});
 
+		// Initialize per-context pipeline manager
+		this.pipelineManager = new PipelineManager(this);
+
 		Input.init();
 	}
 
@@ -123,7 +132,7 @@ export class Context {
 	// Basic geometry cache
 	private defaultGeometries: Record<string, any> = {};
 
-	private applyTransformOptions(mesh: Mesh, options: any) {
+	public applyTransformOptions(mesh: Mesh, options: any) {
 		if (options.position) mesh.position.copy(Vec3.from(options.position));
 		if (options.scale !== undefined) {
 			if (typeof options.scale === "number")

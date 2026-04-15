@@ -7,11 +7,11 @@ import { VRAMTracker } from "../debug/vram-tracker";
 import { Color } from "../math/color";
 import { Vec3 } from "../math/vec3";
 import { Camera } from "./camera";
+import { Geometry } from "./geometry";
 import { DirectionalLight, Light, PointLight } from "./light";
 import { Material } from "./materials/material";
 import { StandardMaterial } from "./materials/standard-material";
 import { Mesh } from "./mesh";
-import { PipelineManager } from "./pipeline";
 
 export class Scene extends Node {
 	public ctx: Context;
@@ -29,6 +29,17 @@ export class Scene extends Node {
 	private globalsBindGroup!: GPUBindGroup;
 	private globalsBindGroupDirty: boolean = true;
 	public defaultDir: string = "";
+
+	// --- Instance Batching ---
+	private instanceBatches: Map<
+		string,
+		{
+			buffer: GPUBuffer;
+			bindGroup: GPUBindGroup;
+			capacity: number;
+		}
+	> = new Map();
+	private instanceMatrixScratch: Float32Array = new Float32Array(16 * 64); // Reusable scratch for writing matrices
 
 	// --- Debug / Profiling ---
 	private perfTracker: PerformanceTracker | null = null;
@@ -56,7 +67,13 @@ export class Scene extends Node {
 			usage: GPUTextureUsage.RENDER_ATTACHMENT,
 		});
 		// depth24plus = 4 bytes per pixel (padded)
-		VRAMTracker.register(this.depthTexture, "texture", "Scene Depth Texture", w * h * 4, "Scene");
+		VRAMTracker.register(
+			this.depthTexture,
+			"texture",
+			"Scene Depth Texture",
+			w * h * 4,
+			"Scene",
+		);
 	}
 
 	public static async init(
@@ -185,6 +202,170 @@ export class Scene extends Node {
 		return mesh;
 	}
 
+	/**
+	 * Topology name mapping: friendly names → WebGPU native topology strings.
+	 */
+	private static readonly TOPOLOGY_MAP: Record<string, GPUPrimitiveTopology> = {
+		triangles: "triangle-list",
+		lines: "line-list",
+		points: "point-list",
+		"line-strip": "line-strip",
+		"triangle-strip": "triangle-strip",
+	};
+
+	/**
+	 * Vertex format attribute sizes (in number of floats).
+	 */
+	private static readonly FORMAT_SIZES: Record<string, number> = {
+		position: 3,
+		normal: 3,
+		uv: 2,
+		color: 3,
+		tangent: 4,
+	};
+
+	/**
+	 * Build a mesh from raw vertex data and add it to the scene.
+	 * Inspired by OpenGL's immediate mode but using modern buffer-based approach.
+	 *
+	 * @example
+	 * ```typescript
+	 * const tri = scene.buildMesh({
+	 *   vertexFormat: ["position", "color"],
+	 *   vertexBuffer: [
+	 *     -1, 0, 0,  1, 0, 0,
+	 *      1, 0, 0,  0, 1, 0,
+	 *      0, 1, 0,  0, 0, 1,
+	 *   ],
+	 *   topology: "triangles",
+	 *   material: new StandardMaterial({ albedoColor: "#ff0000" }),
+	 * });
+	 * ```
+	 */
+	public buildMesh(config: {
+		vertexFormat: string[];
+		vertexBuffer: number[];
+		indices?: number[];
+		topology?: string;
+		material?: Material;
+		position?: number[];
+		rotation?: number[];
+		rotationDegrees?: number[] | any;
+		scale?: number | number[];
+	}): Mesh {
+		const {
+			vertexFormat,
+			vertexBuffer,
+			indices,
+			topology = "triangles",
+			material,
+			...transformOptions
+		} = config;
+
+		// Calculate stride from format
+		let stride = 0;
+		const hasNormals = vertexFormat.includes("normal");
+		const hasUVs = vertexFormat.includes("uv");
+
+		for (const attr of vertexFormat) {
+			const size = Scene.FORMAT_SIZES[attr];
+			if (!size) {
+				throw new Error(
+					`buildMesh: Unknown vertex attribute "${attr}". Valid: ${Object.keys(Scene.FORMAT_SIZES).join(", ")}`,
+				);
+			}
+			stride += size;
+		}
+
+		const vertexCount = Math.floor(vertexBuffer.length / stride);
+		if (vertexCount * stride !== vertexBuffer.length) {
+			throw new Error(
+				`buildMesh: vertexBuffer length (${vertexBuffer.length}) is not evenly divisible by stride (${stride}). Check your vertexFormat.`,
+			);
+		}
+
+		// Our standard pipeline expects: position(3) + normal(3) + uv(2) = 8 floats per vertex.
+		// We need to remap whatever the user gave us into that format.
+		const pipelineStride = 8; // pos(3) + normal(3) + uv(2)
+		const remappedVertices = new Float32Array(vertexCount * pipelineStride);
+
+		for (let v = 0; v < vertexCount; v++) {
+			const srcOffset = v * stride;
+			const dstOffset = v * pipelineStride;
+
+			let cursor = 0;
+			let pos = [0, 0, 0];
+			let norm = [0, 0, 1]; // Default normal: facing camera
+			let uv = [0, 0];
+
+			for (const attr of vertexFormat) {
+				const attrSize = Scene.FORMAT_SIZES[attr];
+				if (attr === "position") {
+					pos = [
+						vertexBuffer[srcOffset + cursor],
+						vertexBuffer[srcOffset + cursor + 1],
+						vertexBuffer[srcOffset + cursor + 2],
+					];
+				} else if (attr === "normal") {
+					norm = [
+						vertexBuffer[srcOffset + cursor],
+						vertexBuffer[srcOffset + cursor + 1],
+						vertexBuffer[srcOffset + cursor + 2],
+					];
+				} else if (attr === "uv") {
+					uv = [
+						vertexBuffer[srcOffset + cursor],
+						vertexBuffer[srcOffset + cursor + 1],
+					];
+				}
+				// color, tangent, etc are read but not mapped to standard pipeline (user can use ShaderMaterial for those)
+				cursor += attrSize;
+			}
+
+			// Write in pipeline order: position, normal, uv
+			remappedVertices[dstOffset + 0] = pos[0];
+			remappedVertices[dstOffset + 1] = pos[1];
+			remappedVertices[dstOffset + 2] = pos[2];
+			remappedVertices[dstOffset + 3] = norm[0];
+			remappedVertices[dstOffset + 4] = norm[1];
+			remappedVertices[dstOffset + 5] = norm[2];
+			remappedVertices[dstOffset + 6] = uv[0];
+			remappedVertices[dstOffset + 7] = uv[1];
+		}
+
+		// Generate indices if not provided
+		let indexArray: Uint16Array | Uint32Array;
+		if (indices) {
+			indexArray =
+				vertexCount > 65535
+					? new Uint32Array(indices)
+					: new Uint16Array(indices);
+		} else {
+			const autoIndices = Array.from({ length: vertexCount }, (_, i) => i);
+			indexArray =
+				vertexCount > 65535
+					? new Uint32Array(autoIndices)
+					: new Uint16Array(autoIndices);
+		}
+
+		// Create Geometry
+		const geometry = new Geometry(this.ctx, remappedVertices, indexArray, {
+			hasNormals: true,
+			hasUVs: true,
+		});
+
+		// Resolve material
+		const finalMaterial =
+			material instanceof Material ? material : new StandardMaterial();
+
+		// Create Mesh
+		const mesh = new Mesh(this.ctx, { geometry, material: finalMaterial });
+		this.ctx.applyTransformOptions(mesh, transformOptions);
+		this.add(mesh);
+
+		return mesh;
+	}
+
 	public override add(node: Node): void {
 		super.add(node);
 		if (node instanceof Mesh) {
@@ -226,13 +407,13 @@ export class Scene extends Node {
 	private ensureLightsBufferSize(): void {
 		// Count(16 bytes) + 32 bytes per light
 		const requiredSize = 16 + 32 * this.lights.length;
-		
+
 		if (!this.lightsBuffer || this.lightsBuffer.size < requiredSize) {
 			if (this.lightsBuffer) {
 				VRAMTracker.unregister(this.lightsBuffer);
 				this.lightsBuffer.destroy();
 			}
-			
+
 			// Allocate in chunks of 50 to avoid frequent reallocation
 			const capacity = Math.max(50, this.lights.length + 20);
 			const newSize = 16 + 32 * capacity;
@@ -242,7 +423,13 @@ export class Scene extends Node {
 				size: newSize,
 				usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
 			});
-			VRAMTracker.register(this.lightsBuffer, "buffer", "Scene Lights Storage Buffer", newSize, "Scene");
+			VRAMTracker.register(
+				this.lightsBuffer,
+				"buffer",
+				"Scene Lights Storage Buffer",
+				newSize,
+				"Scene",
+			);
 
 			this.globalsBindGroupDirty = true;
 
@@ -289,14 +476,14 @@ export class Scene extends Node {
 			floatData[offset + 7] = light.intensity;
 		}
 
-		// Only write the bytes we actually populated + the padded count container. 
+		// Only write the bytes we actually populated + the padded count container.
 		// Length in bytes = 16 for count block + (limit * 32 bytes for lights).
 		this.ctx.device.queue.writeBuffer(
-			this.lightsBuffer, 
-			0, 
+			this.lightsBuffer,
+			0,
 			this.lightsDataFloat.buffer,
 			0,
-			16 + 32 * limit
+			16 + 32 * limit,
 		);
 	}
 
@@ -402,7 +589,7 @@ export class Scene extends Node {
 		if (this.globalsBindGroupDirty && this.camera.uniformBuffer) {
 			this.globalsBindGroup = this.ctx.device.createBindGroup({
 				label: "Scene_Globals_BindGroup",
-				layout: PipelineManager.getGlobalsBindGroupLayout(this.ctx),
+				layout: this.ctx.pipelineManager.getGlobalsBindGroupLayout(),
 				entries: [
 					{ binding: 0, resource: { buffer: this.camera.uniformBuffer } },
 					{ binding: 1, resource: { buffer: this.lightsBuffer } },
@@ -415,23 +602,124 @@ export class Scene extends Node {
 			passEncoder.setBindGroup(0, this.globalsBindGroup);
 		}
 
-		let lastPipeline: GPURenderPipeline | null = null;
+		// ─── Instanced Batch Rendering ──────────────────────────────
+		// Group visible meshes by shared (geometry, material) for instancing.
+		const batchGroups = new Map<string, Mesh[]>();
 		for (const mesh of this.meshes) {
 			if (!mesh.visible) continue;
-			// By moving setPipeline here, Standard vs ShaderMaterials can toggle
-			const pipeline = mesh.material.getPipeline(this.ctx);
+			const key = `${mesh.geometry.id}_${mesh.material.id}`;
+			let group = batchGroups.get(key);
+			if (!group) {
+				group = [];
+				batchGroups.set(key, group);
+			}
+			group.push(mesh);
+		}
+
+		let lastPipeline: GPURenderPipeline | null = null;
+
+		for (const [batchKey, batchMeshes] of batchGroups) {
+			const instanceCount = batchMeshes.length;
+			const representative = batchMeshes[0];
+
+			// Ensure scratch buffer large enough for this batch
+			const floatsNeeded = instanceCount * 16;
+			if (this.instanceMatrixScratch.length < floatsNeeded) {
+				this.instanceMatrixScratch = new Float32Array(
+					Math.max(floatsNeeded, this.instanceMatrixScratch.length * 2),
+				);
+			}
+
+			// Fill in world matrices
+			for (let i = 0; i < instanceCount; i++) {
+				this.instanceMatrixScratch.set(
+					batchMeshes[i].worldMatrix.values,
+					i * 16,
+				);
+			}
+
+			// Get or create storage buffer for this batch
+			let batch = this.instanceBatches.get(batchKey);
+			if (!batch || batch.capacity < instanceCount) {
+				// Destroy old buffer
+				if (batch) {
+					VRAMTracker.unregister(batch.buffer);
+					batch.buffer.destroy();
+				}
+
+				// Allocate with headroom to avoid frequent resize
+				const capacity = Math.max(
+					instanceCount,
+					(batch?.capacity || 0) * 2,
+					16,
+				);
+				const bufferSize = capacity * 64; // 64 bytes per mat4x4
+
+				const buffer = this.ctx.device.createBuffer({
+					label: `Instance Storage (batch ${batchKey})`,
+					size: bufferSize,
+					usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+				});
+				VRAMTracker.register(
+					buffer,
+					"buffer",
+					`Instance Storage (batch ${batchKey})`,
+					bufferSize,
+					"Scene",
+				);
+
+				const bindGroup = this.ctx.device.createBindGroup({
+					label: `Instance BindGroup (batch ${batchKey})`,
+					layout: this.ctx.pipelineManager.getModelBindGroupLayout(),
+					entries: [{ binding: 0, resource: { buffer } }],
+				});
+
+				batch = { buffer, bindGroup, capacity };
+				this.instanceBatches.set(batchKey, batch);
+			}
+
+			// Upload matrices (only the bytes we need)
+			this.ctx.device.queue.writeBuffer(
+				batch.buffer,
+				0,
+				this.instanceMatrixScratch.buffer,
+				0,
+				instanceCount * 64,
+			);
+
+			// Set pipeline
+			const pipeline = representative.material.getPipeline(this.ctx);
 			if (pipeline !== lastPipeline) {
 				passEncoder.setPipeline(pipeline);
 				lastPipeline = pipeline;
 				if (this.perfTracker) this.perfTracker.recordMaterialChange();
 			}
-			mesh.draw(passEncoder);
+
+			// Bind instance storage (Group 1) and material (Group 2)
+			passEncoder.setBindGroup(1, batch.bindGroup);
+			passEncoder.setBindGroup(
+				2,
+				representative.material.getBindGroup(this.ctx),
+			);
+
+			// Set geometry buffers
+			passEncoder.setVertexBuffer(0, representative.geometry.vertexBuffer);
+			passEncoder.setIndexBuffer(
+				representative.geometry.indexBuffer,
+				representative.geometry.indexFormat,
+			);
+
+			// INSTANCED DRAW: one call for potentially thousands of objects!
+			passEncoder.drawIndexed(
+				representative.geometry.indexCount,
+				instanceCount,
+			);
 
 			// --- Debug: record draw stats ---
 			if (this.perfTracker) {
 				this.perfTracker.recordDraw(
-					mesh.geometry.vertexCount,
-					mesh.geometry.indexCount,
+					representative.geometry.vertexCount * instanceCount,
+					representative.geometry.indexCount * instanceCount,
 				);
 			}
 		}
