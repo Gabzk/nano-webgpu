@@ -1,4 +1,5 @@
 import type { Context } from "../core/context";
+import { VRAMTracker } from "../debug/vram-tracker";
 import { Node3D } from "../core/node3d";
 import type { Geometry } from "./geometry";
 import { Material } from "./materials/material";
@@ -52,6 +53,7 @@ export class Mesh extends Node3D {
 			size: 64,
 			usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
 		});
+		VRAMTracker.register(this.modelBuffer, "buffer", "Mesh Model Buffer", 64, "Mesh");
 
 		// 2. Create the Bind Group strictly for Model Info (Layout index 1)
 		this.bindGroup = ctx.device.createBindGroup({
@@ -92,6 +94,7 @@ export class Mesh extends Node3D {
 
 		// 2. Destroy GPU memory for this mesh
 		if (this.modelBuffer) {
+			VRAMTracker.unregister(this.modelBuffer);
 			this.modelBuffer.destroy();
 		}
 

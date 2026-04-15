@@ -1,6 +1,9 @@
 import { Context } from "../core/context";
 import { Node } from "../core/node";
 import { Node3D } from "../core/node3d";
+import { DebugPanel, type DebugPanelOptions } from "../debug/debug-panel";
+import { PerformanceTracker } from "../debug/performance-tracker";
+import { VRAMTracker } from "../debug/vram-tracker";
 import { Color } from "../math/color";
 import { Vec3 } from "../math/vec3";
 import { Camera } from "./camera";
@@ -25,6 +28,10 @@ export class Scene extends Node {
 	private globalsBindGroupDirty: boolean = true;
 	public defaultDir: string = "";
 
+	// --- Debug / Profiling ---
+	private perfTracker: PerformanceTracker | null = null;
+	private debugPanel: DebugPanel | null = null;
+
 	constructor(ctx: Context) {
 		super();
 		this.ctx = ctx;
@@ -38,21 +45,25 @@ export class Scene extends Node {
 			size: lightsBufferSize,
 			usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
 		});
+		VRAMTracker.register(this.lightsBuffer, "buffer", "Scene Lights Storage Buffer", lightsBufferSize, "Scene");
 
 		// We defer BindGroup creation until camera is attached and initialized
 	}
 
 	private resizeDepthTexture() {
-		if (this.depthTexture) this.depthTexture.destroy();
+		if (this.depthTexture) {
+			VRAMTracker.unregister(this.depthTexture);
+			this.depthTexture.destroy();
+		}
+		const w = this.ctx.context.canvas.width || 1;
+		const h = this.ctx.context.canvas.height || 1;
 		this.depthTexture = this.ctx.device.createTexture({
-			size: [
-				this.ctx.context.canvas.width || 1,
-				this.ctx.context.canvas.height || 1,
-				1,
-			],
+			size: [w, h, 1],
 			format: "depth24plus",
 			usage: GPUTextureUsage.RENDER_ATTACHMENT,
 		});
+		// depth24plus = 4 bytes per pixel (padded)
+		VRAMTracker.register(this.depthTexture, "texture", "Scene Depth Texture", w * h * 4, "Scene");
 	}
 
 	public static async init(
@@ -269,8 +280,49 @@ export class Scene extends Node {
 		}
 	}
 
+	/**
+	 * Enable the debug overlay panel (inspired by Godot's Debugger).
+	 * Shows real-time performance metrics, VRAM allocations, and scene stats.
+	 * Toggle visibility with F3.
+	 */
+	public enableDebug(options: DebugPanelOptions = {}): DebugPanel {
+		if (this.debugPanel) return this.debugPanel;
+
+		this.perfTracker = new PerformanceTracker();
+
+		const canvas = this.ctx.context.canvas as HTMLCanvasElement;
+		this.debugPanel = new DebugPanel(canvas, this.perfTracker, options);
+
+		// Provide live scene stats
+		this.debugPanel.setSceneStatsProvider(() => ({
+			totalMeshes: this.meshes.length,
+			totalNodes: this.countNodes(),
+			lightCount: this.lights.length,
+		}));
+
+		return this.debugPanel;
+	}
+
+	/**
+	 * Recursively count all nodes in the scene graph.
+	 */
+	private countNodes(): number {
+		let count = 0;
+		const walk = (node: Node) => {
+			count++;
+			for (const child of node.children) {
+				walk(child);
+			}
+		};
+		walk(this);
+		return count;
+	}
+
 	private _renderFrame(dt: number): void {
 		if (!this.camera) return;
+
+		// --- Debug: begin frame timing ---
+		if (this.perfTracker) this.perfTracker.beginFrame();
 
 		// Ensure camera buffers exist before matrices are calculated
 		if (!this.camera.uniformBuffer) this.camera.initWebGPU(this.ctx);
@@ -332,14 +384,36 @@ export class Scene extends Node {
 			passEncoder.setBindGroup(0, this.globalsBindGroup);
 		}
 
+		let lastPipeline: GPURenderPipeline | null = null;
 		for (const mesh of this.meshes) {
 			if (!mesh.visible) continue;
 			// By moving setPipeline here, Standard vs ShaderMaterials can toggle
-			passEncoder.setPipeline(mesh.material.getPipeline(this.ctx));
+			const pipeline = mesh.material.getPipeline(this.ctx);
+			if (pipeline !== lastPipeline) {
+				passEncoder.setPipeline(pipeline);
+				lastPipeline = pipeline;
+				if (this.perfTracker) this.perfTracker.recordMaterialChange();
+			}
 			mesh.draw(passEncoder);
+
+			// --- Debug: record draw stats ---
+			if (this.perfTracker) {
+				this.perfTracker.recordDraw(
+					mesh.geometry.vertexCount,
+					mesh.geometry.indexCount,
+				);
+			}
 		}
 
 		passEncoder.end();
 		this.ctx.device.queue.submit([commandEncoder.finish()]);
+
+		// --- Debug: end frame + update panel ---
+		if (this.perfTracker) {
+			this.perfTracker.totalMeshes = this.meshes.length;
+			this.perfTracker.lightCount = this.lights.length;
+			this.perfTracker.endFrame();
+		}
+		if (this.debugPanel) this.debugPanel.update();
 	}
 }

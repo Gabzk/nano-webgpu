@@ -1,4 +1,5 @@
 import type { Context } from "../core/context";
+import { VRAMTracker } from "../debug/vram-tracker";
 
 export class Geometry {
 	public vertexBuffer!: GPUBuffer;
@@ -35,6 +36,7 @@ export class Geometry {
 			usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
 		});
 		ctx.device.queue.writeBuffer(this.vertexBuffer, 0, vertices as any);
+		VRAMTracker.register(this.vertexBuffer, "buffer", "Geometry Vertex Buffer", vertices.byteLength, "Geometry");
 
 		// Create Index Buffer
 		this.indexBuffer = ctx.device.createBuffer({
@@ -43,6 +45,7 @@ export class Geometry {
 			usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST,
 		});
 		ctx.device.queue.writeBuffer(this.indexBuffer, 0, indices as any);
+		VRAMTracker.register(this.indexBuffer, "buffer", "Geometry Index Buffer", indices.byteLength, "Geometry");
 	}
 
 	/**
@@ -50,7 +53,13 @@ export class Geometry {
 	 * Be careful: only destroy a geometry if no other meshes are sharing it.
 	 */
 	public destroy(): void {
-		if (this.vertexBuffer) this.vertexBuffer.destroy();
-		if (this.indexBuffer) this.indexBuffer.destroy();
+		if (this.vertexBuffer) {
+			VRAMTracker.unregister(this.vertexBuffer);
+			this.vertexBuffer.destroy();
+		}
+		if (this.indexBuffer) {
+			VRAMTracker.unregister(this.indexBuffer);
+			this.indexBuffer.destroy();
+		}
 	}
 }

@@ -35,14 +35,13 @@ scene.addLight({
 	intensity: 1,
 });
 
-let fpsElement = document.getElementById("fps-value");
+scene.enableDebug({
+	opacity: 0.5,
+	position: "top-right",
+});
 
 // Loop de renderização totalmente gerenciado pela Scene
 scene.render((dt) => {
-	let fps = 1 / dt;
-	if (fpsElement) {
-		fpsElement.textContent = fps.toFixed(0);
-	}
-	// Agora giramos a luz igual fazemos no Node3D da Godot Engine!
+
 	dirLight.rotationDegrees.y += 90 * dt;
 });

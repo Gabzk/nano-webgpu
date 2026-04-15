@@ -4,6 +4,9 @@ export { Loader } from "./core/loader";
 export { Node } from "./core/node";
 export { Node3D } from "./core/node3d";
 export { CollisionShape } from "./core/collision-shape";
+export { DebugPanel } from "./debug/debug-panel";
+export { PerformanceTracker } from "./debug/performance-tracker";
+export { VRAMTracker } from "./debug/vram-tracker";
 export { Camera } from "./graphics/camera";
 export { CameraController } from "./graphics/camera-controller";
 export { DirectionalLight, PointLight } from "./graphics/light";
@@ -20,3 +23,4 @@ export { Vec2 } from "./math/vec2";
 export { Vec3 } from "./math/vec3";
 
 export const VERSION = "0.1.0";
+

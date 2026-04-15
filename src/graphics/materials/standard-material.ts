@@ -1,4 +1,5 @@
 import type { Context } from "../../core/context";
+import { VRAMTracker } from "../../debug/vram-tracker";
 import { Color } from "../../math/color";
 import { PipelineManager } from "../pipeline";
 import { Texture } from "../texture";
@@ -207,6 +208,7 @@ export class StandardMaterial extends Material {
 				size: 64, // 16 floats * 4 bytes
 				usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
 			});
+			VRAMTracker.register(this.uniformBuffer, "buffer", `StandardMaterial_${this.id}_Buffer`, 64, "StandardMaterial");
 			this.isDirty = true;
 		}
 

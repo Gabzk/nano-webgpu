@@ -18,6 +18,7 @@ const scene = await Scene.init("#canvas");
 scene.setCamera({ position: [0, 4, 12], target: [0, 0, 0] });
 scene.addLight({ type: 'directional', rotationDegrees: [-50, 30, 0], color: "#ffeedd", intensity: 0.8 });
 scene.addLight({ type: 'point', position: [0, 3, 0], color: "#4488ff", intensity: 1.5 });
+scene.enableDebug();
 
 // Cenário base
 scene.addPlane({ scale: 30, position: [0, -0.5, 0], material: new StandardMaterial({ albedoColor: "#1a1a2e" }) });
