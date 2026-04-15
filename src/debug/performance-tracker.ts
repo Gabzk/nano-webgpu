@@ -27,7 +27,6 @@ export class PerformanceTracker {
 	// --- Internal timing ---
 	private frameStart: number = 0;
 	private frameCount: number = 0;
-	private fpsAccumulator: number = 0;
 	private fpsUpdateInterval: number = 200; // ms between FPS updates
 	private lastFpsUpdate: number = 0;
 	private smoothFps: number = 60;
@@ -82,15 +81,14 @@ export class PerformanceTracker {
 		this.visibleMeshes = this._visibleMeshes;
 		this.materialChanges = this._materialChanges;
 
-		// Smooth FPS calculation
+		// Smooth FPS calculation using actual elapsed wall-clock time
 		this.frameCount++;
-		this.fpsAccumulator += this.frameTimeMs;
 
 		if (now - this.lastFpsUpdate >= this.fpsUpdateInterval) {
-			this.smoothFps = (this.frameCount / this.fpsAccumulator) * 1000;
-			this.fps = Math.round(this.smoothFps);
+			const elapsedMs = now - this.lastFpsUpdate;
+			this.smoothFps = (this.frameCount / elapsedMs) * 1000;
+			this.fps = Math.round(this.smoothFps);			
 			this.frameCount = 0;
-			this.fpsAccumulator = 0;
 			this.lastFpsUpdate = now;
 		}
 

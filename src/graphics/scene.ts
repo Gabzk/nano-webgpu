@@ -22,7 +22,9 @@ export class Scene extends Node {
 
 	private depthTexture!: GPUTexture;
 	private lightsBuffer!: GPUBuffer;
-	private maxLights: number = 10;
+
+	private lightsDataFloat!: Float32Array;
+	private lightsDataUint32!: Uint32Array;
 
 	private globalsBindGroup!: GPUBindGroup;
 	private globalsBindGroupDirty: boolean = true;
@@ -36,16 +38,7 @@ export class Scene extends Node {
 		super();
 		this.ctx = ctx;
 		this.resizeDepthTexture();
-
-		// Count + Pad1 + Pad2 + Pad3 = 4 * 4 bytes = 16 bytes
-		// Each Light = vec4(Pos/Dir) + vec4(Color) = 32 bytes
-		const lightsBufferSize = 16 + 32 * this.maxLights;
-		this.lightsBuffer = ctx.device.createBuffer({
-			label: "Scene Lights Storage Buffer",
-			size: lightsBufferSize,
-			usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
-		});
-		VRAMTracker.register(this.lightsBuffer, "buffer", "Scene Lights Storage Buffer", lightsBufferSize, "Scene");
+		this.ensureLightsBufferSize(); // Initialize buffer and arrays
 
 		// We defer BindGroup creation until camera is attached and initialized
 	}
@@ -230,16 +223,46 @@ export class Scene extends Node {
 		return result;
 	}
 
+	private ensureLightsBufferSize(): void {
+		// Count(16 bytes) + 32 bytes per light
+		const requiredSize = 16 + 32 * this.lights.length;
+		
+		if (!this.lightsBuffer || this.lightsBuffer.size < requiredSize) {
+			if (this.lightsBuffer) {
+				VRAMTracker.unregister(this.lightsBuffer);
+				this.lightsBuffer.destroy();
+			}
+			
+			// Allocate in chunks of 50 to avoid frequent reallocation
+			const capacity = Math.max(50, this.lights.length + 20);
+			const newSize = 16 + 32 * capacity;
+
+			this.lightsBuffer = this.ctx.device.createBuffer({
+				label: "Scene Lights Storage Buffer",
+				size: newSize,
+				usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+			});
+			VRAMTracker.register(this.lightsBuffer, "buffer", "Scene Lights Storage Buffer", newSize, "Scene");
+
+			this.globalsBindGroupDirty = true;
+
+			this.lightsDataFloat = new Float32Array(newSize / 4);
+			this.lightsDataUint32 = new Uint32Array(this.lightsDataFloat.buffer);
+		}
+	}
+
 	private updateLightsBuffer(): void {
-		const floatData = new Float32Array(4 + this.lights.length * 8);
-		const limit = Math.min(this.lights.length, this.maxLights);
+		this.ensureLightsBufferSize();
+
+		const limit = this.lights.length;
+		const floatData = this.lightsDataFloat;
 
 		// Count
-		new Uint32Array(floatData.buffer)[0] = limit;
+		this.lightsDataUint32[0] = limit;
 
 		for (let i = 0; i < limit; i++) {
 			const light = this.lights[i];
-			const offset = 4 + i * 8;
+			const offset = 4 + i * 8; // Float 32 indices
 
 			if (light instanceof DirectionalLight) {
 				// Na Godot, luzes direcionais projetam sombra para trás de sua "frente" (Eixo local -Z)
@@ -266,7 +289,15 @@ export class Scene extends Node {
 			floatData[offset + 7] = light.intensity;
 		}
 
-		this.ctx.device.queue.writeBuffer(this.lightsBuffer, 0, floatData);
+		// Only write the bytes we actually populated + the padded count container. 
+		// Length in bytes = 16 for count block + (limit * 32 bytes for lights).
+		this.ctx.device.queue.writeBuffer(
+			this.lightsBuffer, 
+			0, 
+			this.lightsDataFloat.buffer,
+			0,
+			16 + 32 * limit
+		);
 	}
 
 	public render(loopCallback?: (dt: number) => void): void {
