@@ -288,17 +288,26 @@ export class Loader {
 				const bc = getTexUri(mat.pbrMetallicRoughness.baseColorTexture);
 				if (bc) parsedMaterial.albedoTexture = bc;
 
+				// GLTF metallicRoughnessTexture is a packed ORM map:
+				// R=occlusion(unused here), G=roughness, B=metallic
+				// Pass as ormTexture so the shader reads it correctly.
 				const mr = getTexUri(mat.pbrMetallicRoughness.metallicRoughnessTexture);
-				if (mr) {
-					parsedMaterial.metallicTexture = mr;
-					parsedMaterial.roughnessTexture = mr;
-				}
+				if (mr) parsedMaterial.ormTexture = mr;
+
+				// Scalar factors from the GLTF material
+				const roughnessFactor = mat.pbrMetallicRoughness.roughnessFactor ?? 1.0;
+				const metallicFactor = mat.pbrMetallicRoughness.metallicFactor ?? 1.0;
+				parsedMaterial.roughness = roughnessFactor;
+				parsedMaterial.metallic = metallicFactor;
 			}
 			const norm = getTexUri(mat.normalTexture);
 			if (norm) parsedMaterial.normalTexture = norm;
 
 			const occ = getTexUri(mat.occlusionTexture);
-			if (occ) parsedMaterial.aoTexture = occ;
+			if (occ && !parsedMaterial.ormTexture) {
+				// Only use separate AO if there is no packed ORM
+				parsedMaterial.aoTexture = occ;
+			}
 		}
 
 		return {

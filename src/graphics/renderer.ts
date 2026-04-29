@@ -348,7 +348,8 @@ export class Renderer {
 		this.sceneTexture = this.ctx.device.createTexture({
 			size: [w, h, 1],
 			format: this.ctx.format,
-			usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
+			usage:
+				GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
 		});
 
 		VRAMTracker.register(
@@ -478,7 +479,6 @@ export class Renderer {
 			camera.updateProjection();
 			this.resizeDepthTexture();
 		}
-
 
 		const textureView = this.ctx.context.getCurrentTexture().createView();
 		const renderPassDescriptor: GPURenderPassDescriptor = {

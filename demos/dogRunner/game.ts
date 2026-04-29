@@ -85,7 +85,7 @@ const _rightWall = scene.addCube({
 
 // ===================== JOGADOR =====================
 
-const player = await scene.addMesh("../render/assets/shiba.glb", {
+const player = await scene.loadMesh("../render/assets/shiba.glb", {
 	position: [0, 0, 2],
 	scale: 0.5,
 	rotation: [-1.5, 0, 0],

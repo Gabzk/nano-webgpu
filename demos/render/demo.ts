@@ -4,11 +4,10 @@ import { Input, InputManager, Scene } from "nano-webgpu";
 const canvas = document.getElementById("canvas") as HTMLCanvasElement;
 const scene = await Scene.init("#canvas");
 
-// Resolução baixa 16:9
-canvas.width = 1280;
-canvas.height = 700;
+canvas.height = window.innerHeight;
+canvas.width = window.innerWidth;
 
-// scene.enableFXAA = false;
+scene.enableFXAA = true;
 
 // Configurando a câmera com atributos simples
 scene.setCamera({ position: [0, 2, 5] });
@@ -33,14 +32,16 @@ scene.instantiate(shiba, {
 	rotation: [-1.5, -0.5, 0],
 });
 
+const cube = scene.addCube()
+
 // Adicionando luzes via opções fáceis
 const sun = scene.addLight({
 	type: "directional",
-	rotationDegrees: [-45, 0, 0],
+	rotationDegrees: [-90 ,0, 0],
 	color: "#ffffff",
-	intensity: 1,
+	intensity: 0.5,
 	castShadow: true,
-	shadowMapSize: 1024,
+	shadowMapSize: 4096,
 	usePCF: true,
 });
 

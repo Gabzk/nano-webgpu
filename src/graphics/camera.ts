@@ -99,14 +99,14 @@ export class Camera extends Node3D {
 		this.ctx = ctx;
 		this.uniformBuffer = ctx.device.createBuffer({
 			label: "Camera Uniform Buffer",
-			size: 64, // mat4x4
+			size: 80, // mat4x4 (64) + vec4 cameraPos (16)
 			usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
 		});
 		VRAMTracker.register(
 			this.uniformBuffer,
 			"buffer",
 			"Camera Uniform Buffer",
-			64,
+			80,
 			"Camera",
 		);
 
@@ -132,12 +132,21 @@ export class Camera extends Node3D {
 			this.viewProjMatrix.copy(this.projectionMatrix).multiply(this.viewMatrix);
 
 			if (this.ctx && this.uniformBuffer) {
+				// Write viewProjMatrix (bytes 0-63)
 				this.ctx.device.queue.writeBuffer(
 					this.uniformBuffer,
 					0,
 					// biome-ignore lint/suspicious/noExplicitAny: disable rule for now
 					this.viewProjMatrix.values as any,
 				);
+				// Write cameraPos (bytes 64-79) — used by fragment shader for view vector V
+				const posData = new Float32Array([
+					this.position.x,
+					this.position.y,
+					this.position.z,
+					0.0,
+				]);
+				this.ctx.device.queue.writeBuffer(this.uniformBuffer, 64, posData);
 			}
 		}
 	}

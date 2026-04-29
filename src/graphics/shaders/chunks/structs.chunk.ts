@@ -7,6 +7,7 @@ export const structsChunk = /* wgsl */ `
 // --- GLOBALS (@group(0)) ---
 struct CameraUniform {
     viewProj: mat4x4<f32>,
+    cameraPos: vec4<f32>,  // xyz = world position, w = unused
 }
 @group(0) @binding(0) var<uniform> camera: CameraUniform;
 
