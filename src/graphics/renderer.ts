@@ -27,6 +27,13 @@ export class Renderer {
 	private shadowTextureSize = 2048;
 	public shadowMatrix: Mat4 = new Mat4();
 
+	// --- Post Processing ---
+	private sceneTexture!: GPUTexture;
+	private postProcessSampler!: GPUSampler;
+	private postProcessBindGroup!: GPUBindGroup;
+	public renderSettingsBuffer!: GPUBuffer;
+	public renderSettingsData = new Uint32Array(4); // fxaa_enabled, pad1, pad2, pad3
+
 	// --- Instance Batching ---
 	private instanceBatches: Map<
 		string,
@@ -46,9 +53,29 @@ export class Renderer {
 
 	constructor(ctx: Context) {
 		this.ctx = ctx;
+		this.initPostProcess();
 		this.resizeDepthTexture();
 		this.ensureLightsBufferSize(0);
 		this.initShadows();
+	}
+
+	private initPostProcess() {
+		this.renderSettingsBuffer = this.ctx.device.createBuffer({
+			size: 16,
+			usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+		});
+		// Enable FXAA by default
+		this.renderSettingsData[0] = 1;
+		this.ctx.device.queue.writeBuffer(
+			this.renderSettingsBuffer,
+			0,
+			this.renderSettingsData.buffer,
+		);
+
+		this.postProcessSampler = this.ctx.device.createSampler({
+			magFilter: "linear",
+			minFilter: "linear",
+		});
 	}
 
 	private initShadows() {
@@ -295,6 +322,11 @@ export class Renderer {
 			VRAMTracker.unregister(this.depthTexture);
 			this.depthTexture.destroy();
 		}
+		if (this.sceneTexture) {
+			VRAMTracker.unregister(this.sceneTexture);
+			this.sceneTexture.destroy();
+		}
+
 		const w = this.ctx.context.canvas.width || 1;
 		const h = this.ctx.context.canvas.height || 1;
 
@@ -312,6 +344,29 @@ export class Renderer {
 			w * h * 4,
 			"Renderer",
 		);
+
+		this.sceneTexture = this.ctx.device.createTexture({
+			size: [w, h, 1],
+			format: this.ctx.format,
+			usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
+		});
+
+		VRAMTracker.register(
+			this.sceneTexture,
+			"texture",
+			"Scene Color Texture",
+			w * h * 4,
+			"Renderer",
+		);
+
+		this.postProcessBindGroup = this.ctx.device.createBindGroup({
+			layout: this.ctx.pipelineManager.getPostProcessBindGroupLayout(),
+			entries: [
+				{ binding: 0, resource: this.postProcessSampler },
+				{ binding: 1, resource: this.sceneTexture.createView() },
+				{ binding: 2, resource: { buffer: this.renderSettingsBuffer } },
+			],
+		});
 	}
 
 	private ensureLightsBufferSize(lightCount: number) {
@@ -424,27 +479,12 @@ export class Renderer {
 			this.resizeDepthTexture();
 		}
 
-		if (this.globalsBindGroupDirty && camera.uniformBuffer) {
-			this.globalsBindGroup = this.ctx.device.createBindGroup({
-				label: "Scene_Globals_BindGroup",
-				layout: this.ctx.pipelineManager.getGlobalsBindGroupLayout(),
-				entries: [
-					{ binding: 0, resource: { buffer: camera.uniformBuffer } },
-					{ binding: 1, resource: { buffer: this.lightsBuffer } },
-
-					{ binding: 2, resource: this.shadowTexture.createView() },
-					{ binding: 3, resource: this.shadowSampler },
-					{ binding: 4, resource: { buffer: this.shadowUniformBuffer } },
-				],
-			});
-			this.globalsBindGroupDirty = false;
-		}
 
 		const textureView = this.ctx.context.getCurrentTexture().createView();
 		const renderPassDescriptor: GPURenderPassDescriptor = {
 			colorAttachments: [
 				{
-					view: textureView,
+					view: this.sceneTexture.createView(),
 					// biome-ignore lint/suspicious/noExplicitAny: disable rule for now
 					clearValue: scene.backgroundColor.toFloat32Array() as any,
 					loadOp: "clear",
@@ -465,6 +505,23 @@ export class Renderer {
 		this.rebuildBatchGroups(scene.meshes);
 
 		this.renderShadowPass(scene, camera, commandEncoder);
+
+		if (this.globalsBindGroupDirty && camera.uniformBuffer) {
+			this.globalsBindGroup = this.ctx.device.createBindGroup({
+				label: "Scene_Globals_BindGroup",
+				layout: this.ctx.pipelineManager.getGlobalsBindGroupLayout(),
+				entries: [
+					{ binding: 0, resource: { buffer: camera.uniformBuffer } },
+					{ binding: 1, resource: { buffer: this.lightsBuffer } },
+
+					{ binding: 2, resource: this.shadowTexture.createView() },
+					{ binding: 3, resource: this.shadowSampler },
+					{ binding: 4, resource: { buffer: this.shadowUniformBuffer } },
+					{ binding: 5, resource: { buffer: this.renderSettingsBuffer } },
+				],
+			});
+			this.globalsBindGroupDirty = false;
+		}
 
 		const passEncoder = commandEncoder.beginRenderPass(renderPassDescriptor);
 
@@ -572,6 +629,25 @@ export class Renderer {
 		}
 
 		passEncoder.end();
+
+		// --- Post Processing Pass ---
+		const postProcessPassDescriptor: GPURenderPassDescriptor = {
+			colorAttachments: [
+				{
+					view: textureView, // render to the actual canvas
+					clearValue: { r: 0, g: 0, b: 0, a: 1 },
+					loadOp: "clear",
+					storeOp: "store",
+				},
+			],
+		};
+
+		const ppEncoder = commandEncoder.beginRenderPass(postProcessPassDescriptor);
+		ppEncoder.setPipeline(this.ctx.pipelineManager.getPostProcessPipeline());
+		ppEncoder.setBindGroup(0, this.postProcessBindGroup);
+		ppEncoder.draw(3); // Draw full-screen triangle
+		ppEncoder.end();
+
 		this.ctx.device.queue.submit([commandEncoder.finish()]);
 	}
 }

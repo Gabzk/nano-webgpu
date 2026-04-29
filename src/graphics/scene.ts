@@ -79,6 +79,19 @@ export class Scene extends Node {
 		}
 	}
 
+	public get enableFXAA(): boolean {
+		return this.renderer.renderSettingsData[0] === 1;
+	}
+
+	public set enableFXAA(value: boolean) {
+		this.renderer.renderSettingsData[0] = value ? 1 : 0;
+		this.ctx.device.queue.writeBuffer(
+			this.renderer.renderSettingsBuffer,
+			0,
+			this.renderer.renderSettingsData.buffer,
+		);
+	}
+
 	public setCamera(cameraOrOptions: Camera | CameraOptions): Camera {
 		this.camera =
 			cameraOrOptions instanceof Camera

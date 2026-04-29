@@ -10,6 +10,16 @@ struct CameraUniform {
 }
 @group(0) @binding(0) var<uniform> camera: CameraUniform;
 
+
+struct RenderSettings {
+    fxaa_enabled: u32,
+    _pad1: u32,
+    _pad2: u32,
+    _pad3: u32,
+}
+
+@group(0) @binding(5) var <uniform> settings: RenderSettings;
+
 struct Light {
     position: vec4<f32>, // xyz = pos or dir, w = type:
                          // 0=directional no shadow, 1=directional with shadow
@@ -85,4 +95,5 @@ struct VertexOutput {
     @location(2) uv: vec2<f32>,
     @location(3) shadow_pos: vec4<f32>,
 }
+
 `;

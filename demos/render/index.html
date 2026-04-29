@@ -13,14 +13,19 @@
             color: #fff;
         }
 
+        html,
+        body {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background: #000;
+        }
+
         canvas {
             display: block;
-            width: 80%;
-            height: 80%;
-            margin-top: 20px;
-            background: #000;
-            border: 1px solid #333;
-            border-radius: 8px;
+            width: 100vw;
+            height: 100vh;
         }
 
         .status {
@@ -40,8 +45,7 @@
 </head>
 
 <body>
-    <h1>Nano WebGPU</h1>
-    <canvas id="canvas" width="1280" height="720"></canvas>
+    <canvas id="canvas"></canvas>
     <script type="module" src="./demo.ts"></script>
 </body>
 

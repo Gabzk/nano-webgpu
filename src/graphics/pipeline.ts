@@ -1,5 +1,6 @@
 import type { Context } from "../core/context";
 import { buildDefaultShader } from "./shaders/default";
+import { postProcessShader } from "./shaders/post-process";
 
 export class PipelineManager {
 	private ctx: Context;
@@ -54,6 +55,11 @@ export class PipelineManager {
 					binding: 4,
 					visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT,
 					buffer: { type: "uniform" }, // Shadow matrix
+				},
+				{
+					binding: 5,
+					visibility: GPUShaderStage.FRAGMENT | GPUShaderStage.VERTEX,
+					buffer: { type: "uniform" }, // Render settings
 				},
 			],
 		});
@@ -369,5 +375,67 @@ export class PipelineManager {
 		this.buildBindGroupLayouts();
 		// biome-ignore lint/style/noNonNullAssertion: disable rule for now
 		return this.bindGroupLayout1_Model!;
+	}
+
+	// --- Post Processing ---
+
+	private postProcessPipeline: GPURenderPipeline | null = null;
+	private bindGroupLayout_PostProcess: GPUBindGroupLayout | null = null;
+
+	public getPostProcessBindGroupLayout(): GPUBindGroupLayout {
+		if (!this.bindGroupLayout_PostProcess) {
+			this.bindGroupLayout_PostProcess = this.ctx.device.createBindGroupLayout({
+				label: "Post Process Bind Group Layout",
+				entries: [
+					{
+						binding: 0,
+						visibility: GPUShaderStage.FRAGMENT,
+						sampler: { type: "filtering" },
+					},
+					{
+						binding: 1,
+						visibility: GPUShaderStage.FRAGMENT,
+						texture: { sampleType: "float", viewDimension: "2d" },
+					},
+					{
+						binding: 2,
+						visibility: GPUShaderStage.FRAGMENT,
+						buffer: { type: "uniform" }, // RenderSettings (fxaa_enabled, etc)
+					},
+				],
+			});
+		}
+		return this.bindGroupLayout_PostProcess;
+	}
+
+	public getPostProcessPipeline(): GPURenderPipeline {
+		if (this.postProcessPipeline) return this.postProcessPipeline;
+
+		const shaderModule = this.ctx.device.createShaderModule({
+			label: "Post Process Shader",
+			code: postProcessShader,
+		});
+
+		const layout = this.ctx.device.createPipelineLayout({
+			label: "Post Process Pipeline Layout",
+			bindGroupLayouts: [this.getPostProcessBindGroupLayout()],
+		});
+
+		this.postProcessPipeline = this.ctx.device.createRenderPipeline({
+			label: "Post Process Pipeline",
+			layout,
+			vertex: {
+				module: shaderModule,
+				entryPoint: "vs_main",
+			},
+			fragment: {
+				module: shaderModule,
+				entryPoint: "fs_main",
+				targets: [{ format: this.ctx.format }],
+			},
+			primitive: { topology: "triangle-list" },
+		});
+
+		return this.postProcessPipeline;
 	}
 }

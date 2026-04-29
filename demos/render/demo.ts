@@ -1,7 +1,14 @@
-import { Scene } from "nano-webgpu";
+import { Input, InputManager, Scene } from "nano-webgpu";
 
 // Inicializando o WebGPU e a Scene de uma vez só (mantive o await para evitar engasgos no runtime)
+const canvas = document.getElementById("canvas") as HTMLCanvasElement;
 const scene = await Scene.init("#canvas");
+
+// Resolução baixa 16:9
+canvas.width = 1280;
+canvas.height = 700;
+
+// scene.enableFXAA = false;
 
 // Configurando a câmera com atributos simples
 scene.setCamera({ position: [0, 2, 5] });
@@ -33,7 +40,7 @@ const sun = scene.addLight({
 	color: "#ffffff",
 	intensity: 1,
 	castShadow: true,
-	shadowMapSize: 256,
+	shadowMapSize: 1024,
 	usePCF: true,
 });
 
@@ -42,6 +49,8 @@ scene.addLight({
 	position: [2, 1, 0],
 	color: "#ffffff",
 	intensity: 1,
+	castShadow: true,
+	shadowMapSize: 256,
 });
 
 scene.enableDebug({
@@ -49,4 +58,8 @@ scene.enableDebug({
 	position: "top-right",
 });
 
-scene.render((_dt) => {});
+
+scene.render((_dt) => {
+
+});
+
