@@ -168,8 +168,12 @@ export class StandardMaterial extends Material {
 		this.bufferData[15] = 0.0;
 	}
 
+	/** Selects which shadow variant pipeline this material uses.
+	 *  Set by the scene when the shadow-casting directional light's usePCF is known. */
+	public usePCF: boolean = true;
+
 	public getPipeline(ctx: Context): GPURenderPipeline {
-		return ctx.pipelineManager.getStandardPipeline();
+		return ctx.pipelineManager.getStandardPipeline(this.usePCF);
 	}
 
 	public getBindGroup(ctx: Context): GPUBindGroup {
@@ -254,7 +258,9 @@ export class StandardMaterial extends Material {
 			if (this.bindGroup) return; // Prevent double trigger
 			this.bindGroup = ctx.device.createBindGroup({
 				label: `StandardMaterial_${this.id}_BindGroup`,
-				layout: ctx.pipelineManager.getStandardPipeline().getBindGroupLayout(2),
+				layout: ctx.pipelineManager
+					.getStandardPipeline(this.usePCF)
+					.getBindGroupLayout(2),
 				entries: [
 					{ binding: 0, resource: { buffer: this.uniformBuffer } },
 					{ binding: 1, resource: sampler },

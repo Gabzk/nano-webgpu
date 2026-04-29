@@ -1,5 +1,9 @@
 import type { Context } from "../../core/context";
 
+export interface MaterialOptions {
+	transparent?: boolean;
+}
+
 let NEXT_MATERIAL_ID = 0;
 
 export abstract class Material {

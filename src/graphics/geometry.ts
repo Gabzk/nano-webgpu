@@ -39,6 +39,7 @@ export class Geometry {
 			size: vertices.byteLength,
 			usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
 		});
+		// biome-ignore lint/suspicious/noExplicitAny: disable rule for now
 		ctx.device.queue.writeBuffer(this.vertexBuffer, 0, vertices as any);
 		VRAMTracker.register(
 			this.vertexBuffer,
@@ -49,17 +50,30 @@ export class Geometry {
 		);
 
 		// Create Index Buffer
+		// WebGPU requires buffer sizes and writeBuffer data to be 4-byte aligned.
+		// Uint16Array with an odd number of elements (e.g. 3 indices = 6 bytes) would fail.
+		const alignedIndexSize = Math.ceil(indices.byteLength / 4) * 4;
 		this.indexBuffer = ctx.device.createBuffer({
 			label: "Geometry Index Buffer",
-			size: indices.byteLength,
+			size: alignedIndexSize,
 			usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST,
 		});
-		ctx.device.queue.writeBuffer(this.indexBuffer, 0, indices as any);
+		// If the index data isn't 4-byte aligned, copy into a padded buffer first
+		if (indices.byteLength % 4 !== 0) {
+			const padded = new Uint8Array(alignedIndexSize);
+			padded.set(
+				new Uint8Array(indices.buffer, indices.byteOffset, indices.byteLength),
+			);
+			ctx.device.queue.writeBuffer(this.indexBuffer, 0, padded);
+		} else {
+			// biome-ignore lint/suspicious/noExplicitAny: disable rule for now
+			ctx.device.queue.writeBuffer(this.indexBuffer, 0, indices as any);
+		}
 		VRAMTracker.register(
 			this.indexBuffer,
 			"buffer",
 			"Geometry Index Buffer",
-			indices.byteLength,
+			alignedIndexSize,
 			"Geometry",
 		);
 	}

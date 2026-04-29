@@ -1,17 +1,39 @@
 import { Context } from "../core/context";
 import { Node } from "../core/node";
-import { Node3D } from "../core/node3d";
-import { DebugPanel, type DebugPanelOptions } from "../debug/debug-panel";
+import type { Node3D } from "../core/node3d";
+import { DebugPanel } from "../debug/debug-panel";
 import { PerformanceTracker } from "../debug/performance-tracker";
-import { VRAMTracker } from "../debug/vram-tracker";
 import { Color } from "../math/color";
 import { Vec3 } from "../math/vec3";
 import { Camera } from "./camera";
 import { Geometry } from "./geometry";
-import { DirectionalLight, Light, PointLight } from "./light";
-import { Material } from "./materials/material";
-import { StandardMaterial } from "./materials/standard-material";
-import { Mesh } from "./mesh";
+import { DirectionalLight, Light, type LightOptions, PointLight } from "./light";
+import { Material, type MaterialOptions } from "./materials/material";
+import { StandardMaterial, type StandardMaterialOptions } from "./materials/standard-material";
+import { Mesh, type MeshOptions } from "./mesh";
+import { Renderer } from "./renderer";
+
+/**
+ * Scene specific options for adding lights.
+ */
+export interface SceneLightOptions extends LightOptions {
+	type?: "point" | "directional";
+	radius?: number;
+	castShadow?: boolean;
+	shadowMapSize?: number;
+	usePCF?: boolean;
+}
+
+/**
+ * Scene specific options for geometry primitives.
+ */
+export interface SceneGeometryOptions extends StandardMaterialOptions {
+	position?: number[];
+	rotation?: number[];
+	rotationDegrees?: number[];
+	scale?: number | number[];
+	addToScene?: boolean;
+}
 
 export class Scene extends Node {
 	public ctx: Context;
@@ -19,27 +41,9 @@ export class Scene extends Node {
 	public lights: Light[] = [];
 	public meshes: Mesh[] = [];
 	public backgroundColor: Color = Color.fromHex("#111122");
-
-	private depthTexture!: GPUTexture;
-	private lightsBuffer!: GPUBuffer;
-
-	private lightsDataFloat!: Float32Array;
-	private lightsDataUint32!: Uint32Array;
-
-	private globalsBindGroup!: GPUBindGroup;
-	private globalsBindGroupDirty: boolean = true;
 	public defaultDir: string = "";
 
-	// --- Instance Batching ---
-	private instanceBatches: Map<
-		string,
-		{
-			buffer: GPUBuffer;
-			bindGroup: GPUBindGroup;
-			capacity: number;
-		}
-	> = new Map();
-	private instanceMatrixScratch: Float32Array = new Float32Array(16 * 64); // Reusable scratch for writing matrices
+	public renderer: Renderer;
 
 	// --- Debug / Profiling ---
 	private perfTracker: PerformanceTracker | null = null;
@@ -48,32 +52,7 @@ export class Scene extends Node {
 	constructor(ctx: Context) {
 		super();
 		this.ctx = ctx;
-		this.resizeDepthTexture();
-		this.ensureLightsBufferSize(); // Initialize buffer and arrays
-
-		// We defer BindGroup creation until camera is attached and initialized
-	}
-
-	private resizeDepthTexture() {
-		if (this.depthTexture) {
-			VRAMTracker.unregister(this.depthTexture);
-			this.depthTexture.destroy();
-		}
-		const w = this.ctx.context.canvas.width || 1;
-		const h = this.ctx.context.canvas.height || 1;
-		this.depthTexture = this.ctx.device.createTexture({
-			size: [w, h, 1],
-			format: "depth24plus",
-			usage: GPUTextureUsage.RENDER_ATTACHMENT,
-		});
-		// depth24plus = 4 bytes per pixel (padded)
-		VRAMTracker.register(
-			this.depthTexture,
-			"texture",
-			"Scene Depth Texture",
-			w * h * 4,
-			"Scene",
-		);
+		this.renderer = new Renderer(ctx);
 	}
 
 	public static async init(
@@ -90,6 +69,7 @@ export class Scene extends Node {
 		}
 	}
 
+	// biome-ignore lint/suspicious/noExplicitAny: disable rule for now
 	public setCamera(cameraOrOptions: Camera | any): Camera {
 		if (cameraOrOptions instanceof Camera) {
 			this.camera = cameraOrOptions;
@@ -103,40 +83,55 @@ export class Scene extends Node {
 				);
 		}
 
-		this.globalsBindGroupDirty = true;
+		this.renderer.globalsBindGroupDirty = true;
 		if (!this.children.includes(this.camera)) {
 			this.add(this.camera);
 		}
 		return this.camera;
 	}
 
-	public addLight(options: any | Light): Light {
+	
+
+	/**
+	 * Adds a light to the scene.
+	 * @param options - A Light instance or configuration options.
+	 * @example
+	 * ```ts
+	 * scene.addLight({
+	 *   type: "directional",
+	 *   color: "#ffffff",
+	 *   intensity: 1.0,
+	 *   position: [0, 10, 0],
+	 *   castShadow: true
+	 * });
+	 * ```
+	 */
+	public addLight(options: SceneLightOptions | Light): Light {
 		let light: Light;
 		if (options instanceof Light) {
 			light = options;
 		} else {
 			if (options.type === "point") {
-				light = new PointLight();
+				light = new PointLight(options);
 			} else {
-				light = new DirectionalLight();
+				light = new DirectionalLight(options);
 			}
-			if (options.color) light.color = Color.fromHex(options.color);
+			if (options.color) light.color = Color.from(options.color);
 			if (options.intensity !== undefined) light.intensity = options.intensity;
-			if (options.position)
-				light.position.set(
-					options.position[0],
-					options.position[1],
-					options.position[2],
-				);
-			if (options.rotation) light.rotation.copy(Vec3.from(options.rotation));
+			if (options.position) {
+				const p = options.position as number[];
+				light.position.set(p[0], p[1], p[2]);
+			}
+			if (options.rotation) light.rotation.copy(Vec3.from(options.rotation as number[]));
 			if (options.rotationDegrees)
-				light.rotationDegrees = options.rotationDegrees;
+				light.rotationDegrees = options.rotationDegrees as any;
 		}
 		this.lights.push(light);
 		this.add(light);
 		return light;
 	}
 
+	// biome-ignore lint/suspicious/noExplicitAny: disable rule for now
 	private parseMaterialOptions(options: any): any {
 		if (!options) return options;
 
@@ -172,46 +167,76 @@ export class Scene extends Node {
 		return parsedOptions;
 	}
 
-	public async addMesh(url: string, options: any = {}): Promise<Mesh> {
-		const finalUrl = this.defaultDir ? this.defaultDir + url : url;
-		const parsedOptions = this.parseMaterialOptions(options);
+	/**
+	 * Load a mesh from a URL, or clone an existing Mesh template with new transforms.
+	 * - `addMesh(url, options)` — loads a model file
+	 * - `addMesh(template, options)` — clones a template Mesh (for instancing)
+	 * @param urlOrTemplate - The URL of the model file or a Mesh instance to clone.
+	 * @param options - Load or clone options.
+	 */
+	public addMesh(template: Mesh, options?: SceneGeometryOptions): Mesh;
+	public addMesh(url: string, options?: SceneGeometryOptions): Promise<Mesh>;
+	public addMesh(
+		urlOrTemplate: string | Mesh,
+		options: SceneGeometryOptions = {},
+	): Mesh | Promise<Mesh> {
+		if (urlOrTemplate instanceof Mesh) {
+			// Clone mode: share geometry+material, apply new transforms
+			const clone = new Mesh(this.ctx, {
+				geometry: urlOrTemplate.geometry,
+				material: urlOrTemplate.material,
+			});
+			Mesh.applyTransformOptions(clone, options);
+			this.add(clone);
+			return clone;
+		}
 
-		const mesh = await this.ctx.loadMesh(finalUrl, parsedOptions);
-		this.add(mesh);
-		return mesh;
+		// URL load mode
+		const finalUrl = this.defaultDir
+			? this.defaultDir + urlOrTemplate
+			: urlOrTemplate;
+		const parsedOptions = this.parseMaterialOptions(options);
+		return Mesh.load(this.ctx, finalUrl, parsedOptions).then((mesh) => {
+			this.add(mesh);
+			return mesh;
+		});
 	}
 
-	public addCube(options: any = {}): Mesh {
-		const parsedOptions = this.parseMaterialOptions(options);
-		const mesh = this.ctx.createCube(parsedOptions);
-		this.add(mesh);
-		return mesh;
-	}
-
-	public addSphere(options: any = {}): Mesh {
-		const parsedOptions = this.parseMaterialOptions(options);
-		const mesh = this.ctx.createSphere(parsedOptions);
-		this.add(mesh);
-		return mesh;
-	}
-
-	public addPlane(options: any = {}): Mesh {
-		const parsedOptions = this.parseMaterialOptions(options);
-		const mesh = this.ctx.createPlane(parsedOptions);
-		this.add(mesh);
+	/**
+	 * Adds a cube mesh to the scene.
+	 * @param options - Transform and material options.
+	 */
+	public addCube(options: SceneGeometryOptions = {}): Mesh {
+		const { addToScene = true, ...rest } = options;
+		const parsedOptions = this.parseMaterialOptions(rest);
+		const mesh = Mesh.createCube(this.ctx, parsedOptions);
+		if (addToScene) this.add(mesh);
 		return mesh;
 	}
 
 	/**
-	 * Topology name mapping: friendly names → WebGPU native topology strings.
+	 * Adds a sphere mesh to the scene.
+	 * @param options - Transform and material options.
 	 */
-	private static readonly TOPOLOGY_MAP: Record<string, GPUPrimitiveTopology> = {
-		triangles: "triangle-list",
-		lines: "line-list",
-		points: "point-list",
-		"line-strip": "line-strip",
-		"triangle-strip": "triangle-strip",
-	};
+	public addSphere(options: SceneGeometryOptions = {}): Mesh {
+		const { addToScene = true, ...rest } = options;
+		const parsedOptions = this.parseMaterialOptions(rest);
+		const mesh = Mesh.createSphere(this.ctx, parsedOptions);
+		if (addToScene) this.add(mesh);
+		return mesh;
+	}
+
+	/**
+	 * Adds a plane mesh to the scene.
+	 * @param options - Transform and material options.
+	 */
+	public addPlane(options: SceneGeometryOptions = {}): Mesh {
+		const { addToScene = true, ...rest } = options;
+		const parsedOptions = this.parseMaterialOptions(rest);
+		const mesh = Mesh.createPlane(this.ctx, parsedOptions);
+		if (addToScene) this.add(mesh);
+		return mesh;
+	}
 
 	/**
 	 * Vertex format attribute sizes (in number of floats).
@@ -250,8 +275,10 @@ export class Scene extends Node {
 		material?: Material;
 		position?: number[];
 		rotation?: number[];
+		// biome-ignore lint/suspicious/noExplicitAny: disable rule for now
 		rotationDegrees?: number[] | any;
 		scale?: number | number[];
+		addToScene?: boolean;
 	}): Mesh {
 		const {
 			vertexFormat,
@@ -259,13 +286,14 @@ export class Scene extends Node {
 			indices,
 			topology = "triangles",
 			material,
+			addToScene = true,
 			...transformOptions
 		} = config;
 
 		// Calculate stride from format
 		let stride = 0;
-		const hasNormals = vertexFormat.includes("normal");
-		const hasUVs = vertexFormat.includes("uv");
+		const _hasNormals = vertexFormat.includes("normal");
+		const _hasUVs = vertexFormat.includes("uv");
 
 		for (const attr of vertexFormat) {
 			const size = Scene.FORMAT_SIZES[attr];
@@ -360,8 +388,8 @@ export class Scene extends Node {
 
 		// Create Mesh
 		const mesh = new Mesh(this.ctx, { geometry, material: finalMaterial });
-		this.ctx.applyTransformOptions(mesh, transformOptions);
-		this.add(mesh);
+		Mesh.applyTransformOptions(mesh, transformOptions);
+		if (addToScene) this.add(mesh);
 
 		return mesh;
 	}
@@ -404,89 +432,6 @@ export class Scene extends Node {
 		return result;
 	}
 
-	private ensureLightsBufferSize(): void {
-		// Count(16 bytes) + 32 bytes per light
-		const requiredSize = 16 + 32 * this.lights.length;
-
-		if (!this.lightsBuffer || this.lightsBuffer.size < requiredSize) {
-			if (this.lightsBuffer) {
-				VRAMTracker.unregister(this.lightsBuffer);
-				this.lightsBuffer.destroy();
-			}
-
-			// Allocate in chunks of 50 to avoid frequent reallocation
-			const capacity = Math.max(50, this.lights.length + 20);
-			const newSize = 16 + 32 * capacity;
-
-			this.lightsBuffer = this.ctx.device.createBuffer({
-				label: "Scene Lights Storage Buffer",
-				size: newSize,
-				usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
-			});
-			VRAMTracker.register(
-				this.lightsBuffer,
-				"buffer",
-				"Scene Lights Storage Buffer",
-				newSize,
-				"Scene",
-			);
-
-			this.globalsBindGroupDirty = true;
-
-			this.lightsDataFloat = new Float32Array(newSize / 4);
-			this.lightsDataUint32 = new Uint32Array(this.lightsDataFloat.buffer);
-		}
-	}
-
-	private updateLightsBuffer(): void {
-		this.ensureLightsBufferSize();
-
-		const limit = this.lights.length;
-		const floatData = this.lightsDataFloat;
-
-		// Count
-		this.lightsDataUint32[0] = limit;
-
-		for (let i = 0; i < limit; i++) {
-			const light = this.lights[i];
-			const offset = 4 + i * 8; // Float 32 indices
-
-			if (light instanceof DirectionalLight) {
-				// Na Godot, luzes direcionais projetam sombra para trás de sua "frente" (Eixo local -Z)
-				const baseLocalAxis = new Vec3(0, 0, -1);
-				const finalDirection =
-					light.worldMatrix.transformDirection(baseLocalAxis);
-
-				floatData[offset + 0] = finalDirection.x;
-				floatData[offset + 1] = finalDirection.y;
-				floatData[offset + 2] = finalDirection.z;
-				floatData[offset + 3] = 0.0; // 0.0 = Directional
-			} else if (light instanceof PointLight) {
-				const pos = light.worldMatrix.values; // Translation is at 12, 13, 14
-				floatData[offset + 0] = pos[12];
-				floatData[offset + 1] = pos[13];
-				floatData[offset + 2] = pos[14];
-				floatData[offset + 3] = 1.0; // 1.0 = Point
-			}
-
-			// color (rgba = rgb, intensity)
-			floatData[offset + 4] = light.color.r;
-			floatData[offset + 5] = light.color.g;
-			floatData[offset + 6] = light.color.b;
-			floatData[offset + 7] = light.intensity;
-		}
-
-		// Only write the bytes we actually populated + the padded count container.
-		// Length in bytes = 16 for count block + (limit * 32 bytes for lights).
-		this.ctx.device.queue.writeBuffer(
-			this.lightsBuffer,
-			0,
-			this.lightsDataFloat.buffer,
-			0,
-			16 + 32 * limit,
-		);
-	}
-
 	public render(loopCallback?: (dt: number) => void): void {
 		if (loopCallback) {
 			this.ctx.run((dt) => {
@@ -498,12 +443,8 @@ export class Scene extends Node {
 		}
 	}
 
-	/**
-	 * Enable the debug overlay panel (inspired by Godot's Debugger).
-	 * Shows real-time performance metrics, VRAM allocations, and scene stats.
-	 * Toggle visibility with F3.
-	 */
-	public enableDebug(options: DebugPanelOptions = {}): DebugPanel {
+	// biome-ignore lint/suspicious/noExplicitAny: disable rule for now
+	public enableDebug(options: any = {}): DebugPanel {
 		if (this.debugPanel) return this.debugPanel;
 
 		this.perfTracker = new PerformanceTracker();
@@ -511,7 +452,6 @@ export class Scene extends Node {
 		const canvas = this.ctx.context.canvas as HTMLCanvasElement;
 		this.debugPanel = new DebugPanel(canvas, this.perfTracker, options);
 
-		// Provide live scene stats
 		this.debugPanel.setSceneStatsProvider(() => ({
 			totalMeshes: this.meshes.length,
 			totalNodes: this.countNodes(),
@@ -521,9 +461,6 @@ export class Scene extends Node {
 		return this.debugPanel;
 	}
 
-	/**
-	 * Recursively count all nodes in the scene graph.
-	 */
 	private countNodes(): number {
 		let count = 0;
 		const walk = (node: Node) => {
@@ -539,195 +476,19 @@ export class Scene extends Node {
 	private _renderFrame(dt: number): void {
 		if (!this.camera) return;
 
-		// --- Debug: begin frame timing ---
 		if (this.perfTracker) this.perfTracker.beginFrame();
 
-		// Ensure camera buffers exist before matrices are calculated
 		if (!this.camera.uniformBuffer) this.camera.initWebGPU(this.ctx);
 
-		// Update camera controller (third-person, first-person, orbit) before matrices
 		if (this.camera.controller) {
 			this.camera.controller.update(dt);
 		}
 
-		// Auto-fix resizing aspect before updating matrices
-		if (
-			this.camera.aspect !==
-			this.ctx.context.canvas.width / this.ctx.context.canvas.height
-		) {
-			this.camera.aspect =
-				this.ctx.context.canvas.width / this.ctx.context.canvas.height;
-			this.camera.updateProjection();
-			this.resizeDepthTexture();
-		}
+		this.updateWorldMatrix(false);
 
-		// Now calculate matrices so it will write to the initialized uniformBuffer
-		this.updateWorldMatrix(false); // Only update nodes that are explicitly marked as isDirty
-		this.updateLightsBuffer();
+		this.renderer.updateLightsBuffer(this.lights);
+		this.renderer.render(this, this.camera, this.perfTracker);
 
-		const textureView = this.ctx.context.getCurrentTexture().createView();
-		const renderPassDescriptor: GPURenderPassDescriptor = {
-			colorAttachments: [
-				{
-					view: textureView,
-					clearValue: this.backgroundColor.toFloat32Array() as any,
-					loadOp: "clear",
-					storeOp: "store",
-				},
-			],
-			depthStencilAttachment: {
-				view: this.depthTexture.createView(),
-				depthClearValue: 1.0,
-				depthLoadOp: "clear",
-				depthStoreOp: "store",
-			},
-		};
-
-		const commandEncoder = this.ctx.device.createCommandEncoder();
-		const passEncoder = commandEncoder.beginRenderPass(renderPassDescriptor);
-
-		if (this.globalsBindGroupDirty && this.camera.uniformBuffer) {
-			this.globalsBindGroup = this.ctx.device.createBindGroup({
-				label: "Scene_Globals_BindGroup",
-				layout: this.ctx.pipelineManager.getGlobalsBindGroupLayout(),
-				entries: [
-					{ binding: 0, resource: { buffer: this.camera.uniformBuffer } },
-					{ binding: 1, resource: { buffer: this.lightsBuffer } },
-				],
-			});
-			this.globalsBindGroupDirty = false;
-		}
-
-		if (this.globalsBindGroup) {
-			passEncoder.setBindGroup(0, this.globalsBindGroup);
-		}
-
-		// ─── Instanced Batch Rendering ──────────────────────────────
-		// Group visible meshes by shared (geometry, material) for instancing.
-		const batchGroups = new Map<string, Mesh[]>();
-		for (const mesh of this.meshes) {
-			if (!mesh.visible) continue;
-			const key = `${mesh.geometry.id}_${mesh.material.id}`;
-			let group = batchGroups.get(key);
-			if (!group) {
-				group = [];
-				batchGroups.set(key, group);
-			}
-			group.push(mesh);
-		}
-
-		let lastPipeline: GPURenderPipeline | null = null;
-
-		for (const [batchKey, batchMeshes] of batchGroups) {
-			const instanceCount = batchMeshes.length;
-			const representative = batchMeshes[0];
-
-			// Ensure scratch buffer large enough for this batch
-			const floatsNeeded = instanceCount * 16;
-			if (this.instanceMatrixScratch.length < floatsNeeded) {
-				this.instanceMatrixScratch = new Float32Array(
-					Math.max(floatsNeeded, this.instanceMatrixScratch.length * 2),
-				);
-			}
-
-			// Fill in world matrices
-			for (let i = 0; i < instanceCount; i++) {
-				this.instanceMatrixScratch.set(
-					batchMeshes[i].worldMatrix.values,
-					i * 16,
-				);
-			}
-
-			// Get or create storage buffer for this batch
-			let batch = this.instanceBatches.get(batchKey);
-			if (!batch || batch.capacity < instanceCount) {
-				// Destroy old buffer
-				if (batch) {
-					VRAMTracker.unregister(batch.buffer);
-					batch.buffer.destroy();
-				}
-
-				// Allocate with headroom to avoid frequent resize
-				const capacity = Math.max(
-					instanceCount,
-					(batch?.capacity || 0) * 2,
-					16,
-				);
-				const bufferSize = capacity * 64; // 64 bytes per mat4x4
-
-				const buffer = this.ctx.device.createBuffer({
-					label: `Instance Storage (batch ${batchKey})`,
-					size: bufferSize,
-					usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
-				});
-				VRAMTracker.register(
-					buffer,
-					"buffer",
-					`Instance Storage (batch ${batchKey})`,
-					bufferSize,
-					"Scene",
-				);
-
-				const bindGroup = this.ctx.device.createBindGroup({
-					label: `Instance BindGroup (batch ${batchKey})`,
-					layout: this.ctx.pipelineManager.getModelBindGroupLayout(),
-					entries: [{ binding: 0, resource: { buffer } }],
-				});
-
-				batch = { buffer, bindGroup, capacity };
-				this.instanceBatches.set(batchKey, batch);
-			}
-
-			// Upload matrices (only the bytes we need)
-			this.ctx.device.queue.writeBuffer(
-				batch.buffer,
-				0,
-				this.instanceMatrixScratch.buffer,
-				0,
-				instanceCount * 64,
-			);
-
-			// Set pipeline
-			const pipeline = representative.material.getPipeline(this.ctx);
-			if (pipeline !== lastPipeline) {
-				passEncoder.setPipeline(pipeline);
-				lastPipeline = pipeline;
-				if (this.perfTracker) this.perfTracker.recordMaterialChange();
-			}
-
-			// Bind instance storage (Group 1) and material (Group 2)
-			passEncoder.setBindGroup(1, batch.bindGroup);
-			passEncoder.setBindGroup(
-				2,
-				representative.material.getBindGroup(this.ctx),
-			);
-
-			// Set geometry buffers
-			passEncoder.setVertexBuffer(0, representative.geometry.vertexBuffer);
-			passEncoder.setIndexBuffer(
-				representative.geometry.indexBuffer,
-				representative.geometry.indexFormat,
-			);
-
-			// INSTANCED DRAW: one call for potentially thousands of objects!
-			passEncoder.drawIndexed(
-				representative.geometry.indexCount,
-				instanceCount,
-			);
-
-			// --- Debug: record draw stats ---
-			if (this.perfTracker) {
-				this.perfTracker.recordDraw(
-					representative.geometry.vertexCount * instanceCount,
-					representative.geometry.indexCount * instanceCount,
-				);
-			}
-		}
-
-		passEncoder.end();
-		this.ctx.device.queue.submit([commandEncoder.finish()]);
-
-		// --- Debug: end frame + update panel ---
 		if (this.perfTracker) {
 			this.perfTracker.totalMeshes = this.meshes.length;
 			this.perfTracker.lightCount = this.lights.length;

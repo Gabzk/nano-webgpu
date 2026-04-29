@@ -10,11 +10,16 @@ export interface LightOptions {
 	rotationDegrees?: Vec3 | number[];
 }
 
-export interface DirectionalLightOptions extends LightOptions {}
+export interface DirectionalLightOptions extends LightOptions {
+	castShadow?: boolean;
+	shadowMapSize?: number;
+	usePCF?: boolean;
+}
 
 export interface PointLightOptions extends LightOptions {
 	position?: Vec3 | number[];
 	radius?: number;
+	castShadow?: boolean;
 }
 
 export class Light extends Node3D {
@@ -51,17 +56,27 @@ export class Light extends Node3D {
 }
 
 export class DirectionalLight extends Light {
+	public castShadow: boolean = true;
+	public shadowMapSize: number = 2048;
+	public usePCF: boolean = true;
+
 	constructor(options: DirectionalLightOptions = {}) {
 		super(options);
+		if (options.castShadow !== undefined) this.castShadow = options.castShadow;
+		if (options.shadowMapSize !== undefined)
+			this.shadowMapSize = options.shadowMapSize;
+		if (options.usePCF !== undefined) this.usePCF = options.usePCF;
 	}
 }
 
 export class PointLight extends Light {
 	public radius: number;
+	public castShadow: boolean = false;
 
 	constructor(options: PointLightOptions = {}) {
 		super(options);
 		this.position = Vec3.from(options.position ?? [0, 0, 0]);
 		this.radius = options.radius ?? 10.0;
+		if (options.castShadow !== undefined) this.castShadow = options.castShadow;
 	}
 }

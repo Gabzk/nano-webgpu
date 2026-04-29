@@ -1,7 +1,6 @@
-import { AABB } from "../math/aabb";
-import { Mat4 } from "../math/mat4";
+import type { AABB } from "../math/aabb";
 import { Vec3 } from "../math/vec3";
-import { CollisionShape } from "./collision-shape";
+import type { CollisionShape } from "./collision-shape";
 import { Node } from "./node";
 
 /**
@@ -92,6 +91,7 @@ export class Node3D extends Node {
 	}
 
 	set rotationDegrees(val: Vec3 | number[]) {
+		// biome-ignore lint/suspicious/noExplicitAny: disable rule for now
 		const v = Vec3.from(val as any);
 		this._rotation.x = v.x * (Math.PI / 180);
 		this._rotation.y = v.y * (Math.PI / 180);
