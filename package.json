@@ -18,7 +18,8 @@
 		"test:run": "vitest run",
 		"check": "biome check --write .",
 		"format": "biome format --write .",
-		"lint": "biome lint ."
+		"lint": "biome lint .",
+		"docs": "typedoc --out docs src/index.ts"
 	},
 	"keywords": [],
 	"author": "",
@@ -33,6 +34,7 @@
 		"happy-dom": "^20.7.0",
 		"rollup": "^4.59.0",
 		"tslib": "^2.8.1",
+		"typedoc": "^0.28.19",
 		"typescript": "^5.9.3",
 		"vite": "^7.3.1",
 		"vitest": "^4.0.18"

@@ -1,0 +1,12 @@
+{
+	"$schema": "https://typedoc.org/schema.json",
+	"entryPoints": ["src/index.ts"],
+	"out": "docs",
+	"name": "Nano WebGPU API",
+	"includeVersion": true,
+	"excludePrivate": true,
+	"excludeProtected": false,
+	"excludeInternal": true,
+	"cleanOutputDir": true,
+	"githubPages": true
+}
