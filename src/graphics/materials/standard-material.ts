@@ -87,7 +87,8 @@ export class StandardMaterial extends Material {
 	private pendingTextures: { [key: string]: string } = {};
 
 	private uniformBuffer!: GPUBuffer;
-	private bindGroup!: GPUBindGroup;
+	private bindGroup: GPUBindGroup | null = null;
+	private sampler: GPUSampler | null = null;
 	private bufferData!: Float32Array;
 
 	constructor(options: StandardMaterialOptions = {}) {
@@ -239,20 +240,21 @@ export class StandardMaterial extends Material {
 		const tAO = this.aoTexture || Texture.getDummyWhite(ctx);
 		const tORM = this.ormTexture || Texture.getDummyWhite(ctx);
 
-		// To avoid constantly remaking bind group, we do it if not exists or if a texture finishes loading
-		const needsRebuild = !this.bindGroup;
+		// Return cached bind group if already built
+		if (this.bindGroup) return this.bindGroup;
+
 		const textures = [tAlbedo, tNormal, tRoughness, tMetallic, tAO, tORM];
 
-		if (!needsRebuild) {
-			return this.bindGroup;
+		// Cache the sampler — creating a GPUSampler is not free, do it once per material
+		if (!this.sampler) {
+			this.sampler = ctx.device.createSampler({
+				minFilter: "linear",
+				magFilter: "linear",
+				mipmapFilter: "linear",
+				maxAnisotropy: 4,
+			});
 		}
-
-		const sampler = ctx.device.createSampler({
-			minFilter: "linear",
-			magFilter: "linear",
-			mipmapFilter: "linear",
-			maxAnisotropy: 4,
-		});
+		const sampler = this.sampler;
 
 		const tryBuild = () => {
 			if (this.bindGroup) return; // Prevent double trigger
@@ -276,18 +278,17 @@ export class StandardMaterial extends Material {
 
 		tryBuild();
 
-		// Listen for async loading
+		// Listen for async texture loading — rebuild the bind group when a texture is ready
 		for (const tex of textures) {
 			if (tex && !tex.isLoaded) {
 				tex.onUpdate(() => {
-					// Force rebuild the group
-					//@ts-expect-error
-					this.bindGroup = null;
+					this.bindGroup = null; // Force rebuild; bindGroup is GPUBindGroup | null
 					tryBuild();
 				});
 			}
 		}
 
-		return this.bindGroup;
+		// biome-ignore lint/style/noNonNullAssertion: tryBuild() above always assigns this.bindGroup
+		return this.bindGroup!;
 	}
 }

@@ -15,12 +15,25 @@ export {
 	type OrbitOptions,
 	type ThirdPersonOptions,
 } from "./graphics/camera-controller";
-export { DirectionalLight, PointLight, type LightOptions, type DirectionalLightOptions, type PointLightOptions } from "./graphics/light";
+export {
+	DirectionalLight,
+	type DirectionalLightOptions,
+	type LightOptions,
+	PointLight,
+	type PointLightOptions,
+} from "./graphics/light";
 export { Material } from "./graphics/materials/material";
 export { ShaderMaterial } from "./graphics/materials/shader-material";
-export { StandardMaterial, type StandardMaterialOptions } from "./graphics/materials/standard-material";
+export {
+	StandardMaterial,
+	type StandardMaterialOptions,
+} from "./graphics/materials/standard-material";
 export { Mesh, type MeshOptions } from "./graphics/mesh";
-export { Scene, type SceneLightOptions, type SceneGeometryOptions } from "./graphics/scene";
+export {
+	Scene,
+	type SceneGeometryOptions,
+	type SceneLightOptions,
+} from "./graphics/scene";
 export { Texture } from "./graphics/texture";
 export { AABB } from "./math/aabb";
 export { Color } from "./math/color";

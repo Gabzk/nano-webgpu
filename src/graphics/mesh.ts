@@ -6,7 +6,10 @@ import { AABB } from "../math/aabb";
 import { Vec3 } from "../math/vec3";
 import { Geometry } from "./geometry";
 import { Material } from "./materials/material";
-import { StandardMaterial, type StandardMaterialOptions } from "./materials/standard-material";
+import {
+	StandardMaterial,
+	type StandardMaterialOptions,
+} from "./materials/standard-material";
 import {
 	createCubeGeometry,
 	createPlaneGeometry,
@@ -28,10 +31,7 @@ export class Mesh extends Node3D {
 	public geometry: Geometry;
 	public material: Material;
 
-	constructor(
-		ctx: Context,
-		options: MeshOptions,
-	) {
+	constructor(ctx: Context, options: MeshOptions) {
 		super();
 		this.ctx = ctx;
 		this.geometry = options.geometry;
@@ -82,20 +82,25 @@ export class Mesh extends Node3D {
 	/**
 	 * Applies transform options to a mesh.
 	 */
-	public static applyTransformOptions(mesh: Mesh, options: {
-		position?: number[];
-		scale?: number | number[];
-		rotation?: number[];
-		rotationDegrees?: number[];
-	}) {
+	public static applyTransformOptions(
+		mesh: Mesh,
+		options: {
+			position?: number[];
+			scale?: number | number[];
+			rotation?: number[];
+			rotationDegrees?: number[];
+		},
+	) {
 		if (options.position) mesh.position.copy(Vec3.from(options.position));
 		if (options.scale !== undefined) {
 			if (typeof options.scale === "number")
 				mesh.scale.set(options.scale, options.scale, options.scale);
 			else mesh.scale.copy(Vec3.from(options.scale as number[]));
 		}
-		if (options.rotation) mesh.rotation.copy(Vec3.from(options.rotation as number[]));
-		if (options.rotationDegrees) mesh.rotationDegrees = options.rotationDegrees as any;
+		if (options.rotation)
+			mesh.rotation.copy(Vec3.from(options.rotation as number[]));
+		if (options.rotationDegrees)
+			mesh.rotationDegrees = options.rotationDegrees as any;
 	}
 
 	// --- Static Factory Methods ---
@@ -103,19 +108,34 @@ export class Mesh extends Node3D {
 	/**
 	 * Creates a cube mesh.
 	 */
-	public static createCube(ctx: Context, options: StandardMaterialOptions & { size?: number } = {}): Mesh {
+	public static createCube(
+		ctx: Context,
+		options: StandardMaterialOptions & { size?: number } = {},
+	): Mesh {
 		if (!ctx.defaultGeometries.cube) {
 			ctx.defaultGeometries.cube = createCubeGeometry(ctx, options.size || 1.0);
 		}
-		const meshOptions: any = { ...options, geometry: ctx.defaultGeometries.cube };
+		const meshOptions: any = {
+			...options,
+			geometry: ctx.defaultGeometries.cube,
+		};
 		const mesh = new Mesh(ctx, meshOptions);
 		Mesh.applyTransformOptions(mesh, options as any);
 		mesh.collisionShape = CollisionShape.box(options.size || 1.0);
 		return mesh;
 	}
 
-	// biome-ignore lint/suspicious/noExplicitAny: disable rule for now
-	public static createPlane(ctx: Context, options: any): Mesh {
+	public static createPlane(
+		ctx: Context,
+		options: StandardMaterialOptions & {
+			width?: number;
+			height?: number;
+			position?: number[];
+			rotation?: number[];
+			rotationDegrees?: number[];
+			scale?: number | number[];
+		} = {},
+	): Mesh {
 		if (!ctx.defaultGeometries.plane) {
 			ctx.defaultGeometries.plane = createPlaneGeometry(
 				ctx,
@@ -123,14 +143,23 @@ export class Mesh extends Node3D {
 				options.height || 1.0,
 			);
 		}
-		options.geometry = ctx.defaultGeometries.plane;
-		const mesh = new Mesh(ctx, options);
+		const meshOptions = { ...options, geometry: ctx.defaultGeometries.plane };
+		const mesh = new Mesh(ctx, meshOptions as any);
 		Mesh.applyTransformOptions(mesh, options);
 		return mesh;
 	}
 
-	// biome-ignore lint/suspicious/noExplicitAny: disable rule for now
-	public static createSphere(ctx: Context, options: any): Mesh {
+	public static createSphere(
+		ctx: Context,
+		options: StandardMaterialOptions & {
+			radius?: number;
+			segments?: number;
+			position?: number[];
+			rotation?: number[];
+			rotationDegrees?: number[];
+			scale?: number | number[];
+		} = {},
+	): Mesh {
 		if (!ctx.defaultGeometries.sphere) {
 			ctx.defaultGeometries.sphere = createSphereGeometry(
 				ctx,
@@ -139,8 +168,8 @@ export class Mesh extends Node3D {
 				options.segments || 16,
 			);
 		}
-		options.geometry = ctx.defaultGeometries.sphere;
-		const mesh = new Mesh(ctx, options);
+		const meshOptions = { ...options, geometry: ctx.defaultGeometries.sphere };
+		const mesh = new Mesh(ctx, meshOptions as any);
 		Mesh.applyTransformOptions(mesh, options);
 		mesh.collisionShape = CollisionShape.sphere(options.radius || 1.0);
 		return mesh;

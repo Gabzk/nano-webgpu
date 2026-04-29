@@ -115,9 +115,19 @@ export class Context {
 		requestAnimationFrame(frame);
 	}
 
-	// ------------- Factory Methods for Primitives -------------
-	// Added to fulfill the 'nano' API abstraction requirements.
+	// ------------- Default resource caches (per-context, avoids cross-device contamination) -------------
 
-	// biome-ignore lint/suspicious/noExplicitAny: disable rule for now
-	public defaultGeometries: Record<string, any> = {};
+	/** Cached primitive geometries (cube, plane, sphere). Keyed by primitive name. */
+	public defaultGeometries: {
+		cube?: unknown;
+		plane?: unknown;
+		sphere?: unknown;
+		[key: string]: unknown;
+	} = {};
+
+	/** Cached dummy textures (white 1×1, flat-normal 1×1). Keyed by "white" | "normal". */
+	public defaultTextures: {
+		white?: unknown;
+		normal?: unknown;
+	} = {};
 }

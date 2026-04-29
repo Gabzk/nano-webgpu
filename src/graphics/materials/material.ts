@@ -4,15 +4,15 @@ export interface MaterialOptions {
 	transparent?: boolean;
 }
 
-let NEXT_MATERIAL_ID = 0;
-
 export abstract class Material {
+	private static _nextId = 0;
+
 	public id: number;
 	public type: string = "Material";
 	public isDirty: boolean = true;
 
 	constructor() {
-		this.id = NEXT_MATERIAL_ID++;
+		this.id = Material._nextId++;
 	}
 
 	/**

@@ -142,10 +142,6 @@ export class Camera extends Node3D {
 		}
 	}
 
-	public enableOrbitControls(canvas?: HTMLCanvasElement | string): void {
-		console.log("Orbit controls enabled for", canvas || "auto-detected canvas");
-	}
-
 	/**
 	 * Attaches a pre-built camera controller.
 	 * Modes:

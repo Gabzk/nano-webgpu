@@ -4,7 +4,7 @@ import { VRAMTracker } from "../debug/vram-tracker";
 import { Mat4 } from "../math/mat4";
 import { Vec3 } from "../math/vec3";
 import type { Camera } from "./camera";
-import type { Light } from "./light";
+import { DirectionalLight, type Light, PointLight } from "./light";
 import type { Mesh } from "./mesh";
 import type { Scene } from "./scene";
 
@@ -36,7 +36,13 @@ export class Renderer {
 			capacity: number;
 		}
 	> = new Map();
-	private instanceMatrixScratch: Float32Array = new Float32Array(16 * 64); // Reusable scratch for writing matrices
+	private instanceMatrixScratch: Float32Array = new Float32Array(16 * 64);
+
+	/**
+	 * Persistent batch-group map. Arrays inside are cleared and re-filled each frame
+	 * (group.length = 0) to avoid `new Map()` / `new Array()` allocations every frame.
+	 */
+	private batchGroups: Map<string, Mesh[]> = new Map();
 
 	constructor(ctx: Context) {
 		this.ctx = ctx;
@@ -133,6 +139,27 @@ export class Renderer {
 		}
 	}
 
+	/**
+	 * Groups scene meshes by geometry+material into persistent arrays.
+	 * Reuses existing arrays (sets length=0) to avoid per-frame GC allocations.
+	 */
+	private rebuildBatchGroups(meshes: Mesh[]): void {
+		// Clear existing groups, reusing the array objects
+		for (const group of this.batchGroups.values()) {
+			group.length = 0;
+		}
+		for (const mesh of meshes) {
+			if (!mesh.visible) continue;
+			const key = `${mesh.geometry.id}_${mesh.material.id}`;
+			let group = this.batchGroups.get(key);
+			if (!group) {
+				group = [];
+				this.batchGroups.set(key, group);
+			}
+			group.push(mesh);
+		}
+	}
+
 	private renderShadowPass(
 		scene: Scene,
 		commandEncoder: GPUCommandEncoder,
@@ -140,11 +167,7 @@ export class Renderer {
 		// biome-ignore lint/suspicious/noExplicitAny: disable rule for now
 		let dirLight: any = null;
 		for (const light of scene.lights) {
-			if (
-				light.constructor.name === "DirectionalLight" &&
-				// biome-ignore lint/suspicious/noExplicitAny: disable rule for now
-				(light as any).castShadow
-			) {
+			if (light instanceof DirectionalLight && light.castShadow) {
 				dirLight = light;
 				break;
 			}
@@ -201,24 +224,12 @@ export class Renderer {
 		passEncoder.setPipeline(this.ctx.pipelineManager.getShadowPipeline());
 		passEncoder.setBindGroup(0, this.shadowBindGroup);
 
-		// Group meshes
-		const batchGroups = new Map<string, Mesh[]>();
-		for (const mesh of scene.meshes) {
-			if (!mesh.visible) continue;
-			const key = `${mesh.geometry.id}_${mesh.material.id}`;
-			let group = batchGroups.get(key);
-			if (!group) {
-				group = [];
-				batchGroups.set(key, group);
-			}
-			group.push(mesh);
-		}
-
-		for (const [batchKey, batchMeshes] of batchGroups) {
+		for (const [batchKey, batchMeshes] of this.batchGroups) {
+			if (batchMeshes.length === 0) continue;
 			const instanceCount = batchMeshes.length;
 			const representative = batchMeshes[0];
 
-			// Assuming matrices are already updated by updateWorldMatrix
+			// Matrices are already updated by updateWorldMatrix
 			const batch = this.instanceBatches.get(batchKey);
 			if (batch) {
 				passEncoder.setBindGroup(1, batch.bindGroup);
@@ -319,24 +330,21 @@ export class Renderer {
 			let py = light.worldMatrix.values[13];
 			let pz = light.worldMatrix.values[14];
 
-			if (light.constructor.name === "DirectionalLight") {
+			if (light instanceof DirectionalLight) {
 				const baseLocalAxis = new Vec3(0, 0, -1);
 				const finalDirection =
 					light.worldMatrix.transformDirection(baseLocalAxis);
 				px = finalDirection.x;
 				py = finalDirection.y;
 				pz = finalDirection.z;
-				if ((light as any).castShadow) {
-					this.lightsDataFloat[offset + 3] = 1.0; // castShadow=true, type is always 1.0; usePCF is in shadowUniformBuffer
+				if (light.castShadow) {
+					this.lightsDataFloat[offset + 3] = 1.0;
 				} else {
 					this.lightsDataFloat[offset + 3] = 0.0;
 				}
-			} else if (light.constructor.name === "PointLight") {
+			} else if (light instanceof PointLight) {
 				// type encoding: 2=point no shadow, 3=point with shadow
-				// biome-ignore lint/suspicious/noExplicitAny: disable rule for now
-				this.lightsDataFloat[offset + 3] = (light as any).castShadow
-					? 3.0
-					: 2.0;
+				this.lightsDataFloat[offset + 3] = light.castShadow ? 3.0 : 2.0;
 			}
 
 			this.lightsDataFloat[offset + 0] = px;
@@ -419,21 +427,13 @@ export class Renderer {
 			passEncoder.setBindGroup(0, this.globalsBindGroup);
 		}
 
-		const batchGroups = new Map<string, Mesh[]>();
-		for (const mesh of scene.meshes) {
-			if (!mesh.visible) continue;
-			const key = `${mesh.geometry.id}_${mesh.material.id}`;
-			let group = batchGroups.get(key);
-			if (!group) {
-				group = [];
-				batchGroups.set(key, group);
-			}
-			group.push(mesh);
-		}
+		// Build batch groups once per frame (reusing persistent arrays)
+		this.rebuildBatchGroups(scene.meshes);
 
 		let lastPipeline: GPURenderPipeline | null = null;
 
-		for (const [batchKey, batchMeshes] of batchGroups) {
+		for (const [batchKey, batchMeshes] of this.batchGroups) {
+			if (batchMeshes.length === 0) continue;
 			const instanceCount = batchMeshes.length;
 			const representative = batchMeshes[0];
 

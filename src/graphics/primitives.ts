@@ -6,9 +6,11 @@ import { Geometry } from "./geometry";
  */
 export function createCubeGeometry(ctx: Context, size: number = 1.0): Geometry {
 	const s = size / 2;
-	// Format: Position(XYZ), Normal(XYZ), UV(XY)
+	// Format per vertex: Position(XYZ), Normal(XYZ), UV(XY) — 8 floats per vertex
+	// prettier-ignore
 	const vertices = new Float32Array([
-		// Front face
+		// pos.x  pos.y  pos.z   nor.x  nor.y  nor.z   uv.u  uv.v
+		// Front face (Z+)
 		-s,
 		-s,
 		s,
@@ -41,7 +43,7 @@ export function createCubeGeometry(ctx: Context, size: number = 1.0): Geometry {
 		1,
 		0,
 		0,
-		// Back face
+		// Back face (Z-)
 		-s,
 		-s,
 		-s,
@@ -74,7 +76,7 @@ export function createCubeGeometry(ctx: Context, size: number = 1.0): Geometry {
 		-1,
 		0,
 		1,
-		// Top face
+		// Top face (Y+)
 		-s,
 		s,
 		-s,
@@ -107,21 +109,21 @@ export function createCubeGeometry(ctx: Context, size: number = 1.0): Geometry {
 		0,
 		1,
 		0,
-		// Bottom face
+		// Bottom face (Y-)
 		-s,
-		-s,
-		-s,
-		0,
-		-1,
-		0,
-		1,
-		0,
-		s,
 		-s,
 		-s,
 		0,
 		-1,
 		0,
+		1,
+		0,
+		s,
+		-s,
+		-s,
+		0,
+		-1,
+		0,
 		0,
 		0,
 		s,
@@ -140,7 +142,7 @@ export function createCubeGeometry(ctx: Context, size: number = 1.0): Geometry {
 		0,
 		1,
 		1,
-		// Right face
+		// Right face (X+)
 		s,
 		-s,
 		-s,
@@ -173,7 +175,7 @@ export function createCubeGeometry(ctx: Context, size: number = 1.0): Geometry {
 		0,
 		0,
 		1,
-		// Left face
+		// Left face (X-)
 		-s,
 		-s,
 		-s,
@@ -208,6 +210,7 @@ export function createCubeGeometry(ctx: Context, size: number = 1.0): Geometry {
 		0,
 	]);
 
+	// prettier-ignore
 	const indices = new Uint16Array([
 		0,
 		1,
@@ -264,8 +267,10 @@ export function createPlaneGeometry(
 	const hw = width / 2;
 	const hh = height / 2;
 
+	// Format per vertex: Position(XYZ), Normal(XYZ), UV(XY) — 8 floats per vertex
+	// prettier-ignore
 	const vertices = new Float32Array([
-		// Pos             Normals        UVs
+		// pos.x  pos.y  pos.z   nor.x  nor.y  nor.z   uv.u  uv.v
 		-hw,
 		0,
 		hh,

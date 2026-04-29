@@ -5,11 +5,19 @@ import { DebugPanel } from "../debug/debug-panel";
 import { PerformanceTracker } from "../debug/performance-tracker";
 import { Color } from "../math/color";
 import { Vec3 } from "../math/vec3";
-import { Camera } from "./camera";
+import { Camera, type CameraOptions } from "./camera";
 import { Geometry } from "./geometry";
-import { DirectionalLight, Light, type LightOptions, PointLight } from "./light";
+import {
+	DirectionalLight,
+	Light,
+	type LightOptions,
+	PointLight,
+} from "./light";
 import { Material, type MaterialOptions } from "./materials/material";
-import { StandardMaterial, type StandardMaterialOptions } from "./materials/standard-material";
+import {
+	StandardMaterial,
+	type StandardMaterialOptions,
+} from "./materials/standard-material";
 import { Mesh, type MeshOptions } from "./mesh";
 import { Renderer } from "./renderer";
 
@@ -28,6 +36,8 @@ export interface SceneLightOptions extends LightOptions {
  * Scene specific options for geometry primitives.
  */
 export interface SceneGeometryOptions extends StandardMaterialOptions {
+	color?: Color | string;
+	material?: Material | StandardMaterialOptions;
 	position?: number[];
 	rotation?: number[];
 	rotationDegrees?: number[];
@@ -69,19 +79,11 @@ export class Scene extends Node {
 		}
 	}
 
-	// biome-ignore lint/suspicious/noExplicitAny: disable rule for now
-	public setCamera(cameraOrOptions: Camera | any): Camera {
-		if (cameraOrOptions instanceof Camera) {
-			this.camera = cameraOrOptions;
-		} else {
-			this.camera = new Camera(cameraOrOptions);
-			if (cameraOrOptions.position)
-				this.camera.position.set(
-					cameraOrOptions.position[0],
-					cameraOrOptions.position[1],
-					cameraOrOptions.position[2],
-				);
-		}
+	public setCamera(cameraOrOptions: Camera | CameraOptions): Camera {
+		this.camera =
+			cameraOrOptions instanceof Camera
+				? cameraOrOptions
+				: new Camera(cameraOrOptions);
 
 		this.renderer.globalsBindGroupDirty = true;
 		if (!this.children.includes(this.camera)) {
@@ -89,8 +91,6 @@ export class Scene extends Node {
 		}
 		return this.camera;
 	}
-
-	
 
 	/**
 	 * Adds a light to the scene.
@@ -122,7 +122,8 @@ export class Scene extends Node {
 				const p = options.position as number[];
 				light.position.set(p[0], p[1], p[2]);
 			}
-			if (options.rotation) light.rotation.copy(Vec3.from(options.rotation as number[]));
+			if (options.rotation)
+				light.rotation.copy(Vec3.from(options.rotation as number[]));
 			if (options.rotationDegrees)
 				light.rotationDegrees = options.rotationDegrees as any;
 		}
@@ -168,38 +169,51 @@ export class Scene extends Node {
 	}
 
 	/**
-	 * Load a mesh from a URL, or clone an existing Mesh template with new transforms.
-	 * - `addMesh(url, options)` — loads a model file
-	 * - `addMesh(template, options)` — clones a template Mesh (for instancing)
-	 * @param urlOrTemplate - The URL of the model file or a Mesh instance to clone.
-	 * @param options - Load or clone options.
+	 * Instantiates a copy of an existing Mesh template, sharing its Geometry for GPU batching.
+	 * Use this to create hundreds of instances of the same mesh with minimal draw calls.
+	 * @param template - The Mesh whose geometry (and optionally material) will be shared.
+	 * @param options - Transform and optional material overrides.
+	 * @example
+	 * ```ts
+	 * const cubeTemplate = scene.addCube({ addToScene: false });
+	 * for (let i = 0; i < 500; i++) {
+	 *   scene.instantiate(cubeTemplate, { position: [i, 0, 0] });
+	 * }
+	 * ```
 	 */
-	public addMesh(template: Mesh, options?: SceneGeometryOptions): Mesh;
-	public addMesh(url: string, options?: SceneGeometryOptions): Promise<Mesh>;
-	public addMesh(
-		urlOrTemplate: string | Mesh,
-		options: SceneGeometryOptions = {},
-	): Mesh | Promise<Mesh> {
-		if (urlOrTemplate instanceof Mesh) {
-			// Clone mode: share geometry+material, apply new transforms
-			const clone = new Mesh(this.ctx, {
-				geometry: urlOrTemplate.geometry,
-				material: urlOrTemplate.material,
-			});
-			Mesh.applyTransformOptions(clone, options);
-			this.add(clone);
-			return clone;
-		}
-
-		// URL load mode
-		const finalUrl = this.defaultDir
-			? this.defaultDir + urlOrTemplate
-			: urlOrTemplate;
-		const parsedOptions = this.parseMaterialOptions(options);
-		return Mesh.load(this.ctx, finalUrl, parsedOptions).then((mesh) => {
-			this.add(mesh);
-			return mesh;
+	public instantiate(template: Mesh, options: SceneGeometryOptions = {}): Mesh {
+		const { addToScene = true, ...rest } = options;
+		const parsedOptions = this.parseMaterialOptions(rest);
+		const clone = new Mesh(this.ctx, {
+			geometry: template.geometry,
+			material: parsedOptions.material || template.material,
 		});
+		Mesh.applyTransformOptions(clone, parsedOptions);
+		if (addToScene) this.add(clone);
+		return clone;
+	}
+
+	/**
+	 * Loads a mesh from a GLB, GLTF, or OBJ file URL and adds it to the scene.
+	 * @param url - The URL of the model file (relative URLs are prefixed with `setDefaultDir`).
+	 * @param options - Transform and material options.
+	 * @example
+	 * ```ts
+	 * const shiba = await scene.loadMesh('./assets/shiba.glb', { position: [0, 0, 0] });
+	 * // Clone it without re-loading from disk:
+	 * scene.instantiate(shiba, { position: [2, 0, 0] });
+	 * ```
+	 */
+	public async loadMesh(
+		url: string,
+		options: SceneGeometryOptions = {},
+	): Promise<Mesh> {
+		const { addToScene = true, ...rest } = options;
+		const parsedOptions = this.parseMaterialOptions(rest);
+		const finalUrl = this.defaultDir ? this.defaultDir + url : url;
+		const mesh = await Mesh.load(this.ctx, finalUrl, parsedOptions);
+		if (addToScene) this.add(mesh);
+		return mesh;
 	}
 
 	/**
@@ -292,8 +306,6 @@ export class Scene extends Node {
 
 		// Calculate stride from format
 		let stride = 0;
-		const _hasNormals = vertexFormat.includes("normal");
-		const _hasUVs = vertexFormat.includes("uv");
 
 		for (const attr of vertexFormat) {
 			const size = Scene.FORMAT_SIZES[attr];

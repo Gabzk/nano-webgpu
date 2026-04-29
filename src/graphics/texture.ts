@@ -11,10 +11,6 @@ export class Texture {
 	public url: string = "";
 	private listeners: (() => void)[] = [];
 
-	// --- Static caches for dummy textures (prevents memory leak) ---
-	private static _dummyWhite: Texture | null = null;
-	private static _dummyNormal: Texture | null = null;
-
 	/**
 	 * Called when the texture finishes loading.
 	 */
@@ -24,14 +20,16 @@ export class Texture {
 
 	/**
 	 * Loads a texture synchronously, substituting a white pixel until finished.
+	 * If `url` is a Blob URL (created by the GLTF loader for embedded textures),
+	 * it will be automatically revoked after the GPU upload completes.
 	 * @param ctx The Context
-	 * @param url The image URL
+	 * @param url The image URL (or a blob: URL for embedded GLTF images)
 	 */
 	public static loadBackground(ctx: Context, url: string): Texture {
 		const tex = new Texture();
 		tex.url = url;
 
-		// 1x1 White dummy texture
+		// 1x1 White dummy texture while the real one loads
 		tex.gpuTexture = ctx.device.createTexture({
 			size: [1, 1, 1],
 			format: "rgba8unorm",
@@ -55,13 +53,13 @@ export class Texture {
 			[1, 1, 1],
 		);
 
-		// Async Loader
+		// Async loader
 		const loader = new Loader(ctx.device);
 		loader
 			.loadTexture(url)
 			.then((gpuTex) => {
-				VRAMTracker.unregister(tex.gpuTexture); // Remove dummy
-				tex.gpuTexture.destroy(); // Remove dummy
+				VRAMTracker.unregister(tex.gpuTexture);
+				tex.gpuTexture.destroy();
 				tex.gpuTexture = gpuTex;
 				const w = gpuTex.width || 1;
 				const h = gpuTex.height || 1;
@@ -73,6 +71,10 @@ export class Texture {
 					"Texture",
 				);
 				tex.isLoaded = true;
+				// Revoke blob URLs created by the GLTF loader for embedded images
+				if (url.startsWith("blob:")) {
+					URL.revokeObjectURL(url);
+				}
 				for (const cb of tex.listeners) cb();
 			})
 			.catch((err) => {
@@ -83,10 +85,11 @@ export class Texture {
 	}
 
 	/**
-	 * Returns a cached 1x1 white dummy texture. Created once, reused forever.
+	 * Returns a cached 1×1 white dummy texture for the given context.
+	 * Created once per context and reused — safe across multiple Scene instances.
 	 */
 	public static getDummyWhite(ctx: Context): Texture {
-		if (Texture._dummyWhite) return Texture._dummyWhite;
+		if (ctx.defaultTextures.white) return ctx.defaultTextures.white as Texture;
 
 		const tex = new Texture();
 		tex.url = "dummy_white";
@@ -113,16 +116,17 @@ export class Texture {
 			[1, 1, 1],
 		);
 		tex.isLoaded = true;
-		Texture._dummyWhite = tex;
+		ctx.defaultTextures.white = tex;
 		return tex;
 	}
 
 	/**
-	 * Returns a cached 1x1 flat normal dummy texture. Created once, reused forever.
-	 * Normal maps treat RGB as XYZ vector mapping. (128, 128, 255) means straight Z.
+	 * Returns a cached 1×1 flat normal dummy texture for the given context.
+	 * (128, 128, 255) → straight-Z normal. Created once per context and reused.
 	 */
 	public static getDummyNormal(ctx: Context): Texture {
-		if (Texture._dummyNormal) return Texture._dummyNormal;
+		if (ctx.defaultTextures.normal)
+			return ctx.defaultTextures.normal as Texture;
 
 		const tex = new Texture();
 		tex.url = "dummy_normal";
@@ -149,7 +153,7 @@ export class Texture {
 			[1, 1, 1],
 		);
 		tex.isLoaded = true;
-		Texture._dummyNormal = tex;
+		ctx.defaultTextures.normal = tex;
 		return tex;
 	}
 }

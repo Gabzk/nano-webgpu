@@ -87,7 +87,7 @@ async function main() {
 	for (let x = 0; x < count; x++) {
 		for (let z = 0; z < count; z++) {
 			for (let y = 0; y < 4; y++) {
-				scene.addMesh(cubeTemplate, {
+				scene.instantiate(cubeTemplate, {
 					position: [x * spacing - offset, y * spacing, z * spacing - offset],
 				});
 			}
@@ -97,7 +97,7 @@ async function main() {
 	// 2. Instanciando 2000 triângulos customizados a partir do template buildMesh (1 Draw Call!)
 	for (let x = 0; x < 20; x++) {
 		for (let z = 0; z < 100; z++) {
-			const clone = scene.addMesh(triangle, {
+			const clone = scene.instantiate(triangle, {
 				position: [
 					x * spacing * 2 - 20,
 					10 + Math.random() * 5,
