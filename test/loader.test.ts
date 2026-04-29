@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Loader } from "../src/core/loader";
 
 // Mock GPUTextureUsage for the test environment (which might not have WebGPU natively)
+// biome-ignore lint/suspicious/noExplicitAny: disable rule for now
 (globalThis as any).GPUTextureUsage = {
 	TEXTURE_BINDING: 4,
 	COPY_DST: 2,
@@ -14,12 +15,16 @@ describe("Loader Module", () => {
 	let loader: Loader;
 
 	// Save original fetch
+	// biome-ignore lint/suspicious/noExplicitAny: disable rule for now
 	let originalFetch: any;
+	// biome-ignore lint/suspicious/noExplicitAny: disable rule for now
 	let originalCreateImageBitmap: any;
 
 	beforeEach(() => {
 		originalFetch = window.fetch;
+		// biome-ignore lint/suspicious/noExplicitAny: disable rule for now
 		if ((window as any).createImageBitmap) {
+			// biome-ignore lint/suspicious/noExplicitAny: disable rule for now
 			originalCreateImageBitmap = (window as any).createImageBitmap;
 		}
 
@@ -33,6 +38,7 @@ describe("Loader Module", () => {
 
 		loader = new Loader(mockDevice);
 
+		// biome-ignore lint/suspicious/noExplicitAny: disable rule for now
 		(window as any).createImageBitmap = vi
 			.fn()
 			.mockResolvedValue({ width: 1024, height: 1024 });
@@ -41,6 +47,7 @@ describe("Loader Module", () => {
 	afterEach(() => {
 		window.fetch = originalFetch;
 		if (originalCreateImageBitmap) {
+			// biome-ignore lint/suspicious/noExplicitAny: disable rule for now
 			(window as any).createImageBitmap = originalCreateImageBitmap;
 		}
 		vi.restoreAllMocks();
@@ -57,6 +64,7 @@ describe("Loader Module", () => {
 			window.fetch = mockFetch;
 
 			const expectedShaderModule = {};
+			// biome-ignore lint/suspicious/noExplicitAny: disable rule for now
 			(mockDevice.createShaderModule as any).mockReturnValue(
 				expectedShaderModule,
 			);
@@ -95,6 +103,7 @@ describe("Loader Module", () => {
 
 			await loader.loadTexture("test.png");
 
+			// biome-ignore lint/suspicious/noExplicitAny: disable rule for now
 			expect((window as any).createImageBitmap).toHaveBeenCalled();
 			expect(mockDevice.createTexture).toHaveBeenCalledWith(
 				expect.objectContaining({

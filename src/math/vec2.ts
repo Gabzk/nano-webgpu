@@ -1,6 +1,6 @@
 /**
  * @module Vec2
- * @description
+ 
  * This module provides a 2D vector representation.
  */
 export class Vec2 {

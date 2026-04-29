@@ -1,5 +1,5 @@
 import { Input } from "../core/input";
-import { Node3D } from "../core/node3d";
+import type { Node3D } from "../core/node3d";
 import { Vec3 } from "../math/vec3";
 import type { Camera } from "./camera";
 
@@ -52,7 +52,7 @@ export interface OrbitOptions {
 
 /**
  * @module CameraController
- * @description
+ 
  * Pre-built camera behaviors that eliminate trigonometry for the developer.
  * Inspired by Godot's SpringArm3D + pivot node pattern, but condensed into
  * a single component that attaches to a Camera.
@@ -89,11 +89,13 @@ export class CameraController {
 	constructor(
 		camera: Camera,
 		mode: CameraMode,
+		// biome-ignore lint/suspicious/noExplicitAny: disable rule for now
 		options: ThirdPersonOptions | FirstPersonOptions | OrbitOptions = {} as any,
 	) {
 		this.camera = camera;
 		this.mode = mode;
 
+		// biome-ignore lint/suspicious/noExplicitAny: disable rule for now
 		const opts = options as any;
 		this.target = opts.target ?? null;
 		this.center = opts.center ? Vec3.from(opts.center) : new Vec3(0, 0, 0);

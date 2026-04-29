@@ -1,6 +1,6 @@
 /**
  * @module DebugPanel
- * @description
+ 
  * HTML overlay debug panel inspired by Godot's Debugger panel.
  * Displays real-time performance metrics, VRAM allocations, and scene stats
  * in a semi-transparent dark panel with tabs.
@@ -205,6 +205,7 @@ export class DebugPanel {
 			border-radius: 4px;
 			background: rgba(0,0,0,0.3);
 		`;
+		// biome-ignore lint/style/noNonNullAssertion: disable rule for now
 		this.fpsCtx = this.fpsCanvas.getContext("2d")!;
 
 		this.container.appendChild(innerWrapper);

@@ -1,20 +1,26 @@
+export { CollisionShape } from "./core/collision-shape";
 export { Context } from "./core/context";
 export { Input } from "./core/input";
 export { Loader } from "./core/loader";
 export { Node } from "./core/node";
 export { Node3D } from "./core/node3d";
-export { CollisionShape } from "./core/collision-shape";
 export { DebugPanel } from "./debug/debug-panel";
 export { PerformanceTracker } from "./debug/performance-tracker";
 export { VRAMTracker } from "./debug/vram-tracker";
-export { Camera } from "./graphics/camera";
-export { CameraController } from "./graphics/camera-controller";
-export { DirectionalLight, PointLight } from "./graphics/light";
+export { Camera, type CameraOptions } from "./graphics/camera";
+export {
+	CameraController,
+	type CameraMode,
+	type FirstPersonOptions,
+	type OrbitOptions,
+	type ThirdPersonOptions,
+} from "./graphics/camera-controller";
+export { DirectionalLight, PointLight, type LightOptions, type DirectionalLightOptions, type PointLightOptions } from "./graphics/light";
 export { Material } from "./graphics/materials/material";
 export { ShaderMaterial } from "./graphics/materials/shader-material";
-export { StandardMaterial } from "./graphics/materials/standard-material";
-export { Mesh } from "./graphics/mesh";
-export { Scene } from "./graphics/scene";
+export { StandardMaterial, type StandardMaterialOptions } from "./graphics/materials/standard-material";
+export { Mesh, type MeshOptions } from "./graphics/mesh";
+export { Scene, type SceneLightOptions, type SceneGeometryOptions } from "./graphics/scene";
 export { Texture } from "./graphics/texture";
 export { AABB } from "./math/aabb";
 export { Color } from "./math/color";

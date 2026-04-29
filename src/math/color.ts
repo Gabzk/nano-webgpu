@@ -1,6 +1,6 @@
 /**
  * @module Color
- * @description
+ 
  * This module provides a Color representation for WebGPU (RGBA floats 0.0 - 1.0).
  */
 export class Color {

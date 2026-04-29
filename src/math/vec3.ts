@@ -1,6 +1,6 @@
 /**
  * @module Vec3
- * @description
+ 
  * This module provides a 3D vector representation.
  */
 export class Vec3 {

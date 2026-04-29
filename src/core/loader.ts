@@ -1,6 +1,6 @@
 /**
  * @module Loader
- * @description
+ 
  * This module provides the loader.
  */
 export class Loader {
@@ -149,7 +149,7 @@ export class Loader {
 				const b = gltf.buffers[i];
 				if (b.uri && !b.uri.startsWith("data:")) {
 					buffers.push(await (await fetch(baseUrl + b.uri)).arrayBuffer());
-				} else if (b.uri && b.uri.startsWith("data:")) {
+				} else if (b.uri?.startsWith("data:")) {
 					const data = b.uri.split(",")[1];
 					const binary = atob(data);
 					const ab = new ArrayBuffer(binary.length);
@@ -254,11 +254,13 @@ export class Loader {
 		}
 
 		// Material extraction
+		// biome-ignore lint/suspicious/noExplicitAny: disable rule for now
 		let parsedMaterial: any = null;
 		if (gltf.materials && gltf.materials.length > 0) {
 			const mat = gltf.materials[0];
 			parsedMaterial = {};
 
+			// biome-ignore lint/suspicious/noExplicitAny: disable rule for now
 			const getTexUri = (texRef: any) => {
 				if (texRef === undefined) return null;
 				const texture = gltf.textures[texRef.index];
@@ -358,6 +360,7 @@ export class Loader {
 						const key = parts[i];
 
 						if (indexMap.has(key)) {
+							// biome-ignore lint/style/noNonNullAssertion: disable rule for now
 							faceIndices.push(indexMap.get(key)!);
 						} else {
 							// Parse face component: v/vt/vn

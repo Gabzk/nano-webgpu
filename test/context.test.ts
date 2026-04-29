@@ -8,6 +8,7 @@ describe("Context", () => {
 	});
 
 	describe("Context Initialization", () => {
+		// biome-ignore lint/suspicious/noExplicitAny: disable rule for now
 		let originalGpu: any;
 
 		beforeEach(() => {

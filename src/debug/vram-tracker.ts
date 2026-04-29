@@ -1,6 +1,6 @@
 /**
  * @module VRAMTracker
- * @description
+ 
  * Tracks GPU memory allocations (buffers and textures) created by the engine.
  * WebGPU does not expose a native API for querying total VRAM, so this uses
  * manual bookkeeping — every createBuffer/createTexture in the engine calls
@@ -28,6 +28,7 @@ export interface VRAMEntry {
 
 let _nextId = 1;
 
+// biome-ignore lint/complexity/noStaticOnlyClass: disable rule for now
 export class VRAMTracker {
 	private static entries: Map<GPUBuffer | GPUTexture, VRAMEntry> = new Map();
 

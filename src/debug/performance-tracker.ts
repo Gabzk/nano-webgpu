@@ -1,6 +1,6 @@
 /**
  * @module PerformanceTracker
- * @description
+ 
  * Collects per-frame performance metrics for the debug panel.
  * Inspired by Godot's Monitors tab: tracks FPS, frame time, draw calls,
  * vertex/triangle counts, and maintains a rolling history for graphing.

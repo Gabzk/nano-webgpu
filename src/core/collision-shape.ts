@@ -1,9 +1,9 @@
-import { Vec3 } from "../math/vec3";
 import { AABB } from "../math/aabb";
+import { Vec3 } from "../math/vec3";
 
 /**
  * @module CollisionShape
- * @description
+ 
  * Defines the collision shape associated with a Node3D.
  * Inspired by Godot's CollisionShape3D node — here simplified as a plain data class
  * that is set on the Node3D directly instead of being a child node.

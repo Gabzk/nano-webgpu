@@ -1,6 +1,6 @@
 import type { Context } from "../core/context";
-import { VRAMTracker } from "../debug/vram-tracker";
 import { Node3D } from "../core/node3d";
+import { VRAMTracker } from "../debug/vram-tracker";
 import { Mat4 } from "../math/mat4";
 import { Vec3 } from "../math/vec3";
 import {
@@ -10,7 +10,6 @@ import {
 	type OrbitOptions,
 	type ThirdPersonOptions,
 } from "./camera-controller";
-import { PipelineManager } from "./pipeline";
 
 export interface CameraOptions {
 	fov?: number;
@@ -136,6 +135,7 @@ export class Camera extends Node3D {
 				this.ctx.device.queue.writeBuffer(
 					this.uniformBuffer,
 					0,
+					// biome-ignore lint/suspicious/noExplicitAny: disable rule for now
 					this.viewProjMatrix.values as any,
 				);
 			}
@@ -164,6 +164,7 @@ export class Camera extends Node3D {
 		options: FirstPersonOptions,
 	): CameraController;
 	public addController(mode: "orbit", options?: OrbitOptions): CameraController;
+	// biome-ignore lint/suspicious/noExplicitAny: disable rule for now
 	public addController(mode: CameraMode, options: any = {}): CameraController {
 		this.controller = new CameraController(this, mode, options);
 		return this.controller;

@@ -1,20 +1,9 @@
-import { Geometry } from "../graphics/geometry";
-import { Mesh } from "../graphics/mesh";
 import { PipelineManager } from "../graphics/pipeline";
-import {
-	createCubeGeometry,
-	createPlaneGeometry,
-	createSphereGeometry,
-} from "../graphics/primitives";
-import { AABB } from "../math/aabb";
-import { Vec3 } from "../math/vec3";
-import { CollisionShape } from "./collision-shape";
 import { Input } from "./input";
-import { Loader } from "./loader";
 
 /**
  * @module Context
- * @description
+ 
  * This module provides the WebGPU context.
  */
 export class Context {
@@ -129,117 +118,6 @@ export class Context {
 	// ------------- Factory Methods for Primitives -------------
 	// Added to fulfill the 'nano' API abstraction requirements.
 
-	// Basic geometry cache
-	private defaultGeometries: Record<string, any> = {};
-
-	public applyTransformOptions(mesh: Mesh, options: any) {
-		if (options.position) mesh.position.copy(Vec3.from(options.position));
-		if (options.scale !== undefined) {
-			if (typeof options.scale === "number")
-				mesh.scale.set(options.scale, options.scale, options.scale);
-			else mesh.scale.copy(Vec3.from(options.scale));
-		}
-		if (options.rotation) mesh.rotation.copy(Vec3.from(options.rotation));
-		if (options.rotationDegrees) mesh.rotationDegrees = options.rotationDegrees;
-	}
-
-	public createCube(options: any): any {
-		if (!this.defaultGeometries["cube"]) {
-			this.defaultGeometries["cube"] = createCubeGeometry(
-				this,
-				options.size || 1.0,
-			);
-		}
-
-		options.geometry = this.defaultGeometries["cube"];
-		const mesh = new Mesh(this, options);
-		this.applyTransformOptions(mesh, options);
-
-		// Auto-assign box collision shape matching the cube size (respects scale)
-		const size = options.size || 1.0;
-		mesh.collisionShape = CollisionShape.box(size);
-
-		return mesh;
-	}
-
-	public createPlane(options: any): any {
-		if (!this.defaultGeometries["plane"]) {
-			this.defaultGeometries["plane"] = createPlaneGeometry(
-				this,
-				options.width || 1.0,
-				options.height || 1.0,
-			);
-		}
-
-		options.geometry = this.defaultGeometries["plane"];
-		const mesh = new Mesh(this, options);
-		this.applyTransformOptions(mesh, options);
-		return mesh;
-	}
-
-	public createSphere(options: any): any {
-		if (!this.defaultGeometries["sphere"]) {
-			this.defaultGeometries["sphere"] = createSphereGeometry(
-				this,
-				options.radius || 1.0,
-				options.segments || 16,
-				options.segments || 16,
-			);
-		}
-
-		options.geometry = this.defaultGeometries["sphere"];
-		const mesh = new Mesh(this, options);
-		this.applyTransformOptions(mesh, options);
-
-		// Auto-assign sphere collision shape
-		const radius = options.radius || 1.0;
-		mesh.collisionShape = CollisionShape.sphere(radius);
-
-		return mesh;
-	}
-
-	public async loadMesh(url: string, options: any): Promise<any> {
-		const loader = new Loader(this.device);
-		const modelData = await loader.loadModel(url);
-
-		const vertexCount = modelData.vertices.length / 8; // 8 floats per vertex (pos: 3, norm: 3, uv: 2)
-		const optimalIndicesArray =
-			vertexCount > 65535
-				? new Uint32Array(modelData.indices)
-				: new Uint16Array(modelData.indices);
-
-		const geometry = new Geometry(
-			this,
-			new Float32Array(modelData.vertices),
-			optimalIndicesArray,
-			{ hasUVs: true, hasNormals: true },
-		);
-
-		const finalOptions = { ...options };
-		if (!finalOptions.material && modelData.materialOptions) {
-			finalOptions.material = modelData.materialOptions; // Scene already parses this to StandardMaterial if handled through Scene
-			// Wait, Context.loadMesh could be called directly and users expect Mesh.material to be set or StandardMaterial directly.
-			// Let's ensure it's a StandardMaterial if it's not handled by scene:
-			if (
-				typeof finalOptions.material !== "object" ||
-				!(finalOptions.material as any).isMaterial
-			) {
-				// To avoid importing StandardMaterial here, scene actually already parses the object into StandardMaterial correctly if called from Scene.
-				// But if they call ctx.loadMesh directly, it should be parsed. Let's just assign it and Mesh constructor handles it.
-				// Wait! Mesh constructor currently creates basic standard material if not provided!
-			}
-		}
-
-		const mesh = new Mesh(this, { geometry, ...finalOptions });
-		this.applyTransformOptions(mesh, finalOptions);
-
-		// Auto-compute AABB from the raw vertex data (positions at every 8th float: pos+norm+uv)
-		const localAABB = AABB.fromVertices(modelData.vertices, 8);
-		const halfExtents = localAABB.getHalfExtents();
-		mesh.collisionShape = CollisionShape.box(
-			new Vec3(halfExtents.x * 2, halfExtents.y * 2, halfExtents.z * 2),
-		);
-
-		return mesh;
-	}
+	// biome-ignore lint/suspicious/noExplicitAny: disable rule for now
+	public defaultGeometries: Record<string, any> = {};
 }

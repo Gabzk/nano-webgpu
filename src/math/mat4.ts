@@ -2,7 +2,7 @@ import { Vec3 } from "./vec3";
 
 /**
  * @module Mat4
- * @description
+ 
  * This module provides a 4x4 matrix representation, commonly used for
  * 3D transformations, camera rotations, and projections.
  */
@@ -326,7 +326,7 @@ export class Mat4 {
 	 */
 	public transpose(): this {
 		const v = this.values;
-		let p;
+		let p: number;
 
 		p = v[1];
 		v[1] = v[4];
