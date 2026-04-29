@@ -1,13 +1,14 @@
-export { CollisionShape } from "./core/collision-shape";
+export { CollisionShape, type ShapeType } from "./core/collision-shape";
 export { Context } from "./core/context";
-export { Input } from "./core/input";
+export { Input, InputManager, type MouseMode } from "./core/input";
 export { Loader } from "./core/loader";
 export { Node } from "./core/node";
 export { Node3D } from "./core/node3d";
-export { DebugPanel } from "./debug/debug-panel";
+export { DebugPanel, type DebugPanelOptions } from "./debug/debug-panel";
 export { PerformanceTracker } from "./debug/performance-tracker";
-export { VRAMTracker } from "./debug/vram-tracker";
+export { VRAMTracker, type VRAMEntry } from "./debug/vram-tracker";
 export { Camera, type CameraOptions } from "./graphics/camera";
+export { Geometry } from "./graphics/geometry";
 export {
 	CameraController,
 	type CameraMode,
@@ -18,12 +19,13 @@ export {
 export {
 	DirectionalLight,
 	type DirectionalLightOptions,
+	Light,
 	type LightOptions,
 	PointLight,
 	type PointLightOptions,
 } from "./graphics/light";
 export { Material } from "./graphics/materials/material";
-export { ShaderMaterial } from "./graphics/materials/shader-material";
+export { ShaderMaterial, type ShaderMaterialOptions } from "./graphics/materials/shader-material";
 export {
 	StandardMaterial,
 	type StandardMaterialOptions,
@@ -34,6 +36,8 @@ export {
 	type SceneGeometryOptions,
 	type SceneLightOptions,
 } from "./graphics/scene";
+export { Renderer } from "./graphics/renderer";
+export { PipelineManager } from "./graphics/pipeline";
 export { Texture } from "./graphics/texture";
 export { AABB } from "./math/aabb";
 export { Color } from "./math/color";
