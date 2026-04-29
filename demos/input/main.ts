@@ -47,15 +47,19 @@ async function main() {
 	scene.addLight({
 		type: "directional",
 		rotationDegrees: [-45, 45, 0],
+		position: [0, 1, 0],
 		color: "#ffffff",
 		intensity: 1,
 	});
 
 	// Controller — câmera em 3ª pessoa automática!
-	const ctrl = camera.addController("orbit", {
-		center: [0, 0, 0],
-		distance: 10,
+	const ctrl = camera.addController("third-person", {
+		target: cube,
+		height: 1,
+		distance: 8,
 		sensitivity: 0.003,
+		minPitch: -80,
+		maxPitch: 60,
 	});
 
 	// Variables

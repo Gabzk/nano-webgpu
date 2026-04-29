@@ -25,7 +25,10 @@ export {
 	type PointLightOptions,
 } from "./graphics/light";
 export { Material } from "./graphics/materials/material";
-export { ShaderMaterial, type ShaderMaterialOptions } from "./graphics/materials/shader-material";
+export {
+	ShaderMaterial,
+	type ShaderMaterialOptions,
+} from "./graphics/materials/shader-material";
 export {
 	StandardMaterial,
 	type StandardMaterialOptions,
@@ -45,4 +48,4 @@ export { Mat4 } from "./math/mat4";
 export { Vec2 } from "./math/vec2";
 export { Vec3 } from "./math/vec3";
 
-export const VERSION = "0.2.1";
+export const VERSION = "0.2.2";

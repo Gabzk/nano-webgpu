@@ -223,7 +223,10 @@ export class Scene extends Node {
 	public addCube(options: SceneGeometryOptions & { size?: number } = {}): Mesh {
 		const { addToScene = true, ...rest } = options;
 		const parsedOptions = this.parseMaterialOptions(rest);
-		const mesh = Mesh.createCube(this.ctx, { ...parsedOptions, size: options.size } as any);
+		const mesh = Mesh.createCube(this.ctx, {
+			...parsedOptions,
+			size: options.size,
+		} as any);
 		if (addToScene) this.add(mesh);
 		return mesh;
 	}
@@ -232,10 +235,16 @@ export class Scene extends Node {
 	 * Adds a sphere mesh to the scene.
 	 * @param options - Transform and material options.
 	 */
-	public addSphere(options: SceneGeometryOptions & { radius?: number, segments?: number } = {}): Mesh {
+	public addSphere(
+		options: SceneGeometryOptions & { radius?: number; segments?: number } = {},
+	): Mesh {
 		const { addToScene = true, ...rest } = options;
 		const parsedOptions = this.parseMaterialOptions(rest);
-		const mesh = Mesh.createSphere(this.ctx, { ...parsedOptions, radius: options.radius, segments: options.segments } as any);
+		const mesh = Mesh.createSphere(this.ctx, {
+			...parsedOptions,
+			radius: options.radius,
+			segments: options.segments,
+		} as any);
 		if (addToScene) this.add(mesh);
 		return mesh;
 	}
@@ -244,10 +253,16 @@ export class Scene extends Node {
 	 * Adds a plane mesh to the scene.
 	 * @param options - Transform and material options.
 	 */
-	public addPlane(options: SceneGeometryOptions & { width?: number, height?: number } = {}): Mesh {
+	public addPlane(
+		options: SceneGeometryOptions & { width?: number; height?: number } = {},
+	): Mesh {
 		const { addToScene = true, ...rest } = options;
 		const parsedOptions = this.parseMaterialOptions(rest);
-		const mesh = Mesh.createPlane(this.ctx, { ...parsedOptions, width: options.width, height: options.height } as any);
+		const mesh = Mesh.createPlane(this.ctx, {
+			...parsedOptions,
+			width: options.width,
+			height: options.height,
+		} as any);
 
 		if (addToScene) this.add(mesh);
 		return mesh;

@@ -162,6 +162,7 @@ export class Renderer {
 
 	private renderShadowPass(
 		scene: Scene,
+		camera: Camera,
 		commandEncoder: GPUCommandEncoder,
 	): void {
 		// biome-ignore lint/suspicious/noExplicitAny: disable rule for now
@@ -177,17 +178,58 @@ export class Renderer {
 
 		this.reinitShadowsIfNeeded(dirLight.shadowMapSize);
 
+		// Shadow frustum radius (world-space half-extent). Tune this to balance
+		// coverage vs. shadow texel density. Larger = more coverage, softer shadows.
+		const shadowRadius = 20.0;
+		const shadowDepthRange = 200.0;
+
 		const lightDir = dirLight.worldMatrix.transformDirection(
 			new Vec3(0, 0, -1),
 		);
-		const lightPos = lightDir.clone().scale(-50);
+
+		// Center the shadow frustum on the look-at target (the cube in third-person
+		// mode) so the frustum always covers the area around the player, regardless
+		// of where they've moved in the world.
+		const center = camera.target.clone();
+
+		// Build light-space basis vectors.
+		const worldUp = new Vec3(0, 1, 0);
+		const lightRight = worldUp.clone().cross(lightDir).normalize();
+		const lightUp = lightDir.clone().cross(lightRight).normalize();
+
+		// Snap the frustum centre to a texel-sized grid on the light's XY plane to
+		// eliminate sub-texel shadow-edge crawl as the camera moves.
+		const texelWorldSize = (shadowRadius * 2.0) / this.shadowTextureSize;
+		const rawX = center.dot(lightRight);
+		const rawY = center.dot(lightUp);
+		const snappedX = Math.round(rawX / texelWorldSize) * texelWorldSize;
+		const snappedY = Math.round(rawY / texelWorldSize) * texelWorldSize;
+
+		// Apply snapping as a delta correction on the full world-space center.
+		// This preserves the depth (lightDir) component so the center stays
+		// over the cube rather than collapsing to near the world origin.
+		const snappedCenter = center
+			.clone()
+			.add(lightRight.clone().scale(snappedX - rawX))
+			.add(lightUp.clone().scale(snappedY - rawY));
+
+		const shadowEye = snappedCenter
+			.clone()
+			.add(lightDir.clone().scale(-shadowDepthRange * 0.5));
 
 		const viewMat = new Mat4().lookAt(
-			lightPos,
-			new Vec3(0, 0, 0),
+			shadowEye,
+			snappedCenter,
 			new Vec3(0, 1, 0),
 		);
-		const projMat = new Mat4().ortho(-20, 20, -20, 20, 0.1, 100.0);
+		const projMat = new Mat4().ortho(
+			-shadowRadius,
+			shadowRadius,
+			-shadowRadius,
+			shadowRadius,
+			0.1,
+			shadowDepthRange,
+		);
 
 		this.shadowMatrix = projMat.multiply(viewMat);
 		this.ctx.device.queue.writeBuffer(
@@ -419,7 +461,10 @@ export class Renderer {
 
 		const commandEncoder = this.ctx.device.createCommandEncoder();
 
-		this.renderShadowPass(scene, commandEncoder);
+		// Build batch groups once per frame (reused in shadow + main pass)
+		this.rebuildBatchGroups(scene.meshes);
+
+		this.renderShadowPass(scene, camera, commandEncoder);
 
 		const passEncoder = commandEncoder.beginRenderPass(renderPassDescriptor);
 
@@ -427,8 +472,7 @@ export class Renderer {
 			passEncoder.setBindGroup(0, this.globalsBindGroup);
 		}
 
-		// Build batch groups once per frame (reusing persistent arrays)
-		this.rebuildBatchGroups(scene.meshes);
+		// Batch groups were already built above (before the shadow pass)
 
 		let lastPipeline: GPURenderPipeline | null = null;
 
