@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nano WebGPU - Batching & Instancing Demo</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #111122;
+        }
+        canvas {
+            display: block;
+            width: 100vw;
+            height: 100vh;
+        }
+        #info {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: white;
+            font-family: sans-serif;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 15px;
+            border-radius: 8px;
+            pointer-events: none;
+            max-width: 400px;
+        }
+        h2 {
+            margin-top: 0;
+            color: #00e5ff;
+        }
+    </style>
+</head>
+<body>
+    <div id="info">
+        <h2>Auto-Batching / Instancing</h2>
+        <p>A engine intercepta nós com `Geometry` e `Material` repetidos e os empacota magicamente na mesma Draw Call na GPU!</p>
+        <p>Abra o painel de debug (canto superior direito) e veja que temos <strong>milhares de objetos</strong>, mas apenas <strong>1 Draw Call</strong> por grupo de material/geometria!</p>
+        <p><strong>WASD</strong>: Mover | <strong>Mouse</strong>: Girar Câmera</p>
+    </div>
+    <canvas id="canvas"></canvas>
+    <script type="module" src="./demoBatching.ts"></script>
+</body>
+</html>

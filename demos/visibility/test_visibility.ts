@@ -1,4 +1,4 @@
-import { Scene, Color } from "nano-webgpu";
+import { Color, Scene } from "nano-webgpu";
 
 const canvas = document.getElementById("canvas") as HTMLCanvasElement;
 const scene = await Scene.init(canvas);
@@ -20,7 +20,7 @@ scene.addLight({
 });
 
 // Referencial de Centro (Sempre visível)
-const centerSphere = scene.addSphere({
+const _centerSphere = scene.addSphere({
 	position: [0, 0, 0],
 	scale: 0.3,
 	material: { albedoColor: "#00e5ff", roughness: 0.2, metallic: 0.8 },
@@ -34,6 +34,7 @@ const orbitingCube = scene.addCube({
 });
 
 // Pegando UI
+// biome-ignore lint/style/noNonNullAssertion: disable rule for now
 const btn = document.getElementById("toggle-btn")!;
 
 btn.addEventListener("click", () => {
@@ -51,7 +52,7 @@ btn.addEventListener("click", () => {
 let time = 0;
 
 scene.render((dt) => {
-	if (canvas.width != innerWidth || canvas.height != innerHeight) {
+	if (canvas.width !== innerWidth || canvas.height !== innerHeight) {
 		canvas.width = innerWidth;
 		canvas.height = innerHeight;
 	}

@@ -1,4 +1,4 @@
-import { Scene, StandardMaterial, Color, Input } from "../../src/index";
+import { Color, Input, Scene, StandardMaterial } from "../../src/index";
 
 async function main() {
 	// Config
@@ -37,7 +37,7 @@ async function main() {
 		material: cubeMaterial,
 	});
 
-	const ground = scene.addCube({
+	const _ground = scene.addCube({
 		position: [0, -1, 0],
 		scale: [10, 1, 10],
 		material: groundMaterial,
@@ -66,7 +66,7 @@ async function main() {
 	// Render loop
 	scene.render((dt) => {
 		// Atualiza o canvas em tempo real
-		if (canvas.width != innerWidth || canvas.height != innerHeight) {
+		if (canvas.width !== innerWidth || canvas.height !== innerHeight) {
 			canvas.width = innerWidth;
 			canvas.height = innerHeight;
 		}

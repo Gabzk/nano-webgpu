@@ -1,4 +1,4 @@
-import { Scene, Color, Mesh } from "nano-webgpu";
+import { Color, type Mesh, Scene } from "nano-webgpu";
 
 const scene = await Scene.init("#canvas");
 
@@ -10,11 +10,17 @@ scene.addLight({
 	intensity: 1,
 });
 
+// biome-ignore lint/style/noNonNullAssertion: disable rule for now
 const meshCountEl = document.getElementById("mesh-count")!;
+// biome-ignore lint/style/noNonNullAssertion: disable rule for now
 const fpsEl = document.getElementById("fps")!;
+// biome-ignore lint/style/noNonNullAssertion: disable rule for now
 const step1 = document.getElementById("step1")!;
+// biome-ignore lint/style/noNonNullAssertion: disable rule for now
 const step2 = document.getElementById("step2")!;
+// biome-ignore lint/style/noNonNullAssertion: disable rule for now
 const step3 = document.getElementById("step3")!;
+// biome-ignore lint/style/noNonNullAssertion: disable rule for now
 const step4 = document.getElementById("step4")!;
 
 let spawnedCubes: Mesh[] = [];
@@ -54,7 +60,7 @@ scene.render((dt) => {
 				],
 				scale: 0.5 + Math.random() * 0.5,
 				color: Color.fromHex(
-					"#" + Math.floor(Math.random() * 16777215).toString(16),
+					`#${Math.floor(Math.random() * 16777215).toString(16)}`,
 				),
 			});
 			spawnedCubes.push(cube);
@@ -89,8 +95,7 @@ scene.render((dt) => {
 			step4.innerText = "Verifying scene graph dropped to 0 (PASSED!)";
 			step4.className = "success";
 		} else {
-			step4.innerText =
-				`FAILED! ` + scene.meshes.length + ` meshes stuck in Scene.`;
+			step4.innerText = `FAILED! ${scene.meshes.length} meshes stuck in Scene.`;
 			step4.style.color = "red";
 		}
 		phase = 4;

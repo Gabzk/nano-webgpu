@@ -14,24 +14,22 @@
  */
 
 import {
-	Camera,
 	Color,
-	DirectionalLight,
 	Input,
 	type Mesh,
 	type PointLight,
 	Scene,
 	StandardMaterial,
-	Vec3,
 } from "nano-webgpu";
 
+// biome-ignore lint/style/noNonNullAssertion: disable rule for now
 const fpsValue = document.getElementById("fps-value")!;
 
 // ===================== CONFIGURAÇÃO DA CENA =====================
 
 const scene = await Scene.init("#canvas");
 
-const camera = scene.setCamera({
+const _camera = scene.setCamera({
 	position: [0, 4, 8],
 	target: [0, 0, -5],
 });
@@ -39,7 +37,7 @@ const camera = scene.setCamera({
 scene.backgroundColor = Color.fromHex("#0a0a1a");
 
 // Luzes
-const sun = scene.addLight({
+const _sun = scene.addLight({
 	type: "directional",
 	rotationDegrees: [-50, 30, 0],
 	color: "#ffeedd",
@@ -56,7 +54,7 @@ const orbLight = scene.addLight({
 // ===================== CENÁRIO =====================
 
 // Chão
-const floor = scene.addPlane({
+const _floor = scene.addPlane({
 	scale: 30,
 	position: [0, -0.5, -10],
 	material: new StandardMaterial({
@@ -73,13 +71,13 @@ const wallMaterial = new StandardMaterial({
 	metallic: 0.3,
 });
 
-const leftWall = scene.addCube({
+const _leftWall = scene.addCube({
 	position: [-5.5, 0.5, -10],
 	scale: [0.3, 2, 30],
 	material: wallMaterial,
 });
 
-const rightWall = scene.addCube({
+const _rightWall = scene.addCube({
 	position: [5.5, 0.5, -10],
 	scale: [0.3, 2, 30],
 	material: wallMaterial,
@@ -153,8 +151,11 @@ Input.addAction("confirm", ["Space"]);
 // ===================== HUD (DOM) =====================
 // (Gap #2: sem sistema de UI/Texto na lib)
 
+// biome-ignore lint/style/noNonNullAssertion: disable rule for now
 const scoreEl = document.getElementById("score")!;
+// biome-ignore lint/style/noNonNullAssertion: disable rule for now
 const gameOverEl = document.getElementById("game-over")!;
+// biome-ignore lint/style/noNonNullAssertion: disable rule for now
 const finalScoreEl = document.getElementById("final-score")!;
 
 function updateHUD() {
