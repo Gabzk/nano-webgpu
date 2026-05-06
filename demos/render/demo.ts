@@ -37,12 +37,9 @@ const cube = scene.addCube()
 // Adicionando luzes via opções fáceis
 const sun = scene.addLight({
 	type: "directional",
-	rotationDegrees: [-90 ,0, 0],
+	rotationDegrees: [-135, 0, 0],
 	color: "#ffffff",
 	intensity: 0.5,
-	castShadow: true,
-	shadowMapSize: 4096,
-	usePCF: true,
 });
 
 scene.addLight({
