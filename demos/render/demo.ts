@@ -1,18 +1,9 @@
 import { Input, InputManager, Scene } from "nano-webgpu";
 
-// Inicializando o WebGPU e a Scene de uma vez só (mantive o await para evitar engasgos no runtime)
 const canvas = document.getElementById("canvas") as HTMLCanvasElement;
 const scene = await Scene.init("#canvas");
 
-canvas.height = window.innerHeight;
-canvas.width = window.innerWidth;
-
-scene.enableFXAA = true;
-
-// Configurando a câmera com atributos simples
 scene.setCamera({ position: [0, 2, 5] });
-
-// scene.setDefaultDir("./assets/shiba");
 
 scene.addPlane({
 	position: [0, -0.94, -3],
@@ -20,11 +11,10 @@ scene.addPlane({
 	color: "#339933",
 });
 
-// Adicionando Mesh do GLTF nativamente (Materiais serão auto-inferidos visualmente)
 const shiba = await scene.loadMesh(`./assets/shiba.glb`, {
 	position: [-1, 0, 0],
 	scale: 1,
-	rotation: [-1.5, 0.5, 0], // em radianos
+	rotation: [-1.5, 0.5, 0],
 });
 
 scene.instantiate(shiba, {
@@ -32,10 +22,8 @@ scene.instantiate(shiba, {
 	rotation: [-1.5, -0.5, 0],
 });
 
-const cube = scene.addCube()
-
-// Adicionando luzes via opções fáceis
-const sun = scene.addLight({
+// sun
+scene.addLight({
 	type: "directional",
 	rotationDegrees: [-135, 0, 0],
 	color: "#ffffff",
@@ -44,11 +32,9 @@ const sun = scene.addLight({
 
 scene.addLight({
 	type: "point",
-	position: [2, 1, 0],
+	position: [0, 3, 3],
 	color: "#ffffff",
 	intensity: 1,
-	castShadow: true,
-	shadowMapSize: 256,
 });
 
 scene.enableDebug({
@@ -56,8 +42,9 @@ scene.enableDebug({
 	position: "top-right",
 });
 
-
 scene.render((_dt) => {
-
+	if (canvas.width !== innerWidth || canvas.height !== innerHeight) {
+		canvas.width = innerWidth;
+		canvas.height = innerHeight;
+	}
 });
-
