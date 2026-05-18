@@ -1,115 +1,22 @@
 /**
  * @module Loader
- 
- * This module provides the loader.
+ *
+ * Asset loader for shaders, textures, and 3D models.
+ * Model loading is now driven by a pluggable ModelParser registry (OCP):
+ * new formats can be added externally via `loader.registerParser(parser)`
+ * without modifying this file.
  */
-export class Loader {
-	/**
-	 * The GPUDevice used for creating resources (textures, shaders)
-	 * @private
-	 * @type {GPUDevice}
-	 */
-	private device: GPUDevice;
 
-	/**
-	 * Create a new loader
-	 * @param device The GPU device
-	 */
-	constructor(device: GPUDevice) {
-		this.device = device;
+import type { ModelData, ModelParser } from "./loader-parser";
+
+// ─── Built-in parsers ──────────────────────────────────────────────────────
+
+class GLTFParser implements ModelParser {
+	canParse(url: string): boolean {
+		return url.endsWith(".gltf") || url.endsWith(".glb");
 	}
 
-	/**
-	 * Load a shader module from a URL
-	 * @param url The URL of the shader module
-	 * @returns The shader module
-	 */
-	public async loadShader(url: string): Promise<GPUShaderModule> {
-		const response = await fetch(url);
-		if (!response.ok) {
-			throw new Error(
-				`Failed to load shader: ${url} (HTTP ${response.status})`,
-			);
-		}
-		const code = await response.text();
-
-		return this.device.createShaderModule({
-			label: `Shader: ${url}`,
-			code: code,
-		});
-	}
-
-	/**
-	 * Load a texture from a URL
-	 * @param url The URL of the texture
-	 * @param options The options for the texture
-	 * @returns The texture
-	 */
-	public async loadTexture(
-		url: string,
-		options: { format?: GPUTextureFormat; usage?: GPUTextureUsageFlags } = {},
-	): Promise<GPUTexture> {
-		const response = await fetch(url);
-		if (!response.ok) {
-			throw new Error(
-				`Failed to load texture: ${url} (HTTP ${response.status})`,
-			);
-		}
-
-		// Transform response in blob to create an image bitmap
-		// Using globalThis ensures environments like happy-dom or jsdom can mock it
-		const imageBitmap = await globalThis.createImageBitmap(
-			await response.blob(),
-		);
-
-		const format = options.format || "rgba8unorm";
-		const usage =
-			options.usage ??
-			GPUTextureUsage.TEXTURE_BINDING |
-				GPUTextureUsage.COPY_DST |
-				GPUTextureUsage.RENDER_ATTACHMENT;
-
-		// Create texture on gpu device with the same size of image bitmap
-		const texture = this.device.createTexture({
-			label: `Texture: ${url}`,
-			size: [imageBitmap.width, imageBitmap.height, 1],
-			format: format,
-			usage: usage,
-		});
-
-		// Copy pixels from cpu(ImageBitmap) to gpu(GPUTexture)
-		this.device.queue.copyExternalImageToTexture(
-			{ source: imageBitmap },
-			{ texture: texture },
-			[imageBitmap.width, imageBitmap.height],
-		);
-
-		return texture;
-	}
-
-	/**
-	 * Load a model from a URL
-	 * @param url The URL of the model
-	 * @returns The model
-	 */
-	public async loadModel(url: string) {
-		const response = await fetch(url);
-		if (!response.ok) {
-			throw new Error(`Failed to load model: ${url} (HTTP ${response.status})`);
-		}
-
-		if (url.endsWith(".gltf") || url.endsWith(".glb")) {
-			return this.parseGLTF(url, response);
-		} else {
-			const text = await response.text();
-			return this.parseOBJ(text);
-		}
-	}
-
-	/**
-	 * Parse a GLTF/GLB model
-	 */
-	private async parseGLTF(url: string, response: Response) {
+	async parse(url: string, response: Response): Promise<ModelData> {
 		let jsonStr: string;
 		let binBuffer: ArrayBuffer | null = null;
 
@@ -183,7 +90,8 @@ export class Loader {
 			let elementSize = 4; // default Float32
 			if (accessor.componentType === 5123) elementSize = 2;
 
-			const effectiveStride = stride > 0 ? stride : numComponents * elementSize;
+			const effectiveStride =
+				stride > 0 ? stride : numComponents * elementSize;
 
 			for (let i = 0; i < count; i++) {
 				for (let c = 0; c < numComponents; c++) {
@@ -193,7 +101,6 @@ export class Loader {
 					} else if (accessor.componentType === 5123) {
 						output[i * numComponents + c] = dataView.getUint16(offset, true);
 					} else if (accessor.componentType === 5125) {
-						// Using Float32Array as output container so downcast
 						output[i * numComponents + c] = dataView.getUint32(offset, true);
 					}
 				}
@@ -254,13 +161,13 @@ export class Loader {
 		}
 
 		// Material extraction
-		// biome-ignore lint/suspicious/noExplicitAny: disable rule for now
+		// biome-ignore lint/suspicious/noExplicitAny: GLTF JSON is dynamically typed
 		let parsedMaterial: any = null;
 		if (gltf.materials && gltf.materials.length > 0) {
 			const mat = gltf.materials[0];
 			parsedMaterial = {};
 
-			// biome-ignore lint/suspicious/noExplicitAny: disable rule for now
+			// biome-ignore lint/suspicious/noExplicitAny: GLTF JSON is dynamically typed
 			const getTexUri = (texRef: any) => {
 				if (texRef === undefined) return null;
 				const texture = gltf.textures[texRef.index];
@@ -288,14 +195,11 @@ export class Loader {
 				const bc = getTexUri(mat.pbrMetallicRoughness.baseColorTexture);
 				if (bc) parsedMaterial.albedoTexture = bc;
 
-				// GLTF metallicRoughnessTexture is a packed ORM map:
-				// R=occlusion(unused here), G=roughness, B=metallic
-				// Pass as ormTexture so the shader reads it correctly.
 				const mr = getTexUri(mat.pbrMetallicRoughness.metallicRoughnessTexture);
 				if (mr) parsedMaterial.ormTexture = mr;
 
-				// Scalar factors from the GLTF material
-				const roughnessFactor = mat.pbrMetallicRoughness.roughnessFactor ?? 1.0;
+				const roughnessFactor =
+					mat.pbrMetallicRoughness.roughnessFactor ?? 1.0;
 				const metallicFactor = mat.pbrMetallicRoughness.metallicFactor ?? 1.0;
 				parsedMaterial.roughness = roughnessFactor;
 				parsedMaterial.metallic = metallicFactor;
@@ -305,7 +209,6 @@ export class Loader {
 
 			const occ = getTexUri(mat.occlusionTexture);
 			if (occ && !parsedMaterial.ormTexture) {
-				// Only use separate AO if there is no packed ORM
 				parsedMaterial.aoTexture = occ;
 			}
 		}
@@ -316,13 +219,19 @@ export class Loader {
 			materialOptions: parsedMaterial,
 		};
 	}
+}
 
-	/**
-	 * Parse an OBJ model
-	 * @param text The text of the model
-	 * @returns The model
-	 */
-	private parseOBJ(text: string) {
+class OBJParser implements ModelParser {
+	canParse(url: string): boolean {
+		return url.endsWith(".obj");
+	}
+
+	async parse(_url: string, response: Response): Promise<ModelData> {
+		const text = await response.text();
+		return this.parseOBJ(text);
+	}
+
+	private parseOBJ(text: string): ModelData {
 		const inputVertices: number[] = [];
 		const inputNormals: number[] = [];
 		const inputUVs: number[] = [];
@@ -330,17 +239,14 @@ export class Loader {
 		const interleavedVertices: number[] = [];
 		const interleavedIndices: number[] = [];
 
-		// To avoid duplicating identical vertices, use a map of "v/vt/vn" to index
 		const indexMap = new Map<string, number>();
 		let nextIndex = 0;
 
 		const lines = text.split("\n");
 		for (let line of lines) {
 			line = line.trim();
-			// Skip empty lines and comments
 			if (line === "" || line.startsWith("#")) continue;
 
-			// Split by any whitespace
 			const parts = line.split(/\s+/);
 			const type = parts[0];
 
@@ -363,16 +269,14 @@ export class Loader {
 					inputUVs.push(parseFloat(parts[1]), parseFloat(parts[2]));
 					break;
 				case "f": {
-					// Triangulate faces (supports triangulating quads)
 					const faceIndices = [];
 					for (let i = 1; i < parts.length; i++) {
 						const key = parts[i];
 
 						if (indexMap.has(key)) {
-							// biome-ignore lint/style/noNonNullAssertion: disable rule for now
+							// biome-ignore lint/style/noNonNullAssertion: key guaranteed in map
 							faceIndices.push(indexMap.get(key)!);
 						} else {
-							// Parse face component: v/vt/vn
 							const indices = key.split("/");
 
 							const vIdx = (parseInt(indices[0], 10) - 1) * 3;
@@ -385,14 +289,12 @@ export class Loader {
 									? (parseInt(indices[2], 10) - 1) * 3
 									: -1;
 
-							// 1. Push position
 							interleavedVertices.push(
 								inputVertices[vIdx] || 0,
 								inputVertices[vIdx + 1] || 0,
 								inputVertices[vIdx + 2] || 0,
 							);
 
-							// 2. Push normal
 							if (vnIdx >= 0 && inputNormals.length > vnIdx) {
 								interleavedVertices.push(
 									inputNormals[vnIdx],
@@ -400,17 +302,16 @@ export class Loader {
 									inputNormals[vnIdx + 2],
 								);
 							} else {
-								interleavedVertices.push(0, 1, 0); // Default normal
+								interleavedVertices.push(0, 1, 0);
 							}
 
-							// 3. Push UV
 							if (vtIdx >= 0 && inputUVs.length > vtIdx) {
 								interleavedVertices.push(
 									inputUVs[vtIdx],
 									1.0 - inputUVs[vtIdx + 1], // Invert V for WebGPU
 								);
 							} else {
-								interleavedVertices.push(0, 0); // Default UV
+								interleavedVertices.push(0, 0);
 							}
 
 							indexMap.set(key, nextIndex);
@@ -419,7 +320,6 @@ export class Loader {
 						}
 					}
 
-					// Simple convex triangulation (fan-style from the first vertex)
 					for (let i = 1; i < faceIndices.length - 1; i++) {
 						interleavedIndices.push(
 							faceIndices[0],
@@ -435,7 +335,119 @@ export class Loader {
 		return {
 			vertices: interleavedVertices,
 			indices: interleavedIndices,
-			materialOptions: undefined,
+			materialOptions: null,
 		};
 	}
 }
+
+// ─── Loader ────────────────────────────────────────────────────────────────
+
+export class Loader {
+	/**
+	 * The GPUDevice used for creating GPU resources (textures, shaders).
+	 */
+	private device: GPUDevice;
+
+	/**
+	 * Ordered list of model parsers. First matching parser wins.
+	 * Built-in GLTF and OBJ parsers are registered by default.
+	 * External parsers registered via registerParser() are prepended (higher priority).
+	 */
+	private parsers: ModelParser[] = [new GLTFParser(), new OBJParser()];
+
+	constructor(device: GPUDevice) {
+		this.device = device;
+	}
+
+	/**
+	 * Register a custom model format parser.
+	 * The new parser takes priority over built-in parsers.
+	 */
+	public registerParser(parser: ModelParser): void {
+		this.parsers.unshift(parser);
+	}
+
+	/**
+	 * Load a shader module from a URL.
+	 */
+	public async loadShader(url: string): Promise<GPUShaderModule> {
+		const response = await fetch(url);
+		if (!response.ok) {
+			throw new Error(
+				`Failed to load shader: ${url} (HTTP ${response.status})`,
+			);
+		}
+		const code = await response.text();
+
+		return this.device.createShaderModule({
+			label: `Shader: ${url}`,
+			code: code,
+		});
+	}
+
+	/**
+	 * Load a texture from a URL.
+	 */
+	public async loadTexture(
+		url: string,
+		options: { format?: GPUTextureFormat; usage?: GPUTextureUsageFlags } = {},
+	): Promise<GPUTexture> {
+		const response = await fetch(url);
+		if (!response.ok) {
+			throw new Error(
+				`Failed to load texture: ${url} (HTTP ${response.status})`,
+			);
+		}
+
+		const imageBitmap = await globalThis.createImageBitmap(
+			await response.blob(),
+		);
+
+		const format = options.format || "rgba8unorm";
+		const usage =
+			options.usage ??
+			GPUTextureUsage.TEXTURE_BINDING |
+				GPUTextureUsage.COPY_DST |
+				GPUTextureUsage.RENDER_ATTACHMENT;
+
+		const texture = this.device.createTexture({
+			label: `Texture: ${url}`,
+			size: [imageBitmap.width, imageBitmap.height, 1],
+			format: format,
+			usage: usage,
+		});
+
+		this.device.queue.copyExternalImageToTexture(
+			{ source: imageBitmap },
+			{ texture: texture },
+			[imageBitmap.width, imageBitmap.height],
+		);
+
+		return texture;
+	}
+
+	/**
+	 * Load a 3D model from a URL.
+	 * Delegates to the first registered parser whose canParse() returns true.
+	 * Register additional parsers via registerParser() for new formats.
+	 */
+	public async loadModel(url: string): Promise<ModelData> {
+		const response = await fetch(url);
+		if (!response.ok) {
+			throw new Error(`Failed to load model: ${url} (HTTP ${response.status})`);
+		}
+
+		const parser = this.parsers.find((p) => p.canParse(url));
+		if (!parser) {
+			throw new Error(
+				`No parser found for model: "${url}". Supported extensions: ${this.parsers
+					.map((p) => p.constructor.name)
+					.join(", ")}. Register a custom parser via ctx.loader.registerParser().`,
+			);
+		}
+
+		return parser.parse(url, response);
+	}
+}
+
+export type { ModelData, ModelParser } from "./loader-parser";

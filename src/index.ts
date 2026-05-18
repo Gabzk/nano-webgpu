@@ -20,11 +20,17 @@ export {
 	DirectionalLight,
 	type DirectionalLightOptions,
 	Light,
+	type LightGPUData,
 	type LightOptions,
 	PointLight,
 	type PointLightOptions,
+	type ShadowConfig,
 } from "./graphics/light";
-export { Material } from "./graphics/materials/material";
+export {
+	isShaderMaterial,
+	isStandardMaterial,
+	Material,
+} from "./graphics/materials/material";
 export {
 	ShaderMaterial,
 	type ShaderMaterialOptions,
@@ -42,6 +48,9 @@ export {
 export { Renderer } from "./graphics/renderer";
 export { PipelineManager } from "./graphics/pipeline";
 export { Texture } from "./graphics/texture";
+export { ShadowSystem } from "./graphics/shadow-system";
+export { BatchManager } from "./graphics/batch-manager";
+export { type ModelParser, type ModelData } from "./core/loader-parser";
 export { AABB } from "./math/aabb";
 export { Color } from "./math/color";
 export { Mat4 } from "./math/mat4";

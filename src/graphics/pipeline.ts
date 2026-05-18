@@ -144,6 +144,53 @@ export class PipelineManager {
 		];
 	}
 
+	/**
+	 * Shared descriptor builder for all main (non-shadow) render pipelines.
+	 * Eliminates the ~40-line duplication between standard and custom pipelines.
+	 */
+	private buildRenderPipelineDescriptor(
+		label: string,
+		layout: GPUPipelineLayout,
+		shaderModule: GPUShaderModule,
+	): GPURenderPipelineDescriptor {
+		return {
+			label,
+			layout,
+			vertex: {
+				module: shaderModule,
+				entryPoint: "vs_main",
+				buffers: this.getVertexBuffers(),
+			},
+			fragment: {
+				module: shaderModule,
+				entryPoint: "fs_main",
+				targets: [
+					{
+						format: this.ctx.format,
+						blend: {
+							color: {
+								srcFactor: "src-alpha",
+								dstFactor: "one-minus-src-alpha",
+								operation: "add",
+							},
+							alpha: {
+								srcFactor: "one",
+								dstFactor: "one-minus-src-alpha",
+								operation: "add",
+							},
+						},
+					},
+				],
+			},
+			primitive: { topology: "triangle-list", cullMode: "back" },
+			depthStencil: {
+				depthWriteEnabled: true,
+				depthCompare: "less",
+				format: "depth24plus",
+			},
+		};
+	}
+
 	public getStandardPipelineLayout(): GPUPipelineLayout {
 		if (!this.standardPipelineLayout) {
 			this.buildBindGroupLayouts();
@@ -178,42 +225,13 @@ export class PipelineManager {
 			code: shaderCode,
 		});
 
-		const pipeline = this.ctx.device.createRenderPipeline({
-			label: `Standard Render Pipeline [${variantKey}]`,
-			layout: this.getStandardPipelineLayout(),
-			vertex: {
-				module: shaderModule,
-				entryPoint: "vs_main",
-				buffers: this.getVertexBuffers(),
-			},
-			fragment: {
-				module: shaderModule,
-				entryPoint: "fs_main",
-				targets: [
-					{
-						format: this.ctx.format,
-						blend: {
-							color: {
-								srcFactor: "src-alpha",
-								dstFactor: "one-minus-src-alpha",
-								operation: "add",
-							},
-							alpha: {
-								srcFactor: "one",
-								dstFactor: "one-minus-src-alpha",
-								operation: "add",
-							},
-						},
-					},
-				],
-			},
-			primitive: { topology: "triangle-list", cullMode: "back" },
-			depthStencil: {
-				depthWriteEnabled: true,
-				depthCompare: "less",
-				format: "depth24plus",
-			},
-		});
+		const pipeline = this.ctx.device.createRenderPipeline(
+			this.buildRenderPipelineDescriptor(
+				`Standard Render Pipeline [${variantKey}]`,
+				this.getStandardPipelineLayout(),
+				shaderModule,
+			),
+		);
 
 		this.standardPipelines.set(variantKey, pipeline);
 		return pipeline;
@@ -251,42 +269,13 @@ export class PipelineManager {
 			code: shaderCode,
 		});
 
-		const pipeline = this.ctx.device.createRenderPipeline({
-			label: "Custom Render Pipeline",
-			layout: this.getCustomPipelineLayout(),
-			vertex: {
-				module: shaderModule,
-				entryPoint: "vs_main",
-				buffers: this.getVertexBuffers(),
-			},
-			fragment: {
-				module: shaderModule,
-				entryPoint: "fs_main",
-				targets: [
-					{
-						format: this.ctx.format,
-						blend: {
-							color: {
-								srcFactor: "src-alpha",
-								dstFactor: "one-minus-src-alpha",
-								operation: "add",
-							},
-							alpha: {
-								srcFactor: "one",
-								dstFactor: "one-minus-src-alpha",
-								operation: "add",
-							},
-						},
-					},
-				],
-			},
-			primitive: { topology: "triangle-list", cullMode: "back" },
-			depthStencil: {
-				depthWriteEnabled: true,
-				depthCompare: "less",
-				format: "depth24plus",
-			},
-		});
+		const pipeline = this.ctx.device.createRenderPipeline(
+			this.buildRenderPipelineDescriptor(
+				"Custom Render Pipeline",
+				this.getCustomPipelineLayout(),
+				shaderModule,
+			),
+		);
 
 		this.customPipelines.set(shaderCode, pipeline);
 		return pipeline;

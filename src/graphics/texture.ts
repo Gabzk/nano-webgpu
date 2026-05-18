@@ -1,6 +1,4 @@
 import type { Context } from "../core/context";
-import { Loader } from "../core/loader";
-import { VRAMTracker } from "../debug/vram-tracker";
 
 /**
  * A wrapper for GPUTexture that handles asynchronous loading.
@@ -22,8 +20,7 @@ export class Texture {
 	 * Loads a texture synchronously, substituting a white pixel until finished.
 	 * If `url` is a Blob URL (created by the GLTF loader for embedded textures),
 	 * it will be automatically revoked after the GPU upload completes.
-	 * @param ctx The Context
-	 * @param url The image URL (or a blob: URL for embedded GLTF images)
+	 * Uses ctx.loader (singleton) instead of creating a new Loader instance per call.
 	 */
 	public static loadBackground(ctx: Context, url: string): Texture {
 		const tex = new Texture();
@@ -38,7 +35,7 @@ export class Texture {
 				GPUTextureUsage.COPY_DST |
 				GPUTextureUsage.RENDER_ATTACHMENT,
 		});
-		VRAMTracker.register(
+		ctx.vramTracker.register(
 			tex.gpuTexture,
 			"texture",
 			`Tex dummy: ${url}`,
@@ -53,17 +50,16 @@ export class Texture {
 			[1, 1, 1],
 		);
 
-		// Async loader
-		const loader = new Loader(ctx.device);
-		loader
+		// Use the per-context loader singleton (avoids allocating a new Loader per load)
+		ctx.loader
 			.loadTexture(url)
 			.then((gpuTex) => {
-				VRAMTracker.unregister(tex.gpuTexture);
+				ctx.vramTracker.unregister(tex.gpuTexture);
 				tex.gpuTexture.destroy();
 				tex.gpuTexture = gpuTex;
 				const w = gpuTex.width || 1;
 				const h = gpuTex.height || 1;
-				VRAMTracker.register(
+				ctx.vramTracker.register(
 					gpuTex,
 					"texture",
 					`Tex: ${url}`,
@@ -101,7 +97,7 @@ export class Texture {
 				GPUTextureUsage.COPY_DST |
 				GPUTextureUsage.RENDER_ATTACHMENT,
 		});
-		VRAMTracker.register(
+		ctx.vramTracker.register(
 			tex.gpuTexture,
 			"texture",
 			"Dummy White",
@@ -138,7 +134,7 @@ export class Texture {
 				GPUTextureUsage.COPY_DST |
 				GPUTextureUsage.RENDER_ATTACHMENT,
 		});
-		VRAMTracker.register(
+		ctx.vramTracker.register(
 			tex.gpuTexture,
 			"texture",
 			"Dummy Normal",

@@ -1,5 +1,4 @@
 import type { Context } from "../../core/context";
-import { VRAMTracker } from "../../debug/vram-tracker";
 import { Color } from "../../math/color";
 import { Texture } from "../texture";
 import { Material } from "./material";
@@ -91,6 +90,9 @@ export class StandardMaterial extends Material {
 	private sampler: GPUSampler | null = null;
 	private bufferData!: Float32Array;
 
+	/** Tracks which PCF variant the current bindGroup was built for. */
+	private _bindGroupPCFVariant: boolean | null = null;
+
 	constructor(options: StandardMaterialOptions = {}) {
 		super();
 		this.type = "StandardMaterial";
@@ -169,12 +171,28 @@ export class StandardMaterial extends Material {
 		this.bufferData[15] = 0.0;
 	}
 
-	/** Selects which shadow variant pipeline this material uses.
-	 *  Set by the scene when the shadow-casting directional light's usePCF is known. */
-	public usePCF: boolean = true;
+	/**
+	 * Selects which shadow variant pipeline this material uses.
+	 * Set by the scene when the shadow-casting directional light's usePCF is known.
+	 * Changing this automatically invalidates the cached bind group so it is
+	 * rebuilt against the correct pipeline layout.
+	 */
+	private _usePCF: boolean = true;
+
+	public get usePCF(): boolean {
+		return this._usePCF;
+	}
+	public set usePCF(value: boolean) {
+		if (this._usePCF !== value) {
+			this._usePCF = value;
+			// Invalidate cached bind group — it was built against the old pipeline layout.
+			this.bindGroup = null;
+			this._bindGroupPCFVariant = null;
+		}
+	}
 
 	public getPipeline(ctx: Context): GPURenderPipeline {
-		return ctx.pipelineManager.getStandardPipeline(this.usePCF);
+		return ctx.pipelineManager.getStandardPipeline(this._usePCF);
 	}
 
 	public getBindGroup(ctx: Context): GPUBindGroup {
@@ -212,7 +230,7 @@ export class StandardMaterial extends Material {
 				size: 64, // 16 floats * 4 bytes
 				usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
 			});
-			VRAMTracker.register(
+			ctx.vramTracker.register(
 				this.uniformBuffer,
 				"buffer",
 				`StandardMaterial_${this.id}_Buffer`,
@@ -232,7 +250,7 @@ export class StandardMaterial extends Material {
 			this.isDirty = false;
 		}
 
-		// Gather all textures. If one is missing, provide a dummy texture so WebGPU bind group gets created successfully
+		// Gather all textures. If one is missing, provide a dummy so the bind group is always valid.
 		const tAlbedo = this.albedoTexture || Texture.getDummyWhite(ctx);
 		const tNormal = this.normalTexture || Texture.getDummyNormal(ctx);
 		const tRoughness = this.roughnessTexture || Texture.getDummyWhite(ctx);
@@ -240,12 +258,12 @@ export class StandardMaterial extends Material {
 		const tAO = this.aoTexture || Texture.getDummyWhite(ctx);
 		const tORM = this.ormTexture || Texture.getDummyWhite(ctx);
 
-		// Return cached bind group if already built
-		if (this.bindGroup) return this.bindGroup;
+		// Return cached bind group if already built for the current PCF variant
+		if (this.bindGroup && this._bindGroupPCFVariant === this._usePCF)
+			return this.bindGroup;
 
 		const textures = [tAlbedo, tNormal, tRoughness, tMetallic, tAO, tORM];
 
-		// Cache the sampler — creating a GPUSampler is not free, do it once per material
 		if (!this.sampler) {
 			this.sampler = ctx.device.createSampler({
 				minFilter: "linear",
@@ -257,11 +275,11 @@ export class StandardMaterial extends Material {
 		const sampler = this.sampler;
 
 		const tryBuild = () => {
-			if (this.bindGroup) return; // Prevent double trigger
+			if (this.bindGroup) return;
 			this.bindGroup = ctx.device.createBindGroup({
 				label: `StandardMaterial_${this.id}_BindGroup`,
 				layout: ctx.pipelineManager
-					.getStandardPipeline(this.usePCF)
+					.getStandardPipeline(this._usePCF)
 					.getBindGroupLayout(2),
 				entries: [
 					{ binding: 0, resource: { buffer: this.uniformBuffer } },
@@ -274,6 +292,7 @@ export class StandardMaterial extends Material {
 					{ binding: 7, resource: tORM.gpuTexture.createView() },
 				],
 			});
+			this._bindGroupPCFVariant = this._usePCF;
 		};
 
 		tryBuild();
@@ -282,7 +301,8 @@ export class StandardMaterial extends Material {
 		for (const tex of textures) {
 			if (tex && !tex.isLoaded) {
 				tex.onUpdate(() => {
-					this.bindGroup = null; // Force rebuild; bindGroup is GPUBindGroup | null
+					this.bindGroup = null;
+					this._bindGroupPCFVariant = null;
 					tryBuild();
 				});
 			}

@@ -1,5 +1,4 @@
 import type { Context } from "../core/context";
-import { VRAMTracker } from "../debug/vram-tracker";
 
 export class Geometry {
 	private static _nextId = 0;
@@ -41,7 +40,7 @@ export class Geometry {
 		});
 		// biome-ignore lint/suspicious/noExplicitAny: disable rule for now
 		ctx.device.queue.writeBuffer(this.vertexBuffer, 0, vertices as any);
-		VRAMTracker.register(
+		ctx.vramTracker.register(
 			this.vertexBuffer,
 			"buffer",
 			"Geometry Vertex Buffer",
@@ -69,7 +68,7 @@ export class Geometry {
 			// biome-ignore lint/suspicious/noExplicitAny: disable rule for now
 			ctx.device.queue.writeBuffer(this.indexBuffer, 0, indices as any);
 		}
-		VRAMTracker.register(
+		ctx.vramTracker.register(
 			this.indexBuffer,
 			"buffer",
 			"Geometry Index Buffer",
@@ -82,13 +81,18 @@ export class Geometry {
 	 * Frees the GPU buffers associated with this geometry.
 	 * Be careful: only destroy a geometry if no other meshes are sharing it.
 	 */
-	public destroy(): void {
+	/**
+	 * Frees the GPU buffers associated with this geometry.
+	 * Requires the Context to unregister from the VRAM tracker.
+	 * Be careful: only destroy a geometry if no other meshes are sharing it.
+	 */
+	public destroy(ctx: Context): void {
 		if (this.vertexBuffer) {
-			VRAMTracker.unregister(this.vertexBuffer);
+			ctx.vramTracker.unregister(this.vertexBuffer);
 			this.vertexBuffer.destroy();
 		}
 		if (this.indexBuffer) {
-			VRAMTracker.unregister(this.indexBuffer);
+			ctx.vramTracker.unregister(this.indexBuffer);
 			this.indexBuffer.destroy();
 		}
 	}

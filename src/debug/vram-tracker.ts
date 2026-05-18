@@ -1,12 +1,14 @@
 /**
  * @module VRAMTracker
- 
+ *
  * Tracks GPU memory allocations (buffers and textures) created by the engine.
  * WebGPU does not expose a native API for querying total VRAM, so this uses
  * manual bookkeeping — every createBuffer/createTexture in the engine calls
- * VRAMTracker.register(), and every .destroy() calls VRAMTracker.unregister().
+ * ctx.vramTracker.register(), and every .destroy() calls ctx.vramTracker.unregister().
  *
  * Inspired by Godot's "Video RAM" debugger tab.
+ *
+ * Now an instance class stored on Context to support multiple canvases and testability.
  */
 
 export interface VRAMEntry {
@@ -26,29 +28,22 @@ export interface VRAMEntry {
 	resource: GPUBuffer | GPUTexture;
 }
 
-let _nextId = 1;
-
-// biome-ignore lint/complexity/noStaticOnlyClass: disable rule for now
 export class VRAMTracker {
-	private static entries: Map<GPUBuffer | GPUTexture, VRAMEntry> = new Map();
+	private entries: Map<GPUBuffer | GPUTexture, VRAMEntry> = new Map();
+	private nextId = 1;
 
 	/**
 	 * Register a newly created GPU resource.
-	 * @param resource  The GPUBuffer or GPUTexture
-	 * @param type      'buffer' or 'texture'
-	 * @param label     Descriptive label
-	 * @param sizeBytes Allocated size in bytes
-	 * @param owner     Class name that owns this resource
 	 */
-	public static register(
+	public register(
 		resource: GPUBuffer | GPUTexture,
 		type: "buffer" | "texture",
 		label: string,
 		sizeBytes: number,
 		owner: string,
 	): void {
-		VRAMTracker.entries.set(resource, {
-			id: _nextId++,
+		this.entries.set(resource, {
+			id: this.nextId++,
 			type,
 			label,
 			sizeBytes,
@@ -61,15 +56,15 @@ export class VRAMTracker {
 	/**
 	 * Unregister a GPU resource that has been destroyed.
 	 */
-	public static unregister(resource: GPUBuffer | GPUTexture): void {
-		VRAMTracker.entries.delete(resource);
+	public unregister(resource: GPUBuffer | GPUTexture): void {
+		this.entries.delete(resource);
 	}
 
 	/**
 	 * Returns all tracked entries sorted by size (largest first).
 	 */
-	public static getEntries(): VRAMEntry[] {
-		return Array.from(VRAMTracker.entries.values()).sort(
+	public getEntries(): VRAMEntry[] {
+		return Array.from(this.entries.values()).sort(
 			(a, b) => b.sizeBytes - a.sizeBytes,
 		);
 	}
@@ -77,9 +72,9 @@ export class VRAMTracker {
 	/**
 	 * Total estimated VRAM in bytes.
 	 */
-	public static getTotalBytes(): number {
+	public getTotalBytes(): number {
 		let total = 0;
-		for (const entry of VRAMTracker.entries.values()) {
+		for (const entry of this.entries.values()) {
 			total += entry.sizeBytes;
 		}
 		return total;
@@ -88,7 +83,7 @@ export class VRAMTracker {
 	/**
 	 * Quick summary counts.
 	 */
-	public static getSummary(): {
+	public getSummary(): {
 		buffers: number;
 		textures: number;
 		totalBytes: number;
@@ -97,7 +92,7 @@ export class VRAMTracker {
 		let buffers = 0;
 		let textures = 0;
 		let totalBytes = 0;
-		for (const entry of VRAMTracker.entries.values()) {
+		for (const entry of this.entries.values()) {
 			if (entry.type === "buffer") buffers++;
 			else textures++;
 			totalBytes += entry.sizeBytes;
@@ -122,8 +117,8 @@ export class VRAMTracker {
 	/**
 	 * Clear all entries (useful for hot-reload / test scenarios).
 	 */
-	public static clear(): void {
-		VRAMTracker.entries.clear();
-		_nextId = 1;
+	public clear(): void {
+		this.entries.clear();
+		this.nextId = 1;
 	}
 }

@@ -1,4 +1,6 @@
 import type { Context } from "../../core/context";
+import type { StandardMaterial } from "./standard-material";
+import type { ShaderMaterial } from "./shader-material";
 
 export interface MaterialOptions {
 	transparent?: boolean;
@@ -24,4 +26,19 @@ export abstract class Material {
 	 * Generates or fetches the Material's bound properties (like textures/colors) BindGroup.
 	 */
 	public abstract getBindGroup(ctx: Context): GPUBindGroup;
+}
+
+/**
+ * Type guard — returns true if the material is a StandardMaterial.
+ * Prefer this over `instanceof` or duck-typing with `as any`.
+ */
+export function isStandardMaterial(mat: Material): mat is StandardMaterial {
+	return mat.type === "StandardMaterial";
+}
+
+/**
+ * Type guard — returns true if the material is a ShaderMaterial.
+ */
+export function isShaderMaterial(mat: Material): mat is ShaderMaterial {
+	return mat.type === "ShaderMaterial";
 }

@@ -50,12 +50,16 @@ export class DebugPanel {
 		lightCount: number;
 	};
 
+	private vram: VRAMTracker;
+
 	constructor(
 		canvas: HTMLCanvasElement,
 		perf: PerformanceTracker,
+		vramTracker: VRAMTracker,
 		options: DebugPanelOptions = {},
 	) {
 		this.perf = perf;
+		this.vram = vramTracker;
 		this.hotkey = options.hotkey ?? "F3";
 		this.activeTab = options.defaultTab ?? "monitors";
 		this.opacity = options.opacity ?? 0.9;
@@ -280,7 +284,7 @@ export class DebugPanel {
 
 	private renderMonitorsTab(): void {
 		const p = this.perf;
-		const vram = VRAMTracker.getSummary();
+		const vram = this.vram.getSummary();
 
 		// FPS color: green > 50, yellow > 25, red <= 25
 		const fpsColor =
@@ -316,8 +320,8 @@ export class DebugPanel {
 	}
 
 	private renderVRAMTab(): void {
-		const entries = VRAMTracker.getEntries();
-		const summary = VRAMTracker.getSummary();
+		const entries = this.vram.getEntries();
+		const summary = this.vram.getSummary();
 
 		// Preserve scroll position so it doesn't jump to top on update
 		const scrollContainer = this.tabContentEl.querySelector(
@@ -373,7 +377,7 @@ export class DebugPanel {
 
 	private renderSceneTab(): void {
 		const p = this.perf;
-		const vram = VRAMTracker.getSummary();
+		const vram = this.vram.getSummary();
 		const sceneStats = this.getSceneStats?.() ?? {
 			totalMeshes: p.totalMeshes,
 			totalNodes: p.nodeCount,

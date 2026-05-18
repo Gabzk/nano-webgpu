@@ -1,6 +1,5 @@
 import type { Context } from "../core/context";
 import { Node3D } from "../core/node3d";
-import { VRAMTracker } from "../debug/vram-tracker";
 import { Mat4 } from "../math/mat4";
 import { Vec3 } from "../math/vec3";
 import {
@@ -102,13 +101,14 @@ export class Camera extends Node3D {
 			size: 80, // mat4x4 (64) + vec4 cameraPos (16)
 			usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
 		});
-		VRAMTracker.register(
+		ctx.vramTracker.register(
 			this.uniformBuffer,
 			"buffer",
 			"Camera Uniform Buffer",
 			80,
 			"Camera",
 		);
+
 
 		// Note: BindGroup is now managed by Scene (Group 0: Globals) combining Camera + Lights
 	}

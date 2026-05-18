@@ -491,7 +491,7 @@ export class Scene extends Node {
 		this.perfTracker = new PerformanceTracker();
 
 		const canvas = this.ctx.context.canvas as HTMLCanvasElement;
-		this.debugPanel = new DebugPanel(canvas, this.perfTracker, options);
+		this.debugPanel = new DebugPanel(canvas, this.perfTracker, this.ctx.vramTracker, options);
 
 		this.debugPanel.setSceneStatsProvider(() => ({
 			totalMeshes: this.meshes.length,

@@ -1,6 +1,5 @@
 import { CollisionShape } from "../core/collision-shape";
 import type { Context } from "../core/context";
-import { Loader } from "../core/loader";
 import { Node3D } from "../core/node3d";
 import { AABB } from "../math/aabb";
 import { Vec3 } from "../math/vec3";
@@ -10,11 +9,6 @@ import {
 	StandardMaterial,
 	type StandardMaterialOptions,
 } from "./materials/standard-material";
-import {
-	createCubeGeometry,
-	createPlaneGeometry,
-	createSphereGeometry,
-} from "./primitives";
 import { Texture } from "./texture";
 
 export interface MeshOptions {
@@ -40,11 +34,12 @@ export class Mesh extends Node3D {
 			if (options.material instanceof Material) {
 				this.material = options.material;
 			} else {
-				// biome-ignore lint/suspicious/noExplicitAny: disable rule for now
-				this.material = new StandardMaterial(options.material as any);
+				this.material = new StandardMaterial(
+					options.material as StandardMaterialOptions,
+				);
 			}
 		} else if (options.texture) {
-			// Legacy shorthand approach: convert texture automatically to Standard Material
+			// Legacy shorthand: convert texture automatically to StandardMaterial
 			let tex: Texture;
 			if (typeof options.texture === "string") {
 				tex = Texture.loadBackground(ctx, options.texture);
@@ -53,28 +48,22 @@ export class Mesh extends Node3D {
 			}
 			this.material = new StandardMaterial({ albedoTexture: tex });
 		} else {
-			// Default material
 			this.material = new StandardMaterial();
 		}
-
-		// Note: GPU buffers for model matrices are now managed by Scene's
-		// instanced batching system (Storage Buffer per batch group).
 	}
 
 	/**
 	 * Removes the mesh from its parent (and consequently from the scene)
 	 * and optionally frees its geometry. Similar to Godot's queue_free().
-	 * @param destroyGeometry Should we also destroy the shared geometry? Defaults to false to avoid accidentally breaking instanced copies.
+	 * @param destroyGeometry Should we also destroy the shared geometry? Defaults to false
+	 *   to avoid accidentally breaking instanced copies.
 	 */
 	public destroy(destroyGeometry: boolean = false): void {
-		// 1. Remove from Scene Graph
 		if (this.parent) {
 			this.parent.remove(this);
 		}
-
-		// 2. Optionally destroy the geometry (e.g., if this was uniquely created for this object)
 		if (destroyGeometry && this.geometry) {
-			this.geometry.destroy();
+			this.geometry.destroy(this.ctx);
 		}
 	}
 
@@ -100,6 +89,7 @@ export class Mesh extends Node3D {
 		if (options.rotation)
 			mesh.rotation.copy(Vec3.from(options.rotation as number[]));
 		if (options.rotationDegrees)
+			// biome-ignore lint/suspicious/noExplicitAny: rotationDegrees setter accepts number[] via Vec3.from
 			mesh.rotationDegrees = options.rotationDegrees as any;
 	}
 
@@ -107,19 +97,14 @@ export class Mesh extends Node3D {
 
 	/**
 	 * Creates a cube mesh.
+	 * Uses ctx.primitives for a typed, per-context geometry cache.
 	 */
 	public static createCube(
 		ctx: Context,
 		options: StandardMaterialOptions & { size?: number } = {},
 	): Mesh {
-		if (!ctx.defaultGeometries.cube) {
-			ctx.defaultGeometries.cube = createCubeGeometry(ctx, options.size || 1.0);
-		}
-		const meshOptions: any = {
-			...options,
-			geometry: ctx.defaultGeometries.cube,
-		};
-		const mesh = new Mesh(ctx, meshOptions);
+		const geometry = ctx.primitives.getCube(ctx, options.size || 1.0);
+		const mesh = new Mesh(ctx, { ...options, geometry });
 		Mesh.applyTransformOptions(mesh, options as any);
 		mesh.collisionShape = CollisionShape.box(options.size || 1.0);
 		return mesh;
@@ -136,15 +121,12 @@ export class Mesh extends Node3D {
 			scale?: number | number[];
 		} = {},
 	): Mesh {
-		if (!ctx.defaultGeometries.plane) {
-			ctx.defaultGeometries.plane = createPlaneGeometry(
-				ctx,
-				options.width || 1.0,
-				options.height || 1.0,
-			);
-		}
-		const meshOptions = { ...options, geometry: ctx.defaultGeometries.plane };
-		const mesh = new Mesh(ctx, meshOptions as any);
+		const geometry = ctx.primitives.getPlane(
+			ctx,
+			options.width || 1.0,
+			options.height || 1.0,
+		);
+		const mesh = new Mesh(ctx, { ...options, geometry } as any);
 		Mesh.applyTransformOptions(mesh, options);
 		return mesh;
 	}
@@ -160,16 +142,13 @@ export class Mesh extends Node3D {
 			scale?: number | number[];
 		} = {},
 	): Mesh {
-		if (!ctx.defaultGeometries.sphere) {
-			ctx.defaultGeometries.sphere = createSphereGeometry(
-				ctx,
-				options.radius || 1.0,
-				options.segments || 16,
-				options.segments || 16,
-			);
-		}
-		const meshOptions = { ...options, geometry: ctx.defaultGeometries.sphere };
-		const mesh = new Mesh(ctx, meshOptions as any);
+		const geometry = ctx.primitives.getSphere(
+			ctx,
+			options.radius || 1.0,
+			options.segments || 16,
+			options.segments || 16,
+		);
+		const mesh = new Mesh(ctx, { ...options, geometry } as any);
 		Mesh.applyTransformOptions(mesh, options);
 		mesh.collisionShape = CollisionShape.sphere(options.radius || 1.0);
 		return mesh;
@@ -178,11 +157,10 @@ export class Mesh extends Node3D {
 	public static async load(
 		ctx: Context,
 		url: string,
-		// biome-ignore lint/suspicious/noExplicitAny: disable rule for now
+		// biome-ignore lint/suspicious/noExplicitAny: options are passed through to StandardMaterial
 		options: any,
 	): Promise<Mesh> {
-		const loader = new Loader(ctx.device);
-		const modelData = await loader.loadModel(url);
+		const modelData = await ctx.loader.loadModel(url);
 		const vertexCount = modelData.vertices.length / 8;
 		const optimalIndicesArray =
 			vertexCount > 65535
