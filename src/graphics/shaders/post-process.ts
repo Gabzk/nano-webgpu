@@ -26,7 +26,7 @@ export const postProcessShader = /* wgsl */ `
 
     struct RenderSettings {
         fxaa_enabled: u32,
-        _pad1: u32,
+        time_bits: u32,
         _pad2: u32,
         _pad3: u32,
     }
@@ -39,10 +39,16 @@ export const postProcessShader = /* wgsl */ `
         let size = textureDimensions(screenTexture);
         let inverseScreenSize = vec2<f32>(1.0 / f32(size.x), 1.0 / f32(size.y));
 
+        var finalColor: vec4<f32>;
         if (settings.fxaa_enabled > 0u) {
-            return apply_fxaa(screenTexture, screenSampler, in.uv, inverseScreenSize);
+            finalColor = apply_fxaa(screenTexture, screenSampler, in.uv, inverseScreenSize);
         } else {
-            return textureSample(screenTexture, screenSampler, in.uv);
+            finalColor = textureSample(screenTexture, screenSampler, in.uv);
         }
+        
+        // Linear to sRGB gamma correction (approx 2.2)
+        // Since alpha is linear and we're writing to standard canvas, we only map RGB.
+        let srgbColor = pow(finalColor.rgb, vec3<f32>(1.0 / 2.2));
+        return vec4<f32>(srgbColor, finalColor.a);
     }
 `;

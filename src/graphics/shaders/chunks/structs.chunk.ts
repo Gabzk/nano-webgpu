@@ -14,7 +14,7 @@ struct CameraUniform {
 
 struct RenderSettings {
     fxaa_enabled: u32,
-    _pad1: u32,
+    time_bits: u32,  // f32 bit-cast: use bitcast<f32>(settings.time_bits)
     _pad2: u32,
     _pad3: u32,
 }

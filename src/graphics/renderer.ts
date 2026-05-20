@@ -24,7 +24,12 @@ export class Renderer {
 	private postProcessSampler!: GPUSampler;
 	private postProcessBindGroup!: GPUBindGroup;
 	public renderSettingsBuffer!: GPUBuffer;
-	public renderSettingsData = new Uint32Array(4); // fxaa_enabled, pad1, pad2, pad3
+	// renderSettingsFloat[0] → fxaa_enabled (u32 written via renderSettingsUint32)
+	// renderSettingsFloat[1] → time (f32)
+	public renderSettingsFloat = new Float32Array(4);
+	public renderSettingsUint32 = new Uint32Array(this.renderSettingsFloat.buffer);
+	/** Accumulated render time in seconds. Updated each frame by Scene. */
+	public elapsedTime = 0;
 
 	// --- Subsystems ---
 	private shadow: ShadowSystem;
@@ -45,11 +50,11 @@ export class Renderer {
 			usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
 		});
 		// Enable FXAA by default
-		this.renderSettingsData[0] = 1;
+		this.renderSettingsUint32[0] = 1;
 		this.ctx.device.queue.writeBuffer(
 			this.renderSettingsBuffer,
 			0,
-			this.renderSettingsData.buffer,
+			this.renderSettingsFloat.buffer,
 		);
 
 		this.postProcessSampler = this.ctx.device.createSampler({
@@ -192,7 +197,12 @@ export class Renderer {
 		scene: Scene,
 		camera: Camera,
 		perfTracker: PerformanceTracker | null,
+		dt = 0,
 	): void {
+		// Update elapsed time for shader animations (settings.time_bits = bitcast of f32 seconds)
+		this.elapsedTime += dt;
+		this.renderSettingsFloat[1] = this.elapsedTime;
+		this.ctx.device.queue.writeBuffer(this.renderSettingsBuffer, 4, this.renderSettingsFloat.buffer, 4, 4);
 		if (
 			camera.aspect !==
 			this.ctx.context.canvas.width / this.ctx.context.canvas.height

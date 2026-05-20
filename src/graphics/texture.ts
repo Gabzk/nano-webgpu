@@ -22,14 +22,18 @@ export class Texture {
 	 * it will be automatically revoked after the GPU upload completes.
 	 * Uses ctx.loader (singleton) instead of creating a new Loader instance per call.
 	 */
-	public static loadBackground(ctx: Context, url: string): Texture {
+	public static loadBackground(
+		ctx: Context,
+		url: string,
+		options: { format?: GPUTextureFormat } = {},
+	): Texture {
 		const tex = new Texture();
 		tex.url = url;
 
 		// 1x1 White dummy texture while the real one loads
 		tex.gpuTexture = ctx.device.createTexture({
 			size: [1, 1, 1],
-			format: "rgba8unorm",
+			format: options.format || "rgba8unorm",
 			usage:
 				GPUTextureUsage.TEXTURE_BINDING |
 				GPUTextureUsage.COPY_DST |
@@ -52,7 +56,7 @@ export class Texture {
 
 		// Use the per-context loader singleton (avoids allocating a new Loader per load)
 		ctx.loader
-			.loadTexture(url)
+			.loadTexture(url, { format: options.format })
 			.then((gpuTex) => {
 				ctx.vramTracker.unregister(tex.gpuTexture);
 				tex.gpuTexture.destroy();

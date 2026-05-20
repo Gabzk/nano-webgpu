@@ -258,6 +258,7 @@ export class StandardMaterial extends Material {
 				this.albedoTexture = Texture.loadBackground(
 					ctx,
 					this.pendingTextures.albedo,
+					{ format: "rgba8unorm-srgb" }
 				);
 			if (this.pendingTextures.normal)
 				this.normalTexture = Texture.loadBackground(

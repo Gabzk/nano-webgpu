@@ -7,7 +7,7 @@
  * without modifying this file.
  */
 
-import type { ModelData, ModelParser } from "./loader-parser";
+import type { ModelData, ModelParser, ModelPart } from "./loader-parser";
 
 // ─── Built-in parsers ──────────────────────────────────────────────────────
 
@@ -30,8 +30,11 @@ class GLTFParser implements ModelParser {
 			const jsonBytes = new Uint8Array(arrayBuffer, 20, jsonChunkLength);
 			jsonStr = new TextDecoder().decode(jsonBytes);
 
-			const binOffset = 20 + jsonChunkLength;
-			if (arrayBuffer.byteLength > binOffset) {
+			// JSON chunk is padded to a 4-byte boundary in the file,
+			// but the chunk length field stores the real (unpadded) byte count.
+			const jsonChunkPaddedLength = Math.ceil(jsonChunkLength / 4) * 4;
+			const binOffset = 20 + jsonChunkPaddedLength;
+			if (arrayBuffer.byteLength > binOffset + 8) {
 				const binChunkLength = dataView.getUint32(binOffset, true);
 				binBuffer = arrayBuffer.slice(
 					binOffset + 8,
@@ -107,9 +110,83 @@ class GLTFParser implements ModelParser {
 			return { array: output, count };
 		};
 
-		const outVertices: number[] = [];
-		const outIndices: number[] = [];
-		let indexOffset = 0;
+		// ── Helper: resolve texture URI from a texture reference ───────────────
+		// biome-ignore lint/suspicious/noExplicitAny: GLTF JSON is dynamically typed
+		const getTexUri = (texRef: any): string | null => {
+			if (texRef === undefined) return null;
+			const texture = gltf.textures?.[texRef.index];
+			if (!texture) return null;
+			const image = gltf.images?.[texture.source];
+			if (!image) return null;
+
+			if (image.uri) return baseUrl + image.uri;
+
+			if (image.bufferView !== undefined) {
+				const bv = gltf.bufferViews[image.bufferView];
+				const buffer = buffers[bv.buffer];
+				const byteOffset = bv.byteOffset || 0;
+				const byteLength = bv.byteLength;
+				const slice = buffer.slice(byteOffset, byteOffset + byteLength);
+				const blob = new Blob([slice], {
+					type: image.mimeType || "image/png",
+				});
+				return URL.createObjectURL(blob);
+			}
+
+			return null;
+		};
+
+		// ── Helper: extract material options for a gltf.materials entry ─────────
+		// biome-ignore lint/suspicious/noExplicitAny: GLTF JSON is dynamically typed
+		const extractMaterial = (mat: any): Record<string, any> => {
+			// biome-ignore lint/suspicious/noExplicitAny: GLTF JSON is dynamically typed
+			const out: Record<string, any> = {};
+
+			if (mat.pbrMetallicRoughness) {
+				const pbr = mat.pbrMetallicRoughness;
+
+				// Base color texture (takes priority over factor)
+				const bc = getTexUri(pbr.baseColorTexture);
+				if (bc) out.albedoTexture = bc;
+
+				// Base color factor — used as albedoColor when there is no texture,
+				// or as a tint multiplier when there is one.
+				if (pbr.baseColorFactor) {
+					const [r, g, b, a] = pbr.baseColorFactor as number[];
+					// Convert to hex string for StandardMaterialOptions compatibility
+					const toHex = (v: number) =>
+						Math.round(Math.min(1, Math.max(0, v)) * 255)
+							.toString(16)
+							.padStart(2, "0");
+					out.albedoColor = `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+					if (a !== undefined && a < 1.0) {
+						out.opacity = a;
+					}
+				}
+
+				// Metallic / roughness texture
+				const mr = getTexUri(pbr.metallicRoughnessTexture);
+				if (mr) out.ormTexture = mr;
+
+				out.roughness = pbr.roughnessFactor ?? 1.0;
+				out.metallic = pbr.metallicFactor ?? 1.0;
+			}
+
+			const norm = getTexUri(mat.normalTexture);
+			if (norm) out.normalTexture = norm;
+
+			const occ = getTexUri(mat.occlusionTexture);
+			if (occ && !out.ormTexture) {
+				out.aoTexture = occ;
+			}
+
+			if (mat.doubleSided) out.doubleSided = true;
+
+			return out;
+		};
+
+		// ── Build one ModelPart per GLTF primitive ───────────────────────────────
+		const parts: ModelPart[] = [];
 
 		for (const mesh of gltf.meshes || []) {
 			for (const prim of mesh.primitives) {
@@ -125,96 +202,70 @@ class GLTFParser implements ModelParser {
 						? getAccessorData(prim.attributes.TEXCOORD_0)
 						: null;
 
+				const partVertices: number[] = [];
 				for (let i = 0; i < posData.count; i++) {
-					outVertices.push(
+					// Position (3 floats)
+					partVertices.push(
 						posData.array[i * 3],
 						posData.array[i * 3 + 1],
 						posData.array[i * 3 + 2],
 					);
-
+					// Normal (3 floats, default up)
 					if (normData) {
-						outVertices.push(
+						partVertices.push(
 							normData.array[i * 3],
 							normData.array[i * 3 + 1],
 							normData.array[i * 3 + 2],
 						);
-					} else outVertices.push(0, 1, 0);
-
+					} else {
+						partVertices.push(0, 1, 0);
+					}
+					// UV (2 floats, default 0,0)
 					if (uvData) {
-						outVertices.push(uvData.array[i * 2], uvData.array[i * 2 + 1]);
-					} else outVertices.push(0, 0);
+						partVertices.push(uvData.array[i * 2], uvData.array[i * 2 + 1]);
+					} else {
+						partVertices.push(0, 0);
+					}
 				}
 
+				const partIndices: number[] = [];
 				if (prim.indices !== undefined) {
 					const indData = getAccessorData(prim.indices);
 					for (let i = 0; i < indData.count; i++) {
-						outIndices.push(indData.array[i] + indexOffset);
+						partIndices.push(indData.array[i]);
 					}
 				} else {
-					for (let i = 0; i < posData.count; i++)
-						outIndices.push(i + indexOffset);
+					for (let i = 0; i < posData.count; i++) {
+						partIndices.push(i);
+					}
 				}
 
-				indexOffset += posData.count;
-			}
-		}
-
-		// Material extraction
-		// biome-ignore lint/suspicious/noExplicitAny: GLTF JSON is dynamically typed
-		let parsedMaterial: any = null;
-		if (gltf.materials && gltf.materials.length > 0) {
-			const mat = gltf.materials[0];
-			parsedMaterial = {};
-
-			// biome-ignore lint/suspicious/noExplicitAny: GLTF JSON is dynamically typed
-			const getTexUri = (texRef: any) => {
-				if (texRef === undefined) return null;
-				const texture = gltf.textures[texRef.index];
-				if (!texture) return null;
-				const image = gltf.images[texture.source];
-
-				if (image.uri) return baseUrl + image.uri;
-
-				if (image.bufferView !== undefined) {
-					const bv = gltf.bufferViews[image.bufferView];
-					const buffer = buffers[bv.buffer];
-					const byteOffset = bv.byteOffset || 0;
-					const byteLength = bv.byteLength;
-					const slice = buffer.slice(byteOffset, byteOffset + byteLength);
-					const blob = new Blob([slice], {
-						type: image.mimeType || "image/png",
-					});
-					return URL.createObjectURL(blob);
+				// Resolve material for this primitive
+				// biome-ignore lint/suspicious/noExplicitAny: GLTF JSON is dynamically typed
+				let materialOptions: Record<string, any> | null = null;
+				if (
+					prim.material !== undefined &&
+					gltf.materials &&
+					gltf.materials[prim.material]
+				) {
+					materialOptions = extractMaterial(gltf.materials[prim.material]);
+				} else if (gltf.materials && gltf.materials.length > 0) {
+					// Fallback: use the first material if primitive has no material reference
+					materialOptions = extractMaterial(gltf.materials[0]);
 				}
 
-				return null;
-			};
-
-			if (mat.pbrMetallicRoughness) {
-				const bc = getTexUri(mat.pbrMetallicRoughness.baseColorTexture);
-				if (bc) parsedMaterial.albedoTexture = bc;
-
-				const mr = getTexUri(mat.pbrMetallicRoughness.metallicRoughnessTexture);
-				if (mr) parsedMaterial.ormTexture = mr;
-
-				const roughnessFactor = mat.pbrMetallicRoughness.roughnessFactor ?? 1.0;
-				const metallicFactor = mat.pbrMetallicRoughness.metallicFactor ?? 1.0;
-				parsedMaterial.roughness = roughnessFactor;
-				parsedMaterial.metallic = metallicFactor;
-			}
-			const norm = getTexUri(mat.normalTexture);
-			if (norm) parsedMaterial.normalTexture = norm;
-
-			const occ = getTexUri(mat.occlusionTexture);
-			if (occ && !parsedMaterial.ormTexture) {
-				parsedMaterial.aoTexture = occ;
+				parts.push({
+					vertices: partVertices,
+					indices: partIndices,
+					materialOptions,
+				});
 			}
 		}
 
 		return {
-			vertices: outVertices,
-			indices: outIndices,
-			materialOptions: parsedMaterial,
+			vertices: [],
+			indices: [],
+			parts,
 		};
 	}
 }

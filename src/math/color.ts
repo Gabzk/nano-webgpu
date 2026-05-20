@@ -148,6 +148,22 @@ export class Color {
 	}
 
 	/**
+	 * Returns a new Color converted from sRGB to Linear space.
+	 * Often used when passing uniform colors to PBR shaders.
+	 */
+	public toLinear(): Color {
+		const srgbToLinear = (c: number) => {
+			return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+		};
+		return new Color(
+			srgbToLinear(this._r),
+			srgbToLinear(this._g),
+			srgbToLinear(this._b),
+			this._a
+		);
+	}
+
+	/**
 	 * Creates a Color from varying inputs.
 	 * @param {Color | string | number[]} val - The input value.
 	 * @returns {Color} A new Color instance.

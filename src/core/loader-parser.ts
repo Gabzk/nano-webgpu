@@ -6,12 +6,38 @@
  */
 
 /**
- * Raw model data returned by any parser — format-agnostic geometry + material hints.
+ * A single part of a model — corresponds to one GLTF primitive.
+ * Multi-material models (e.g. GLB with per-mesh colors) produce one part per primitive.
  */
-export interface ModelData {
+export interface ModelPart {
 	/** Interleaved vertex data: pos(3) + normal(3) + uv(2) per vertex */
 	vertices: number[];
 	/** Triangle index list */
+	indices: number[];
+	/**
+	 * Parsed PBR material options compatible with StandardMaterialOptions.
+	 * Keys match StandardMaterialOptions field names.
+	 * `albedoColor` is set when the primitive has a `baseColorFactor` but no texture.
+	 */
+	// biome-ignore lint/suspicious/noExplicitAny: material option shapes are resolved by StandardMaterial
+	materialOptions?: Record<string, any> | null;
+}
+
+/**
+ * Raw model data returned by any parser — format-agnostic geometry + material hints.
+ */
+export interface ModelData {
+	/**
+	 * When the model has multiple primitives with independent materials,
+	 * each is represented as a separate `ModelPart`.
+	 * If present, `vertices` / `indices` / `materialOptions` at the root are ignored
+	 * by `Mesh.load` — use `parts` instead.
+	 */
+	parts?: ModelPart[];
+
+	/** Interleaved vertex data: pos(3) + normal(3) + uv(2) per vertex (single-part models) */
+	vertices: number[];
+	/** Triangle index list (single-part models) */
 	indices: number[];
 	/**
 	 * Parsed PBR material options compatible with StandardMaterialOptions.

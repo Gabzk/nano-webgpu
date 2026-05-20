@@ -1,6 +1,6 @@
 import { Context } from "../core/context";
 import { Node } from "../core/node";
-import type { Node3D } from "../core/node3d";
+import { Node3D } from "../core/node3d";
 import type { DebugPanel } from "../debug/debug-panel";
 import { PerformanceTracker } from "../debug/performance-tracker";
 import { Color } from "../math/color";
@@ -172,15 +172,17 @@ export class Scene extends Node {
 	}
 
 	public get enableFXAA(): boolean {
-		return this.renderer.renderSettingsData[0] === 1;
+		return this.renderer.renderSettingsUint32[0] === 1;
 	}
 
 	public set enableFXAA(value: boolean) {
-		this.renderer.renderSettingsData[0] = value ? 1 : 0;
+		this.renderer.renderSettingsUint32[0] = value ? 1 : 0;
 		this.ctx.device.queue.writeBuffer(
 			this.renderer.renderSettingsBuffer,
 			0,
-			this.renderer.renderSettingsData.buffer,
+			this.renderer.renderSettingsFloat.buffer,
+			0,
+			4,
 		);
 	}
 
@@ -286,13 +288,38 @@ export class Scene extends Node {
 	 * }
 	 * ```
 	 */
-	public addInstance(template: Mesh, options: SceneGeometryOptions = {}): Mesh {
+	public addInstance(template: Mesh | Node3D, options: SceneGeometryOptions = {}): Mesh {
 		const { addToScene = true, ...rest } = options;
 		const parsedOptions = this.parseMaterialOptions(rest);
-		const clone = new Mesh(this.ctx, {
-			geometry: template.geometry,
-			material: parsedOptions.material || template.material,
+
+		let clone: Mesh;
+
+		let meshTemplate: Mesh | null = null;
+		if (template instanceof Mesh) {
+			meshTemplate = template;
+		} else {
+			// Search for Mesh child
+			const findMesh = (n: Node): Mesh | null => {
+				for (const child of n.children) {
+					if (child instanceof Mesh) return child;
+					const found = findMesh(child);
+					if (found) return found;
+				}
+				return null;
+			};
+			meshTemplate = findMesh(template);
+		}
+
+		if (!meshTemplate) {
+			throw new Error("Template must contain at least one Mesh to be used as an instance template");
+		}
+
+		// Create clone with shared geometry
+		clone = new Mesh(this.ctx, {
+			geometry: meshTemplate.geometry,
+			material: parsedOptions.material || meshTemplate.material,
 		});
+		
 		Mesh.applyTransformOptions(clone, parsedOptions);
 		if (addToScene) this.add(clone);
 		return clone;
@@ -300,25 +327,31 @@ export class Scene extends Node {
 
 	/**
 	 * Loads a mesh from a GLB, GLTF, or OBJ file URL and adds it to the scene.
+	 *
+	 * For multi-material models (e.g. GLB files with per-primitive colors), the returned
+	 * `Node3D` is a container whose `.children` are the individual `Mesh` parts.
+	 * For single-material models (OBJ, single-primitive GLTF), the returned `Node3D`
+	 * is the `Mesh` itself (since `Mesh extends Node3D`).
+	 *
 	 * @param url - The URL of the model file (relative URLs are prefixed with `setDefaultDir`).
 	 * @param options - Transform and material options.
 	 * @example
 	 * ```ts
-	 * const shiba = await scene.loadMesh('./assets/shiba.glb', { position: [0, 0, 0] });
-	 * // Clone it without re-loading from disk:
-	 * scene.instantiate(shiba, { position: [2, 0, 0] });
+	 * const model = await scene.loadMesh('./assets/link_cartoon.glb');
+	 * // Access individual parts:
+	 * for (const part of model.children) { ... }
 	 * ```
 	 */
 	public async loadMesh(
 		url: string,
 		options: SceneGeometryOptions = {},
-	): Promise<Mesh> {
+	): Promise<Node3D> {
 		const { addToScene = true, ...rest } = options;
 		const parsedOptions = this.parseMaterialOptions(rest);
 		const finalUrl = this.defaultDir ? this.defaultDir + url : url;
-		const mesh = await Mesh.load(this.ctx, finalUrl, parsedOptions);
-		if (addToScene) this.add(mesh);
-		return mesh;
+		const node = await Mesh.load(this.ctx, finalUrl, parsedOptions);
+		if (addToScene) this.add(node);
+		return node;
 	}
 
 	/**
@@ -409,6 +442,18 @@ export class Scene extends Node {
 		super.add(node);
 		if (node instanceof Mesh) {
 			this._meshes.push(node);
+		} else {
+			// For Node3D containers (e.g. multi-part GLTF models), register Mesh children
+			const registerMeshes = (n: Node) => {
+				for (const child of n.children) {
+					if (child instanceof Mesh) {
+						this._meshes.push(child);
+					} else {
+						registerMeshes(child);
+					}
+				}
+			};
+			registerMeshes(node);
 		}
 	}
 
@@ -515,7 +560,7 @@ export class Scene extends Node {
 		this.updateWorldMatrix(false);
 
 		this.renderer.updateLightsBuffer(this.lights);
-		this.renderer.render(this, this.camera, this.perfTracker);
+		this.renderer.render(this, this.camera, this.perfTracker, dt);
 
 		this.perfTracker.totalMeshes = this.meshes.length;
 		this.perfTracker.lightCount = this.lights.length;

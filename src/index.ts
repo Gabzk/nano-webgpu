@@ -2,7 +2,7 @@ export { CollisionShape, type ShapeType } from "./core/collision-shape";
 export { Context } from "./core/context";
 export { Input, InputManager, type MouseMode } from "./core/input";
 export { Loader } from "./core/loader";
-export type { ModelData, ModelParser } from "./core/loader-parser";
+export type { ModelData, ModelPart, ModelParser } from "./core/loader-parser";
 export { Node } from "./core/node";
 export { Node3D } from "./core/node3d";
 export { DebugPanel, type DebugPanelOptions } from "./debug/debug-panel";

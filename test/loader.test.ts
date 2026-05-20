@@ -216,4 +216,178 @@ f  1/1/1   2/2/1   3/3/1   4/4/1
 			);
 		});
 	});
+
+	describe("loadModel (GLTF Parser)", () => {
+		/**
+		 * Build a minimal GLB ArrayBuffer from a GLTF JSON object.
+		 * The JSON chunk length in the header is set to the EXACT json byte count
+		 * so the parser slices correctly (no garbage bytes included).
+		 * The buffer is padded to 4-byte alignment as required by the spec.
+		 */
+		function buildGlb(gltf: object): ArrayBuffer {
+			const jsonStr = JSON.stringify(gltf);
+			const encoder = new TextEncoder();
+			const jsonBytes = encoder.encode(jsonStr);
+			const realJsonLen = jsonBytes.length;
+			// Pad to 4-byte boundary (GLB spec), but store real length in header
+			const paddedJsonLen = Math.ceil(realJsonLen / 4) * 4;
+
+			const totalLen = 12 + 8 + paddedJsonLen; // GLB header + chunk header + json
+			const buf = new ArrayBuffer(totalLen);
+			const view = new DataView(buf);
+			view.setUint32(0, 0x46546c67, true); // magic "glTF"
+			view.setUint32(4, 2, true);            // version 2
+			view.setUint32(8, totalLen, true);     // total file length
+			// Store REAL json length so the parser slices exactly the valid JSON
+			view.setUint32(12, realJsonLen, true);
+			view.setUint32(16, 0x4e4f534a, true);  // chunk type "JSON"
+			new Uint8Array(buf, 20).set(jsonBytes);
+			return buf;
+		}
+
+		it("should extract baseColorFactor as albedoColor when no texture", async () => {
+			// Model with no geometry data (no buffers/bufferViews/accessors) —
+			// POSITION is absent so the primitive is skipped; we only care that
+			// materialOptions are extracted from the GLTF material.
+			// Use a primitive that has no POSITION so getAccessorData is never called.
+			const gltf = {
+				asset: { version: "2.0" },
+				meshes: [{
+					primitives: [
+						// This primitive has no POSITION → skipped by the parser
+						// but we still need materialOptions parsed.
+						// Use a second primitive WITH POSITION that references accessor 0
+						// pointing to an empty bufferView so count=0, zero iterations.
+						{
+							attributes: { POSITION: 0 },
+							material: 0,
+						},
+					],
+				}],
+				materials: [{
+					pbrMetallicRoughness: {
+						baseColorFactor: [1.0, 0.0, 0.0, 1.0], // red
+						roughnessFactor: 0.8,
+						metallicFactor: 0.0,
+					},
+				}],
+				accessors: [
+					// count=0 so the loop in getAccessorData runs zero times — safe
+					{ bufferView: 0, byteOffset: 0, componentType: 5126, count: 0, type: "VEC3" },
+				],
+				bufferViews: [
+					{ buffer: 0, byteOffset: 0, byteLength: 0 },
+				],
+				buffers: [{ byteLength: 0 }],
+			};
+
+			const glbBuffer = buildGlb(gltf);
+
+			// The bin chunk is absent from our GLB, so buffers[0] won't be in the
+			// buffers array. We need to push an empty ArrayBuffer for buffer index 0.
+			// The parser checks: if (i === 0 && binBuffer) → only if binBuffer exists.
+			// Since our GLB has no bin chunk, buffers[0] won't be loaded from GLB.
+			// But the GLTF references buffer 0 with byteLength 0. The parser skips
+			// external buffers that have no uri and aren't the embedded bin.
+			// To avoid the DataView error, give the buffer a data: URI with 0 bytes.
+			const gltfWithDataUri = {
+				...gltf,
+				buffers: [{ byteLength: 0, uri: "data:application/octet-stream;base64," }],
+			};
+			const glbBuffer2 = buildGlb(gltfWithDataUri);
+
+			window.fetch = vi.fn().mockResolvedValue({
+				ok: true,
+				arrayBuffer: vi.fn().mockResolvedValue(glbBuffer2),
+			});
+
+			const result = await loader.loadModel("model.glb");
+
+			expect(result.parts).toBeDefined();
+			expect(result.parts!.length).toBe(1);
+
+			const part = result.parts![0];
+			expect(part.materialOptions).toBeDefined();
+			expect(part.materialOptions!.albedoColor).toBe("#ff0000");
+			expect(part.materialOptions!.roughness).toBe(0.8);
+			expect(part.materialOptions!.metallic).toBe(0.0);
+			expect(part.materialOptions!.albedoTexture).toBeUndefined();
+		});
+
+		it("should produce one part per GLTF primitive with independent materials", async () => {
+			const gltf = {
+				asset: { version: "2.0" },
+				meshes: [{
+					primitives: [
+						{ attributes: { POSITION: 0 }, material: 0 },
+						{ attributes: { POSITION: 0 }, material: 1 },
+					],
+				}],
+				materials: [
+					{ pbrMetallicRoughness: { baseColorFactor: [0, 1, 0, 1] } }, // green
+					{ pbrMetallicRoughness: { baseColorFactor: [0, 0, 1, 1] } }, // blue
+				],
+				accessors: [
+					{ bufferView: 0, byteOffset: 0, componentType: 5126, count: 0, type: "VEC3" },
+				],
+				bufferViews: [{ buffer: 0, byteOffset: 0, byteLength: 0 }],
+				buffers: [{ byteLength: 0, uri: "data:application/octet-stream;base64," }],
+			};
+
+			const glbBuffer = buildGlb(gltf);
+			window.fetch = vi.fn().mockResolvedValue({
+				ok: true,
+				arrayBuffer: vi.fn().mockResolvedValue(glbBuffer),
+			});
+
+			const result = await loader.loadModel("multipart.glb");
+
+			expect(result.parts).toBeDefined();
+			expect(result.parts!.length).toBe(2);
+			expect(result.parts![0].materialOptions!.albedoColor).toBe("#00ff00");
+			expect(result.parts![1].materialOptions!.albedoColor).toBe("#0000ff");
+		});
+
+		it("should use fallback material when primitive has no material reference", async () => {
+			const gltf = {
+				asset: { version: "2.0" },
+				meshes: [{ primitives: [{ attributes: { POSITION: 0 } }] }],
+				materials: [{
+					pbrMetallicRoughness: { baseColorFactor: [0.5, 0.5, 0.5, 1.0] },
+				}],
+				accessors: [
+					{ bufferView: 0, byteOffset: 0, componentType: 5126, count: 0, type: "VEC3" },
+				],
+				bufferViews: [{ buffer: 0, byteOffset: 0, byteLength: 0 }],
+				buffers: [{ byteLength: 0, uri: "data:application/octet-stream;base64," }],
+			};
+
+			const glbBuffer = buildGlb(gltf);
+			window.fetch = vi.fn().mockResolvedValue({
+				ok: true,
+				arrayBuffer: vi.fn().mockResolvedValue(glbBuffer),
+			});
+
+			const result = await loader.loadModel("fallback.glb");
+			expect(result.parts!.length).toBe(1);
+			expect(result.parts![0].materialOptions!.albedoColor).toBe("#808080");
+		});
+
+		it("should return empty parts array when mesh has no primitives", async () => {
+			const gltf = {
+				asset: { version: "2.0" },
+				meshes: [{ primitives: [] }],
+			};
+
+			const glbBuffer = buildGlb(gltf);
+			window.fetch = vi.fn().mockResolvedValue({
+				ok: true,
+				arrayBuffer: vi.fn().mockResolvedValue(glbBuffer),
+			});
+
+			const result = await loader.loadModel("empty.glb");
+			expect(result.parts).toBeDefined();
+			expect(result.parts!.length).toBe(0);
+		});
+	});
 });

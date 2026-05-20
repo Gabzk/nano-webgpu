@@ -333,8 +333,48 @@ export class Mesh extends Node3D {
 		url: string,
 		// biome-ignore lint/suspicious/noExplicitAny: options are passed through to StandardMaterial
 		options: any,
-	): Promise<Mesh> {
+	): Promise<Node3D> {
 		const modelData = await ctx.loader.loadModel(url);
+
+		// ── Multi-part path (GLTF with per-primitive materials) ─────────────────
+		if (modelData.parts && modelData.parts.length > 0) {
+			const container = new Node3D();
+			Mesh.applyTransformOptions(container as unknown as Mesh, options);
+
+			for (const part of modelData.parts) {
+				const vertexCount = part.vertices.length / 8;
+				const optimalIndicesArray =
+					vertexCount > 65535
+						? new Uint32Array(part.indices)
+						: new Uint16Array(part.indices);
+				const geometry = new Geometry(
+					ctx,
+					new Float32Array(part.vertices),
+					optimalIndicesArray,
+					{ hasUVs: true, hasNormals: true },
+				);
+
+				// Per-part material: options override takes priority, then part material, then default
+				const partFinalOptions = { ...options };
+				if (!partFinalOptions.material && part.materialOptions) {
+					partFinalOptions.material = part.materialOptions;
+				}
+
+				const mesh = new Mesh(ctx, { geometry, ...partFinalOptions });
+
+				const localAABB = AABB.fromVertices(part.vertices, 8);
+				const halfExtents = localAABB.getHalfExtents();
+				mesh.collisionShape = CollisionShape.box(
+					new Vec3(halfExtents.x * 2, halfExtents.y * 2, halfExtents.z * 2),
+				);
+
+				container.add(mesh);
+			}
+
+			return container;
+		}
+
+		// ── Single-part path (OBJ and legacy single-mesh GLTF) ─────────────────
 		const vertexCount = modelData.vertices.length / 8;
 		const optimalIndicesArray =
 			vertexCount > 65535
