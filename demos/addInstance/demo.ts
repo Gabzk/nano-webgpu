@@ -4,9 +4,6 @@ const scene = await Scene.init("#canvas");
 scene.setCamera({ position: [0, 4, 10] });
 scene.backgroundColor = "#c6c6c6";
 
-// loadMesh now returns Node3D — for multi-material GLBs it's a container
-// whose .children are the individual Mesh parts (one per GLTF primitive).
-
 scene.addPlane({
   position: [0, -0.94, -1],
   scale: 10,
@@ -15,11 +12,17 @@ scene.addPlane({
 
 const link = await scene.loadMesh("./link_cartoon.glb",
   {
-    rotationDegrees: [-90, 0, 0],
-    position: [0, -0.5, 0],
+    rotationDegrees: [-90, 30, 0],
+    position: [-2, -0.5, 0],
     scale: [0.5, 0.5, 0.5]
   }
 );
+
+scene.addInstance(link, {
+  position: [2, -0.5, 0],
+  scale: [0.5, 0.5, 0.5],
+  rotationDegrees: [-90, -30, 0],
+});
 
 scene.addLight({
   type: "directional",
@@ -34,7 +37,6 @@ scene.addLight({
   color: "#ffffff",
   intensity: 1,
 });
-
 
 const canvas = scene.getCanvas();
 
