@@ -2,9 +2,9 @@ import type { Context } from "../core/context";
 import { Mat4 } from "../math/mat4";
 import { Vec3 } from "../math/vec3";
 import type { Camera } from "./camera";
-import type { Light } from "./light";
-import type { Mesh } from "./mesh";
+import type { Light, ShadowConfig } from "./light";
 import { isStandardMaterial } from "./materials/material";
+import type { Mesh } from "./mesh";
 
 /** Internal batch record shared with BatchManager. */
 export interface InstanceBatch {
@@ -110,9 +110,12 @@ export class ShadowSystem {
 	 * Stamps the usePCF variant flag on every StandardMaterial in the mesh list.
 	 * Called once per frame so each material routes to the correct compiled pipeline variant.
 	 */
-	public propagateVariant(meshes: Mesh[], usePCF: boolean): void {
+	public propagateVariant(meshes: ReadonlyArray<Mesh>, usePCF: boolean): void {
 		for (const mesh of meshes) {
-			if (isStandardMaterial(mesh.material) && mesh.material.usePCF !== usePCF) {
+			if (
+				isStandardMaterial(mesh.material) &&
+				mesh.material.usePCF !== usePCF
+			) {
 				mesh.material.usePCF = usePCF;
 			}
 		}
@@ -124,23 +127,25 @@ export class ShadowSystem {
 	 */
 	public renderPass(
 		commandEncoder: GPUCommandEncoder,
-		lights: Light[],
+		lights: ReadonlyArray<Light>,
 		camera: Camera,
 		batchGroups: Map<string, Mesh[]>,
 		instanceBatches: Map<string, InstanceBatch>,
-		meshes: Mesh[],
+		meshes: ReadonlyArray<Mesh>,
 	): boolean {
 		// Find the first shadow-casting directional light via polymorphic getShadowConfig()
 		let shadowCaster: Light | null = null;
+		let config: ShadowConfig | null = null;
 		for (const light of lights) {
-			if (light.getShadowConfig()) {
+			const c = light.getShadowConfig();
+			if (c) {
 				shadowCaster = light;
+				config = c;
 				break;
 			}
 		}
-		if (!shadowCaster) return false;
+		if (!shadowCaster || !config) return false;
 
-		const config = shadowCaster.getShadowConfig()!;
 		if (this.reinitIfNeeded(config.shadowMapSize)) {
 			// Caller should mark globals bind group as dirty
 		}
@@ -196,12 +201,7 @@ export class ShadowSystem {
 			this.matrix.values.buffer,
 		);
 
-		const shadowParams = new Float32Array([
-			1.0 / this.textureSize,
-			0,
-			0,
-			0,
-		]);
+		const shadowParams = new Float32Array([1.0 / this.textureSize, 0, 0, 0]);
 		this.ctx.device.queue.writeBuffer(this.uniformBuffer, 64, shadowParams);
 
 		// Propagate PCF variant

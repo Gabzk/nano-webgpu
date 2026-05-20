@@ -1,6 +1,6 @@
 import type { Context } from "../../core/context";
-import type { StandardMaterial } from "./standard-material";
 import type { ShaderMaterial } from "./shader-material";
+import type { StandardMaterial } from "./standard-material";
 
 export interface MaterialOptions {
 	transparent?: boolean;

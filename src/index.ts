@@ -2,13 +2,14 @@ export { CollisionShape, type ShapeType } from "./core/collision-shape";
 export { Context } from "./core/context";
 export { Input, InputManager, type MouseMode } from "./core/input";
 export { Loader } from "./core/loader";
+export type { ModelData, ModelParser } from "./core/loader-parser";
 export { Node } from "./core/node";
 export { Node3D } from "./core/node3d";
 export { DebugPanel, type DebugPanelOptions } from "./debug/debug-panel";
 export { PerformanceTracker } from "./debug/performance-tracker";
-export { VRAMTracker, type VRAMEntry } from "./debug/vram-tracker";
+export { type VRAMEntry, VRAMTracker } from "./debug/vram-tracker";
+export { BatchManager } from "./graphics/batch-manager";
 export { Camera, type CameraOptions } from "./graphics/camera";
-export { Geometry } from "./graphics/geometry";
 export {
 	CameraController,
 	type CameraMode,
@@ -16,6 +17,7 @@ export {
 	type OrbitOptions,
 	type ThirdPersonOptions,
 } from "./graphics/camera-controller";
+export { Geometry } from "./graphics/geometry";
 export {
 	DirectionalLight,
 	type DirectionalLightOptions,
@@ -40,21 +42,18 @@ export {
 	type StandardMaterialOptions,
 } from "./graphics/materials/standard-material";
 export { Mesh, type MeshOptions } from "./graphics/mesh";
+export { PipelineManager } from "./graphics/pipeline";
+export { Renderer } from "./graphics/renderer";
 export {
 	Scene,
 	type SceneGeometryOptions,
 	type SceneLightOptions,
 } from "./graphics/scene";
-export { Renderer } from "./graphics/renderer";
-export { PipelineManager } from "./graphics/pipeline";
-export { Texture } from "./graphics/texture";
 export { ShadowSystem } from "./graphics/shadow-system";
-export { BatchManager } from "./graphics/batch-manager";
-export { type ModelParser, type ModelData } from "./core/loader-parser";
+export { Texture } from "./graphics/texture";
 export { AABB } from "./math/aabb";
 export { Color } from "./math/color";
 export { Mat4 } from "./math/mat4";
 export { Vec2 } from "./math/vec2";
 export { Vec3 } from "./math/vec3";
-
-export const VERSION = "0.3.1";
+export { VERSION } from "./version";

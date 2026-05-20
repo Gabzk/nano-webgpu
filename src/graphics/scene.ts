@@ -13,12 +13,12 @@ import {
 	type LightOptions,
 	PointLight,
 } from "./light";
-import { Material, type MaterialOptions } from "./materials/material";
+import { Material } from "./materials/material";
 import {
 	StandardMaterial,
 	type StandardMaterialOptions,
 } from "./materials/standard-material";
-import { Mesh, type MeshOptions } from "./mesh";
+import { Mesh } from "./mesh";
 import { Renderer } from "./renderer";
 
 /**
@@ -46,14 +46,65 @@ export interface SceneGeometryOptions extends StandardMaterialOptions {
 }
 
 export class Scene extends Node {
-	public ctx: Context;
-	public camera: Camera | null = null;
-	public lights: Light[] = [];
-	public meshes: Mesh[] = [];
-	public backgroundColor: Color = Color.fromHex("#111122");
-	public defaultDir: string = "";
+	public readonly ctx: Context;
+	public readonly renderer: Renderer;
 
-	public renderer: Renderer;
+	public get canvas(): HTMLCanvasElement {
+		return this.ctx.context.canvas as HTMLCanvasElement;
+	}
+
+	public getCanvas(): HTMLCanvasElement {
+		return this.canvas;
+	}
+
+	private _camera: Camera | null = null;
+
+	public get camera(): Camera | null {
+		return this._camera;
+	}
+
+	private _lights: Light[] = [];
+	private _meshes: Mesh[] = [];
+
+	public get lights(): ReadonlyArray<Light> {
+		return this._lights;
+	}
+
+	public get meshes(): ReadonlyArray<Mesh> {
+		return this._meshes;
+	}
+
+	private _backgroundColor: Color = Color.fromHex("#111122");
+
+	public get backgroundColor(): Color {
+		return this._backgroundColor;
+	}
+
+	public set backgroundColor(color: Color | string) {
+		if (!color) {
+			console.warn("nano-webgpu: backgroundColor cannot be null. Ignoring");
+			return;
+		}
+
+		if (typeof color === "string") {
+			this._backgroundColor = Color.fromHex(color);
+		} else {
+			this._backgroundColor = color;
+		}
+	}
+
+	private _defaultDir: string = "";
+
+	public get defaultDir(): string {
+		return this._defaultDir;
+	}
+
+	public set defaultDir(dir: string) {
+		this._defaultDir = dir;
+		if (this._defaultDir && !this._defaultDir.endsWith("/")) {
+			this._defaultDir += "/";
+		}
+	}
 
 	// --- Debug / Profiling ---
 	private perfTracker: PerformanceTracker | null = null;
@@ -72,13 +123,6 @@ export class Scene extends Node {
 		return new Scene(ctx);
 	}
 
-	public setDefaultDir(dir: string): void {
-		this.defaultDir = dir;
-		if (this.defaultDir && !this.defaultDir.endsWith("/")) {
-			this.defaultDir += "/";
-		}
-	}
-
 	public get enableFXAA(): boolean {
 		return this.renderer.renderSettingsData[0] === 1;
 	}
@@ -93,16 +137,16 @@ export class Scene extends Node {
 	}
 
 	public setCamera(cameraOrOptions: Camera | CameraOptions): Camera {
-		this.camera =
+		this._camera =
 			cameraOrOptions instanceof Camera
 				? cameraOrOptions
 				: new Camera(cameraOrOptions);
 
 		this.renderer.globalsBindGroupDirty = true;
-		if (!this.children.includes(this.camera)) {
-			this.add(this.camera);
+		if (!this.children.includes(this._camera)) {
+			this.add(this._camera);
 		}
-		return this.camera;
+		return this._camera;
 	}
 
 	/**
@@ -138,9 +182,9 @@ export class Scene extends Node {
 			if (options.rotation)
 				light.rotation.copy(Vec3.from(options.rotation as number[]));
 			if (options.rotationDegrees)
-				light.rotationDegrees = options.rotationDegrees as any;
+				light.rotationDegrees = options.rotationDegrees as Vec3 | number[];
 		}
-		this.lights.push(light);
+		this._lights.push(light);
 		this.add(light);
 		return light;
 	}
@@ -194,7 +238,7 @@ export class Scene extends Node {
 	 * }
 	 * ```
 	 */
-	public instantiate(template: Mesh, options: SceneGeometryOptions = {}): Mesh {
+	public addInstance(template: Mesh, options: SceneGeometryOptions = {}): Mesh {
 		const { addToScene = true, ...rest } = options;
 		const parsedOptions = this.parseMaterialOptions(rest);
 		const clone = new Mesh(this.ctx, {
@@ -235,11 +279,13 @@ export class Scene extends Node {
 	 */
 	public addCube(options: SceneGeometryOptions & { size?: number } = {}): Mesh {
 		const { addToScene = true, ...rest } = options;
-		const parsedOptions = this.parseMaterialOptions(rest);
+		const parsedOptions = this.parseMaterialOptions(
+			rest,
+		) as StandardMaterialOptions;
 		const mesh = Mesh.createCube(this.ctx, {
 			...parsedOptions,
 			size: options.size,
-		} as any);
+		});
 		if (addToScene) this.add(mesh);
 		return mesh;
 	}
@@ -252,12 +298,14 @@ export class Scene extends Node {
 		options: SceneGeometryOptions & { radius?: number; segments?: number } = {},
 	): Mesh {
 		const { addToScene = true, ...rest } = options;
-		const parsedOptions = this.parseMaterialOptions(rest);
+		const parsedOptions = this.parseMaterialOptions(
+			rest,
+		) as StandardMaterialOptions;
 		const mesh = Mesh.createSphere(this.ctx, {
 			...parsedOptions,
 			radius: options.radius,
 			segments: options.segments,
-		} as any);
+		});
 		if (addToScene) this.add(mesh);
 		return mesh;
 	}
@@ -270,12 +318,14 @@ export class Scene extends Node {
 		options: SceneGeometryOptions & { width?: number; height?: number } = {},
 	): Mesh {
 		const { addToScene = true, ...rest } = options;
-		const parsedOptions = this.parseMaterialOptions(rest);
+		const parsedOptions = this.parseMaterialOptions(
+			rest,
+		) as StandardMaterialOptions;
 		const mesh = Mesh.createPlane(this.ctx, {
 			...parsedOptions,
 			width: options.width,
 			height: options.height,
-		} as any);
+		});
 
 		if (addToScene) this.add(mesh);
 		return mesh;
@@ -438,16 +488,16 @@ export class Scene extends Node {
 	public override add(node: Node): void {
 		super.add(node);
 		if (node instanceof Mesh) {
-			this.meshes.push(node);
+			this._meshes.push(node);
 		}
 	}
 
 	public override remove(node: Node): void {
 		super.remove(node);
 		if (node instanceof Mesh) {
-			const index = this.meshes.indexOf(node);
+			const index = this._meshes.indexOf(node);
 			if (index !== -1) {
-				this.meshes.splice(index, 1);
+				this._meshes.splice(index, 1);
 			}
 		}
 	}
@@ -491,7 +541,12 @@ export class Scene extends Node {
 		this.perfTracker = new PerformanceTracker();
 
 		const canvas = this.ctx.context.canvas as HTMLCanvasElement;
-		this.debugPanel = new DebugPanel(canvas, this.perfTracker, this.ctx.vramTracker, options);
+		this.debugPanel = new DebugPanel(
+			canvas,
+			this.perfTracker,
+			this.ctx.vramTracker,
+			options,
+		);
 
 		this.debugPanel.setSceneStatsProvider(() => ({
 			totalMeshes: this.meshes.length,

@@ -90,8 +90,7 @@ class GLTFParser implements ModelParser {
 			let elementSize = 4; // default Float32
 			if (accessor.componentType === 5123) elementSize = 2;
 
-			const effectiveStride =
-				stride > 0 ? stride : numComponents * elementSize;
+			const effectiveStride = stride > 0 ? stride : numComponents * elementSize;
 
 			for (let i = 0; i < count; i++) {
 				for (let c = 0; c < numComponents; c++) {
@@ -198,8 +197,7 @@ class GLTFParser implements ModelParser {
 				const mr = getTexUri(mat.pbrMetallicRoughness.metallicRoughnessTexture);
 				if (mr) parsedMaterial.ormTexture = mr;
 
-				const roughnessFactor =
-					mat.pbrMetallicRoughness.roughnessFactor ?? 1.0;
+				const roughnessFactor = mat.pbrMetallicRoughness.roughnessFactor ?? 1.0;
 				const metallicFactor = mat.pbrMetallicRoughness.metallicFactor ?? 1.0;
 				parsedMaterial.roughness = roughnessFactor;
 				parsedMaterial.metallic = metallicFactor;
@@ -442,7 +440,9 @@ export class Loader {
 			throw new Error(
 				`No parser found for model: "${url}". Supported extensions: ${this.parsers
 					.map((p) => p.constructor.name)
-					.join(", ")}. Register a custom parser via ctx.loader.registerParser().`,
+					.join(
+						", ",
+					)}. Register a custom parser via ctx.loader.registerParser().`,
 			);
 		}
 

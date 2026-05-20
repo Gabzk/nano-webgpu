@@ -12,8 +12,9 @@
 		}
 	},
 	"scripts": {
-		"dev": "BROWSER=google-chrome vite",
-		"build": "rollup -c",
+		"sync-version": "node -e \"const fs = require('fs'); const pkg = require('./package.json'); fs.writeFileSync('./src/version.ts', 'export const VERSION = \\\"' + pkg.version + '\\\";\\n');\"",
+		"dev": "pnpm sync-version && BROWSER=google-chrome vite",
+		"build": "pnpm sync-version && rollup -c",
 		"test": "vitest",
 		"test:run": "vitest run",
 		"check": "biome check --write ./src",

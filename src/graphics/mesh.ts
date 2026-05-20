@@ -89,8 +89,7 @@ export class Mesh extends Node3D {
 		if (options.rotation)
 			mesh.rotation.copy(Vec3.from(options.rotation as number[]));
 		if (options.rotationDegrees)
-			// biome-ignore lint/suspicious/noExplicitAny: rotationDegrees setter accepts number[] via Vec3.from
-			mesh.rotationDegrees = options.rotationDegrees as any;
+			mesh.rotationDegrees = options.rotationDegrees as Vec3 | number[];
 	}
 
 	// --- Static Factory Methods ---
@@ -101,11 +100,17 @@ export class Mesh extends Node3D {
 	 */
 	public static createCube(
 		ctx: Context,
-		options: StandardMaterialOptions & { size?: number } = {},
+		options: StandardMaterialOptions & {
+			size?: number;
+			position?: number[];
+			rotation?: number[];
+			rotationDegrees?: number[];
+			scale?: number | number[];
+		} = {},
 	): Mesh {
 		const geometry = ctx.primitives.getCube(ctx, options.size || 1.0);
-		const mesh = new Mesh(ctx, { ...options, geometry });
-		Mesh.applyTransformOptions(mesh, options as any);
+		const mesh = new Mesh(ctx, { ...options, geometry } as MeshOptions);
+		Mesh.applyTransformOptions(mesh, options);
 		mesh.collisionShape = CollisionShape.box(options.size || 1.0);
 		return mesh;
 	}
@@ -126,7 +131,7 @@ export class Mesh extends Node3D {
 			options.width || 1.0,
 			options.height || 1.0,
 		);
-		const mesh = new Mesh(ctx, { ...options, geometry } as any);
+		const mesh = new Mesh(ctx, { ...options, geometry } as MeshOptions);
 		Mesh.applyTransformOptions(mesh, options);
 		return mesh;
 	}
@@ -148,7 +153,7 @@ export class Mesh extends Node3D {
 			options.segments || 16,
 			options.segments || 16,
 		);
-		const mesh = new Mesh(ctx, { ...options, geometry } as any);
+		const mesh = new Mesh(ctx, { ...options, geometry } as MeshOptions);
 		Mesh.applyTransformOptions(mesh, options);
 		mesh.collisionShape = CollisionShape.sphere(options.radius || 1.0);
 		return mesh;

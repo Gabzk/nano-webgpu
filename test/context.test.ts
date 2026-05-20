@@ -1,10 +1,11 @@
 /// <reference types="@webgpu/types" />
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Context, VERSION } from "../src/index";
+import pkg from "../package.json";
 
 describe("Context", () => {
 	it("should export correct version", () => {
-		expect(VERSION).toBe("0.1.0");
+		expect(VERSION).toBe(pkg.version);
 	});
 
 	describe("Context Initialization", () => {

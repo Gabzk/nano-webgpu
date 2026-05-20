@@ -159,7 +159,7 @@ export class Renderer {
 	 * Uploads all light data to the GPU lights buffer.
 	 * Uses polymorphic getLightData() — no instanceof checks.
 	 */
-	public updateLightsBuffer(lights: Light[]) {
+	public updateLightsBuffer(lights: ReadonlyArray<Light>) {
 		const limit = lights.length;
 		this.ensureLightsBufferSize(limit);
 

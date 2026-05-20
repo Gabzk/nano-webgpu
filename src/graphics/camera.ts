@@ -109,7 +109,6 @@ export class Camera extends Node3D {
 			"Camera",
 		);
 
-
 		// Note: BindGroup is now managed by Scene (Group 0: Globals) combining Camera + Lights
 	}
 

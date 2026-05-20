@@ -1,6 +1,6 @@
 import type { Context } from "../core/context";
-import type { Mesh } from "./mesh";
 import type { PerformanceTracker } from "../debug/performance-tracker";
+import type { Mesh } from "./mesh";
 
 export interface InstanceBatch {
 	buffer: GPUBuffer;
@@ -37,7 +37,7 @@ export class BatchManager {
 	 * Groups visible meshes by geometry+material, reusing existing array objects to
 	 * avoid per-frame GC pressure. Call once per frame before any render pass.
 	 */
-	public rebuild(meshes: Mesh[]): void {
+	public rebuild(meshes: ReadonlyArray<Mesh>): void {
 		for (const group of this.batchGroups.values()) {
 			group.length = 0;
 		}

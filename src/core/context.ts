@@ -1,8 +1,8 @@
 import { VRAMTracker } from "../debug/vram-tracker";
-import { PrimitivesFactory } from "../graphics/primitives-factory";
 import { PipelineManager } from "../graphics/pipeline";
-import { Loader } from "./loader";
+import { PrimitivesFactory } from "../graphics/primitives-factory";
 import { Input } from "./input";
+import { Loader } from "./loader";
 
 /**
  * @module Context

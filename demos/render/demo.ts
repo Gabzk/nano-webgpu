@@ -1,9 +1,12 @@
 import { Input, InputManager, Scene } from "nano-webgpu";
 
-const canvas = document.getElementById("canvas") as HTMLCanvasElement;
-const scene = await Scene.init("#canvas");
+const scene = await Scene.init("#canvasGetter");
+const canvasGetter = scene.canvas;
+const canvasMethod = scene.getCanvas();
 
 scene.setCamera({ position: [0, 2, 5] });
+
+scene.defaultDir = "./assets";
 
 scene.addPlane({
 	position: [0, -0.94, -3],
@@ -11,18 +14,17 @@ scene.addPlane({
 	color: "#339933",
 });
 
-const shiba = await scene.loadMesh(`./assets/shiba.glb`, {
+const shiba = await scene.loadMesh(`./shiba.glb`, {
 	position: [-1, 0, 0],
 	scale: 1,
 	rotation: [-1.5, 0.5, 0],
 });
 
-scene.instantiate(shiba, {
+scene.addInstance(shiba, {
 	position: [1, 0, 0],
 	rotation: [-1.5, -0.5, 0],
 });
 
-// sun
 scene.addLight({
 	type: "directional",
 	rotationDegrees: [-135, 0, 0],
@@ -43,8 +45,8 @@ scene.enableDebug({
 });
 
 scene.render((_dt) => {
-	if (canvas.width !== innerWidth || canvas.height !== innerHeight) {
-		canvas.width = innerWidth;
-		canvas.height = innerHeight;
+	if (canvasGetter.width !== innerWidth || canvasGetter.height !== innerHeight) {
+		canvasGetter.width = innerWidth;
+		canvasGetter.height = innerHeight;
 	}
 });
