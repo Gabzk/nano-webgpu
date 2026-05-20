@@ -3,6 +3,7 @@ import type { Context } from "../core/context";
 import { Node3D } from "../core/node3d";
 import { AABB } from "../math/aabb";
 import { Vec3 } from "../math/vec3";
+import type { CullMode } from "./cull-mode";
 import { Geometry } from "./geometry";
 import { Material } from "./materials/material";
 import {
@@ -20,10 +21,164 @@ export interface MeshOptions {
 	scale?: number | number[];
 }
 
+export interface BuildMeshOptions {
+	vertexFormat: string[];
+	vertexBuffer: number[];
+	indices?: number[];
+	topology?: GPUPrimitiveTopology;
+	/** Override face culling. Defaults to "back" for triangle-list, "none"/"disabled" for everything else. */
+	cullMode?: CullMode;
+	material?: Material;
+	position?: number[] | Vec3;
+	rotation?: number[] | Vec3;
+	rotationDegrees?: number[] | Vec3;
+	scale?: number | number[];
+	addToScene?: boolean;
+}
+
 export class Mesh extends Node3D {
 	public ctx: Context;
 	public geometry: Geometry;
 	public material: Material;
+
+	public static readonly FORMAT_SIZES: Record<string, number> = {
+		position: 3,
+		normal: 3,
+		uv: 2,
+		color: 3,
+		tangent: 4,
+	};
+
+	/**
+	 * Build a mesh from raw vertex data.
+	 * Inspired by OpenGL's immediate mode but using modern buffer-based approach.
+	 */
+	public static build(ctx: Context, config: BuildMeshOptions): Mesh {
+		const {
+			vertexFormat,
+			vertexBuffer,
+			indices,
+			topology = "triangle-list",
+			cullMode,
+			material,
+			addToScene = true,
+			...transformOptions
+		} = config;
+
+		// Calculate stride from format
+		let stride = 0;
+
+		for (const attr of vertexFormat) {
+			const size = Mesh.FORMAT_SIZES[attr];
+			if (!size) {
+				throw new Error(
+					`buildMesh: Unknown vertex attribute "${attr}". Valid: ${Object.keys(Mesh.FORMAT_SIZES).join(", ")}`,
+				);
+			}
+			stride += size;
+		}
+
+		const vertexCount = Math.floor(vertexBuffer.length / stride);
+		if (vertexCount * stride !== vertexBuffer.length) {
+			throw new Error(
+				`buildMesh: vertexBuffer length (${vertexBuffer.length}) is not evenly divisible by stride (${stride}). Check your vertexFormat.`,
+			);
+		}
+
+		// Our standard pipeline expects: position(3) + normal(3) + uv(2) + color(3) = 11 floats per vertex.
+		// We need to remap whatever the user gave us into that format.
+		const pipelineStride = 11; // pos(3) + normal(3) + uv(2) + color(3)
+		const remappedVertices = new Float32Array(vertexCount * pipelineStride);
+		let hasColors = false;
+
+		for (let v = 0; v < vertexCount; v++) {
+			const srcOffset = v * stride;
+			const dstOffset = v * pipelineStride;
+
+			let cursor = 0;
+			let pos = [0, 0, 0];
+			let norm = [0, 0, 1]; // Default normal: facing camera
+			let uv = [0, 0];
+			let col = [1.0, 1.0, 1.0]; // Default color: white
+
+			for (const attr of vertexFormat) {
+				const attrSize = Mesh.FORMAT_SIZES[attr];
+				if (attr === "position") {
+					pos = [
+						vertexBuffer[srcOffset + cursor],
+						vertexBuffer[srcOffset + cursor + 1],
+						vertexBuffer[srcOffset + cursor + 2],
+					];
+				} else if (attr === "normal") {
+					norm = [
+						vertexBuffer[srcOffset + cursor],
+						vertexBuffer[srcOffset + cursor + 1],
+						vertexBuffer[srcOffset + cursor + 2],
+					];
+				} else if (attr === "uv") {
+					uv = [
+						vertexBuffer[srcOffset + cursor],
+						vertexBuffer[srcOffset + cursor + 1],
+					];
+				} else if (attr === "color") {
+					hasColors = true;
+					col = [
+						vertexBuffer[srcOffset + cursor],
+						vertexBuffer[srcOffset + cursor + 1],
+						vertexBuffer[srcOffset + cursor + 2],
+					];
+				}
+				cursor += attrSize;
+			}
+
+			// Write in pipeline order: position, normal, uv, color
+			remappedVertices[dstOffset + 0] = pos[0];
+			remappedVertices[dstOffset + 1] = pos[1];
+			remappedVertices[dstOffset + 2] = pos[2];
+			remappedVertices[dstOffset + 3] = norm[0];
+			remappedVertices[dstOffset + 4] = norm[1];
+			remappedVertices[dstOffset + 5] = norm[2];
+			remappedVertices[dstOffset + 6] = uv[0];
+			remappedVertices[dstOffset + 7] = uv[1];
+			remappedVertices[dstOffset + 8] = col[0];
+			remappedVertices[dstOffset + 9] = col[1];
+			remappedVertices[dstOffset + 10] = col[2];
+		}
+
+		// Generate indices if not provided
+		let indexArray: Uint16Array | Uint32Array;
+		if (indices) {
+			indexArray =
+				vertexCount > 65535
+					? new Uint32Array(indices)
+					: new Uint16Array(indices);
+		} else {
+			const autoIndices = Array.from({ length: vertexCount }, (_, i) => i);
+			indexArray =
+				vertexCount > 65535
+					? new Uint32Array(autoIndices)
+					: new Uint16Array(autoIndices);
+		}
+
+		// Create Geometry
+		const geometry = new Geometry(ctx, remappedVertices, indexArray, {
+			hasNormals: true,
+			hasUVs: true,
+			hasColors: hasColors,
+			topology,
+			cullMode,
+		});
+
+		// Resolve material
+		const finalMaterial =
+			material instanceof Material ? material : new StandardMaterial();
+
+		// Create Mesh
+		const mesh = new Mesh(ctx, { geometry, material: finalMaterial });
+		Mesh.applyTransformOptions(mesh, transformOptions);
+
+		return mesh;
+	}
 
 	constructor(ctx: Context, options: MeshOptions) {
 		super();
@@ -74,22 +229,36 @@ export class Mesh extends Node3D {
 	public static applyTransformOptions(
 		mesh: Mesh,
 		options: {
-			position?: number[];
+			position?: number[] | Vec3;
 			scale?: number | number[];
-			rotation?: number[];
-			rotationDegrees?: number[];
+			rotation?: number[] | Vec3;
+			rotationDegrees?: number[] | Vec3;
 		},
 	) {
-		if (options.position) mesh.position.copy(Vec3.from(options.position));
-		if (options.scale !== undefined) {
-			if (typeof options.scale === "number")
-				mesh.scale.set(options.scale, options.scale, options.scale);
-			else mesh.scale.copy(Vec3.from(options.scale as number[]));
+		if (options.position) {
+			if (options.position instanceof Vec3) {
+				mesh.position.copy(options.position);
+			} else {
+				mesh.position.copy(Vec3.from(options.position));
+			}
 		}
-		if (options.rotation)
-			mesh.rotation.copy(Vec3.from(options.rotation as number[]));
-		if (options.rotationDegrees)
-			mesh.rotationDegrees = options.rotationDegrees as Vec3 | number[];
+		if (options.scale !== undefined) {
+			if (typeof options.scale === "number") {
+				mesh.scale.set(options.scale, options.scale, options.scale);
+			} else {
+				mesh.scale.copy(Vec3.from(options.scale as number[]));
+			}
+		}
+		if (options.rotation) {
+			if (options.rotation instanceof Vec3) {
+				mesh.rotation.copy(options.rotation);
+			} else {
+				mesh.rotation.copy(Vec3.from(options.rotation));
+			}
+		}
+		if (options.rotationDegrees) {
+			mesh.rotationDegrees = options.rotationDegrees;
+		}
 	}
 
 	// --- Static Factory Methods ---

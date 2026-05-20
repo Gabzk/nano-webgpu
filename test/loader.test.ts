@@ -164,6 +164,9 @@ f 1/1/1 2/2/1 3/3/1
 				ok: true,
 				text: vi.fn().mockResolvedValue(basicObj),
 			});
+
+
+
 			window.fetch = mockFetch;
 
 			const result = await loader.loadModel("triangle.obj");

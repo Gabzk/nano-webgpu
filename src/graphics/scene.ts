@@ -1,12 +1,11 @@
 import { Context } from "../core/context";
 import { Node } from "../core/node";
 import type { Node3D } from "../core/node3d";
-import { DebugPanel } from "../debug/debug-panel";
+import type { DebugPanel } from "../debug/debug-panel";
 import { PerformanceTracker } from "../debug/performance-tracker";
 import { Color } from "../math/color";
 import { Vec3 } from "../math/vec3";
 import { Camera, type CameraOptions } from "./camera";
-import { Geometry } from "./geometry";
 import {
 	DirectionalLight,
 	Light,
@@ -43,6 +42,33 @@ export interface SceneGeometryOptions extends StandardMaterialOptions {
 	rotationDegrees?: number[];
 	scale?: number | number[];
 	addToScene?: boolean;
+}
+
+/**
+ * Information about the current render frame.
+ * Retrieve via scene.getRenderInfo() inside the render loop.
+ */
+export interface RenderInfo {
+	/** Delta time in seconds since the last frame. */
+	dt: number;
+	/** Frames per second, calculated from delta time. */
+	fps: number;
+	/** Total frame time in milliseconds. */
+	frameTimeMs: number;
+	/** Total number of meshes currently in the scene. */
+	meshCount: number;
+	/** Total number of visible meshes drawn this frame. */
+	visibleMeshCount: number;
+	/** Total number of lights currently in the scene. */
+	lightCount: number;
+	/** Total number of nodes in the scene graph. */
+	nodeCount: number;
+	/** Total number of draw calls in this frame. */
+	drawCalls: number;
+	/** Total number of triangles drawn in this frame. */
+	trianglesDrawn: number;
+	/** Total number of vertices drawn in this frame. */
+	verticesDrawn: number;
 }
 
 export class Scene extends Node {
@@ -99,6 +125,27 @@ export class Scene extends Node {
 		return this._defaultDir;
 	}
 
+	private _renderInfo: RenderInfo = {
+		dt: 0,
+		fps: 0,
+		frameTimeMs: 0,
+		meshCount: 0,
+		visibleMeshCount: 0,
+		lightCount: 0,
+		nodeCount: 0,
+		drawCalls: 0,
+		trianglesDrawn: 0,
+		verticesDrawn: 0,
+	};
+
+	/**
+	 * Returns live render frame information (delta time, FPS, mesh/light counts).
+	 * Call this inside the render loop callback to access per-frame data.
+	 */
+	public getRenderInfo(): Readonly<RenderInfo> {
+		return { ...this._renderInfo };
+	}
+
 	public set defaultDir(dir: string) {
 		this._defaultDir = dir;
 		if (this._defaultDir && !this._defaultDir.endsWith("/")) {
@@ -107,13 +154,14 @@ export class Scene extends Node {
 	}
 
 	// --- Debug / Profiling ---
-	private perfTracker: PerformanceTracker | null = null;
+	public readonly perfTracker: PerformanceTracker;
 	private debugPanel: DebugPanel | null = null;
 
 	constructor(ctx: Context) {
 		super();
 		this.ctx = ctx;
 		this.renderer = new Renderer(ctx);
+		this.perfTracker = new PerformanceTracker();
 	}
 
 	public static async init(
@@ -332,17 +380,6 @@ export class Scene extends Node {
 	}
 
 	/**
-	 * Vertex format attribute sizes (in number of floats).
-	 */
-	private static readonly FORMAT_SIZES: Record<string, number> = {
-		position: 3,
-		normal: 3,
-		uv: 2,
-		color: 3,
-		tangent: 4,
-	};
-
-	/**
 	 * Build a mesh from raw vertex data and add it to the scene.
 	 * Inspired by OpenGL's immediate mode but using modern buffer-based approach.
 	 *
@@ -360,128 +397,11 @@ export class Scene extends Node {
 	 * });
 	 * ```
 	 */
-	public buildMesh(config: {
-		vertexFormat: string[];
-		vertexBuffer: number[];
-		indices?: number[];
-		topology?: string;
-		material?: Material;
-		position?: number[];
-		rotation?: number[];
-		// biome-ignore lint/suspicious/noExplicitAny: disable rule for now
-		rotationDegrees?: number[] | any;
-		scale?: number | number[];
-		addToScene?: boolean;
-	}): Mesh {
-		const {
-			vertexFormat,
-			vertexBuffer,
-			indices,
-			topology = "triangles",
-			material,
-			addToScene = true,
-			...transformOptions
-		} = config;
-
-		// Calculate stride from format
-		let stride = 0;
-
-		for (const attr of vertexFormat) {
-			const size = Scene.FORMAT_SIZES[attr];
-			if (!size) {
-				throw new Error(
-					`buildMesh: Unknown vertex attribute "${attr}". Valid: ${Object.keys(Scene.FORMAT_SIZES).join(", ")}`,
-				);
-			}
-			stride += size;
+	public buildMesh(config: Parameters<typeof Mesh.build>[1]): Mesh {
+		const mesh = Mesh.build(this.ctx, config);
+		if (config.addToScene !== false) {
+			this.add(mesh);
 		}
-
-		const vertexCount = Math.floor(vertexBuffer.length / stride);
-		if (vertexCount * stride !== vertexBuffer.length) {
-			throw new Error(
-				`buildMesh: vertexBuffer length (${vertexBuffer.length}) is not evenly divisible by stride (${stride}). Check your vertexFormat.`,
-			);
-		}
-
-		// Our standard pipeline expects: position(3) + normal(3) + uv(2) = 8 floats per vertex.
-		// We need to remap whatever the user gave us into that format.
-		const pipelineStride = 8; // pos(3) + normal(3) + uv(2)
-		const remappedVertices = new Float32Array(vertexCount * pipelineStride);
-
-		for (let v = 0; v < vertexCount; v++) {
-			const srcOffset = v * stride;
-			const dstOffset = v * pipelineStride;
-
-			let cursor = 0;
-			let pos = [0, 0, 0];
-			let norm = [0, 0, 1]; // Default normal: facing camera
-			let uv = [0, 0];
-
-			for (const attr of vertexFormat) {
-				const attrSize = Scene.FORMAT_SIZES[attr];
-				if (attr === "position") {
-					pos = [
-						vertexBuffer[srcOffset + cursor],
-						vertexBuffer[srcOffset + cursor + 1],
-						vertexBuffer[srcOffset + cursor + 2],
-					];
-				} else if (attr === "normal") {
-					norm = [
-						vertexBuffer[srcOffset + cursor],
-						vertexBuffer[srcOffset + cursor + 1],
-						vertexBuffer[srcOffset + cursor + 2],
-					];
-				} else if (attr === "uv") {
-					uv = [
-						vertexBuffer[srcOffset + cursor],
-						vertexBuffer[srcOffset + cursor + 1],
-					];
-				}
-				// color, tangent, etc are read but not mapped to standard pipeline (user can use ShaderMaterial for those)
-				cursor += attrSize;
-			}
-
-			// Write in pipeline order: position, normal, uv
-			remappedVertices[dstOffset + 0] = pos[0];
-			remappedVertices[dstOffset + 1] = pos[1];
-			remappedVertices[dstOffset + 2] = pos[2];
-			remappedVertices[dstOffset + 3] = norm[0];
-			remappedVertices[dstOffset + 4] = norm[1];
-			remappedVertices[dstOffset + 5] = norm[2];
-			remappedVertices[dstOffset + 6] = uv[0];
-			remappedVertices[dstOffset + 7] = uv[1];
-		}
-
-		// Generate indices if not provided
-		let indexArray: Uint16Array | Uint32Array;
-		if (indices) {
-			indexArray =
-				vertexCount > 65535
-					? new Uint32Array(indices)
-					: new Uint16Array(indices);
-		} else {
-			const autoIndices = Array.from({ length: vertexCount }, (_, i) => i);
-			indexArray =
-				vertexCount > 65535
-					? new Uint32Array(autoIndices)
-					: new Uint16Array(autoIndices);
-		}
-
-		// Create Geometry
-		const geometry = new Geometry(this.ctx, remappedVertices, indexArray, {
-			hasNormals: true,
-			hasUVs: true,
-		});
-
-		// Resolve material
-		const finalMaterial =
-			material instanceof Material ? material : new StandardMaterial();
-
-		// Create Mesh
-		const mesh = new Mesh(this.ctx, { geometry, material: finalMaterial });
-		Mesh.applyTransformOptions(mesh, transformOptions);
-		if (addToScene) this.add(mesh);
-
 		return mesh;
 	}
 
@@ -523,22 +443,34 @@ export class Scene extends Node {
 		return result;
 	}
 
-	public render(loopCallback?: (dt: number) => void): void {
-		if (loopCallback) {
-			this.ctx.run((dt) => {
-				loopCallback(dt);
-				this._renderFrame(dt);
-			});
-		} else {
-			this._renderFrame(0);
-		}
+	/**
+	 * Starts the render loop.
+	 * @param loopCallback - Optional callback called every frame. Use scene.getRenderInfo() inside it to access dt and fps.
+	 */
+	public render(loopCallback?: () => void): void {
+		this.ctx.run((dt) => {
+			this._renderFrame(dt);
+			this._renderInfo = {
+				dt,
+				fps: this.perfTracker.fps,
+				frameTimeMs: this.perfTracker.frameTimeMs,
+				meshCount: this._meshes.length,
+				visibleMeshCount: this.perfTracker.visibleMeshes,
+				lightCount: this._lights.length,
+				nodeCount: this.countNodes(),
+				drawCalls: this.perfTracker.drawCalls,
+				trianglesDrawn: this.perfTracker.trianglesDrawn,
+				verticesDrawn: this.perfTracker.verticesDrawn,
+			};
+			loopCallback?.();
+		});
 	}
 
 	// biome-ignore lint/suspicious/noExplicitAny: disable rule for now
-	public enableDebug(options: any = {}): DebugPanel {
+	public async enableDebug(options: any = {}): Promise<DebugPanel> {
 		if (this.debugPanel) return this.debugPanel;
 
-		this.perfTracker = new PerformanceTracker();
+		const { DebugPanel } = await import("../debug/debug-panel");
 
 		const canvas = this.ctx.context.canvas as HTMLCanvasElement;
 		this.debugPanel = new DebugPanel(
@@ -572,7 +504,7 @@ export class Scene extends Node {
 	private _renderFrame(dt: number): void {
 		if (!this.camera) return;
 
-		if (this.perfTracker) this.perfTracker.beginFrame();
+		this.perfTracker.beginFrame();
 
 		if (!this.camera.uniformBuffer) this.camera.initWebGPU(this.ctx);
 
@@ -585,11 +517,11 @@ export class Scene extends Node {
 		this.renderer.updateLightsBuffer(this.lights);
 		this.renderer.render(this, this.camera, this.perfTracker);
 
-		if (this.perfTracker) {
-			this.perfTracker.totalMeshes = this.meshes.length;
-			this.perfTracker.lightCount = this.lights.length;
-			this.perfTracker.endFrame();
-		}
+		this.perfTracker.totalMeshes = this.meshes.length;
+		this.perfTracker.lightCount = this.lights.length;
+		this.perfTracker.nodeCount = this.countNodes();
+		this.perfTracker.endFrame();
+
 		if (this.debugPanel) this.debugPanel.update();
 	}
 }

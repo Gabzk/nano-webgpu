@@ -12,6 +12,7 @@ fn vs_main(@builtin(instance_index) instanceIdx: u32, in: VertexInput) -> Vertex
     // Normalize AFTER model transform — required when model has non-uniform scale.
     out.normal = normalize((modelMatrix * vec4<f32>(in.normal, 0.0)).xyz);
     out.uv = in.uv;
+    out.color = in.color;
 
     out.clip_position = camera.viewProj * world_pos;
 

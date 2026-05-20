@@ -26,7 +26,7 @@ fn schlick5(u: f32) -> f32 {
 }
 
 @fragment
-fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
+fn fs_main(in: VertexOutput, @builtin(front_facing) isFrontFace: bool) -> @location(0) vec4<f32> {
     // Derivatives must be outside branches for WGSL uniform control flow.
     let dp1  = dpdx(in.frag_pos);
     let dp2  = dpdy(in.frag_pos);
@@ -34,7 +34,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let duv2 = dpdy(in.uv);
 
     let texColor  = textureSample(albedoTex, mySampler, in.uv);
-    let baseColor = texColor.rgb * material.color.rgb;
+    let baseColor = texColor.rgb * material.color.rgb * in.color;
     let alpha     = texColor.a * material.color.a;
 
     var N = normalize(in.normal);
@@ -42,6 +42,9 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
         let nSample = textureSample(normalTex, mySampler, in.uv).rgb;
         N = getPerturbedNormal(N, in.frag_pos, in.uv, nSample, material.normalScale,
                                dp1, dp2, duv1, duv2);
+    }
+    if (material.cullMode > 0.5 && !isFrontFace) {
+        N = -N;
     }
 
     var roughness = material.roughness;

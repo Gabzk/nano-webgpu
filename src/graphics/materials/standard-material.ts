@@ -1,5 +1,11 @@
 import type { Context } from "../../core/context";
 import { Color } from "../../math/color";
+import type { CullMode } from "../cull-mode";
+import {
+	isCullDisabled,
+	normalizeCullMode,
+	resolveCullMode,
+} from "../cull-mode";
 import { Texture } from "../texture";
 import { Material } from "./material";
 
@@ -20,6 +26,11 @@ export interface StandardMaterialOptions {
 	aoIntensity?: number;
 
 	ormTexture?: Texture | string;
+
+	/** When true, renders and lights both sides of the surface. */
+	doubleSided?: boolean;
+	/** Cull mode (Godot-style): "back", "front", or "disabled". */
+	cullMode?: CullMode;
 }
 
 export class StandardMaterial extends Material {
@@ -83,6 +94,26 @@ export class StandardMaterial extends Material {
 		this.isDirty = true;
 	}
 
+	public override get cullMode(): CullMode | undefined {
+		return this._cullMode;
+	}
+	public override set cullMode(value: CullMode | undefined) {
+		this._cullMode = value;
+		this.isDirty = true;
+	}
+
+	get doubleSided(): boolean {
+		return isCullDisabled(this._cullMode);
+	}
+	set doubleSided(val: boolean) {
+		if (val) {
+			this.cullMode = "disabled";
+		} else if (isCullDisabled(this._cullMode)) {
+			this.cullMode = undefined;
+		}
+		this.isDirty = true;
+	}
+
 	private pendingTextures: { [key: string]: string } = {};
 
 	private uniformBuffer!: GPUBuffer;
@@ -92,6 +123,7 @@ export class StandardMaterial extends Material {
 
 	/** Tracks which PCF variant the current bindGroup was built for. */
 	private _bindGroupPCFVariant: boolean | null = null;
+	private _lightingCullMode: GPUCullMode | undefined = undefined;
 
 	constructor(options: StandardMaterialOptions = {}) {
 		super();
@@ -144,6 +176,11 @@ export class StandardMaterial extends Material {
 		this._metallic = options.metallic ?? 0.0;
 		this._normalScale = options.normalScale ?? 1.0;
 		this._aoIntensity = options.aoIntensity ?? 1.0;
+		if (options.cullMode !== undefined) {
+			this.cullMode = options.cullMode;
+		} else if (options.doubleSided) {
+			this.cullMode = "disabled";
+		}
 
 		// 16 floats (64 bytes)
 		this.bufferData = new Float32Array(16);
@@ -165,8 +202,13 @@ export class StandardMaterial extends Material {
 		this.bufferData[10] = this.metallicTexture ? 1.0 : 0.0;
 		this.bufferData[11] = this.aoTexture ? 1.0 : 0.0;
 
+		const lightingCull =
+			this._lightingCullMode ?? normalizeCullMode(this._cullMode);
+		const cullModeFlag =
+			lightingCull === "front" ? 1.0 : lightingCull === "none" ? 2.0 : 0.0;
+
 		this.bufferData[12] = this.ormTexture ? 1.0 : 0.0;
-		this.bufferData[13] = 0.0;
+		this.bufferData[13] = cullModeFlag;
 		this.bufferData[14] = 0.0;
 		this.bufferData[15] = 0.0;
 	}
@@ -191,8 +233,23 @@ export class StandardMaterial extends Material {
 		}
 	}
 
-	public getPipeline(ctx: Context): GPURenderPipeline {
-		return ctx.pipelineManager.getStandardPipeline(this._usePCF);
+	public getPipeline(
+		ctx: Context,
+		topology: GPUPrimitiveTopology = "triangle-list",
+		indexFormat: GPUIndexFormat = "uint16",
+		cullMode?: GPUCullMode,
+	): GPURenderPipeline {
+		const resolvedCullMode = resolveCullMode(cullMode, topology);
+		if (this._lightingCullMode !== resolvedCullMode) {
+			this._lightingCullMode = resolvedCullMode;
+			this.isDirty = true;
+		}
+		return ctx.pipelineManager.getStandardPipeline(
+			this._usePCF,
+			topology,
+			indexFormat,
+			cullMode,
+		);
 	}
 
 	public getBindGroup(ctx: Context): GPUBindGroup {

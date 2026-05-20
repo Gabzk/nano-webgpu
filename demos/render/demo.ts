@@ -1,6 +1,6 @@
 import { Input, InputManager, Scene } from "nano-webgpu";
 
-const scene = await Scene.init("#canvasGetter");
+const scene = await Scene.init("#canvas");
 const canvasGetter = scene.canvas;
 const canvasMethod = scene.getCanvas();
 
@@ -44,7 +44,7 @@ scene.enableDebug({
 	position: "top-right",
 });
 
-scene.render((_dt) => {
+scene.render(() => {
 	if (canvasGetter.width !== innerWidth || canvasGetter.height !== innerHeight) {
 		canvasGetter.width = innerWidth;
 		canvasGetter.height = innerHeight;

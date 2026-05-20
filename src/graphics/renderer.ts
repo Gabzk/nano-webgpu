@@ -2,6 +2,7 @@ import type { Context } from "../core/context";
 import type { PerformanceTracker } from "../debug/performance-tracker";
 import { BatchManager } from "./batch-manager";
 import type { Camera } from "./camera";
+import { normalizeCullMode } from "./cull-mode";
 import type { Light } from "./light";
 import type { Scene } from "./scene";
 import { ShadowSystem } from "./shadow-system";
@@ -276,7 +277,17 @@ export class Renderer {
 			const batch = this.batcher.getBatch(batchKey);
 			if (!batch) continue;
 
-			const pipeline = representative.material.getPipeline(this.ctx);
+			const topology = representative.geometry.topology;
+			const indexFormat = representative.geometry.indexFormat;
+			const materialCull = normalizeCullMode(representative.material.cullMode);
+			const geometryCull = normalizeCullMode(representative.geometry.cullMode);
+			const cullMode = materialCull ?? geometryCull;
+			const pipeline = representative.material.getPipeline(
+				this.ctx,
+				topology,
+				indexFormat,
+				cullMode,
+			);
 			if (pipeline !== lastPipeline) {
 				passEncoder.setPipeline(pipeline);
 				lastPipeline = pipeline;

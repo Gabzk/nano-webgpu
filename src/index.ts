@@ -17,6 +17,7 @@ export {
 	type OrbitOptions,
 	type ThirdPersonOptions,
 } from "./graphics/camera-controller";
+export type { CullMode } from "./graphics/cull-mode";
 export { Geometry } from "./graphics/geometry";
 export {
 	DirectionalLight,
@@ -45,6 +46,7 @@ export { Mesh, type MeshOptions } from "./graphics/mesh";
 export { PipelineManager } from "./graphics/pipeline";
 export { Renderer } from "./graphics/renderer";
 export {
+	type RenderInfo,
 	Scene,
 	type SceneGeometryOptions,
 	type SceneLightOptions,

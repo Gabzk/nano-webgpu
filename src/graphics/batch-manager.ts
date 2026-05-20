@@ -43,7 +43,7 @@ export class BatchManager {
 		}
 		for (const mesh of meshes) {
 			if (!mesh.visible) continue;
-			const key = `${mesh.geometry.id}_${mesh.material.id}`;
+			const key = `${mesh.geometry.id}_${mesh.material.id}_${mesh.geometry.topology}`;
 			let group = this.batchGroups.get(key);
 			if (!group) {
 				group = [];

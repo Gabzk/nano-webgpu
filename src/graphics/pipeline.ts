@@ -137,8 +137,9 @@ export class PipelineManager {
 					{ shaderLocation: 0, offset: 0, format: "float32x3" }, // Position
 					{ shaderLocation: 1, offset: 12, format: "float32x3" }, // Normal
 					{ shaderLocation: 2, offset: 24, format: "float32x2" }, // UV
+					{ shaderLocation: 3, offset: 32, format: "float32x3" }, // Color
 				],
-				arrayStride: 32,
+				arrayStride: 44,
 				stepMode: "vertex",
 			},
 		];
@@ -152,7 +153,20 @@ export class PipelineManager {
 		label: string,
 		layout: GPUPipelineLayout,
 		shaderModule: GPUShaderModule,
+		topology: GPUPrimitiveTopology = "triangle-list",
+		indexFormat: GPUIndexFormat = "uint16",
+		cullMode?: GPUCullMode,
 	): GPURenderPipelineDescriptor {
+		// Use explicit override if provided, otherwise fall back to topology-based defaults
+		const resolvedCullMode: GPUCullMode =
+			cullMode ?? (topology === "triangle-list" ? "back" : "none");
+
+		// Strip topologies require a stripIndexFormat matching the geometry's index buffer format.
+		const stripIndexFormat: GPUIndexFormat | undefined =
+			topology === "line-strip" || topology === "triangle-strip"
+				? indexFormat
+				: undefined;
+
 		return {
 			label,
 			layout,
@@ -182,7 +196,7 @@ export class PipelineManager {
 					},
 				],
 			},
-			primitive: { topology: "triangle-list", cullMode: "back" },
+			primitive: { topology, cullMode: resolvedCullMode, stripIndexFormat },
 			depthStencil: {
 				depthWriteEnabled: true,
 				depthCompare: "less",
@@ -213,9 +227,17 @@ export class PipelineManager {
 	 * Each unique variant is compiled once and cached — subsequent calls are O(1) map lookups.
 	 *
 	 * @param usePCF - true → 3×3 PCF soft shadows; false → single-sample hard shadows (~9× cheaper).
+	 * @param topology - WebGPU primitive topology (default: "triangle-list").
+	 * @param indexFormat - Index buffer format used (relevant for strip topologies).
 	 */
-	public getStandardPipeline(usePCF: boolean): GPURenderPipeline {
-		const variantKey = usePCF ? "pcf" : "hard";
+	public getStandardPipeline(
+		usePCF: boolean,
+		topology: GPUPrimitiveTopology = "triangle-list",
+		indexFormat: GPUIndexFormat = "uint16",
+		cullMode?: GPUCullMode,
+	): GPURenderPipeline {
+		const cullKey = cullMode ?? "default";
+		const variantKey = `${usePCF ? "pcf" : "hard"}:${topology}:${indexFormat}:${cullKey}`;
 		const cached = this.standardPipelines.get(variantKey);
 		if (cached) return cached;
 
@@ -230,6 +252,9 @@ export class PipelineManager {
 				`Standard Render Pipeline [${variantKey}]`,
 				this.getStandardPipelineLayout(),
 				shaderModule,
+				topology,
+				indexFormat,
+				cullMode,
 			),
 		);
 
@@ -257,11 +282,17 @@ export class PipelineManager {
 		return this.customPipelineLayout;
 	}
 
-	public getCustomPipeline(shaderCode: string): GPURenderPipeline {
-		// Simple hash via whole string
-		if (this.customPipelines.has(shaderCode)) {
+	public getCustomPipeline(
+		shaderCode: string,
+		topology: GPUPrimitiveTopology = "triangle-list",
+		indexFormat: GPUIndexFormat = "uint16",
+		cullMode?: GPUCullMode,
+	): GPURenderPipeline {
+		const cullKey = cullMode ?? "default";
+		const cacheKey = `${shaderCode}::${topology}::${indexFormat}::${cullKey}`;
+		if (this.customPipelines.has(cacheKey)) {
 			// biome-ignore lint/style/noNonNullAssertion: disable rule for now
-			return this.customPipelines.get(shaderCode)!;
+			return this.customPipelines.get(cacheKey)!;
 		}
 
 		const shaderModule = this.ctx.device.createShaderModule({
@@ -274,10 +305,13 @@ export class PipelineManager {
 				"Custom Render Pipeline",
 				this.getCustomPipelineLayout(),
 				shaderModule,
+				topology,
+				indexFormat,
+				cullMode,
 			),
 		);
 
-		this.customPipelines.set(shaderCode, pipeline);
+		this.customPipelines.set(cacheKey, pipeline);
 		return pipeline;
 	}
 
