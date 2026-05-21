@@ -4,18 +4,21 @@ import { getShadowChunk } from "./chunks/shadow.chunk";
 import { structsChunk } from "./chunks/structs.chunk";
 import { vertexChunk } from "./chunks/vertex.chunk";
 
+/**
+ * Options defining standard shading compilations.
+ */
 export interface DefaultShaderOptions {
-	/** When true, uses a 3×3 PCF kernel (9 samples) for soft shadow edges.
-	 *  When false, uses a single sample — ~9× cheaper on shadow-map bandwidth. */
+	/** If true, compiles PCF soft shadow sampling operations (using 9 tap comparisons). Otherwise uses 1 tap comparison. */
 	usePCF: boolean;
 }
 
 /**
- * Assembles the default PBR shader from composable chunks.
- * The result is a complete, valid WGSL string ready for createShaderModule().
+ * Programmatically constructs the default metallic-roughness PBR shader by stitching WGSL source chunks.
+ * Combines camera structures, instancing vertices, normal mapping routines, shadow calculation utilities,
+ * and standard physically-based lighting shaders.
  *
- * Each call with the same options produces an identical string, so the
- * PipelineManager can use it as a cache key with no extra bookkeeping.
+ * @param opts - Shadow kernel configurations.
+ * @returns The fully assembled WGSL shader source code.
  */
 export function buildDefaultShader(opts: DefaultShaderOptions): string {
 	return [

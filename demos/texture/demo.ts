@@ -4,12 +4,21 @@ const scene = await Scene.init("#canvas");
 const camera = scene.setCamera({ position: [0, 2, 7] });
 scene.backgroundColor = "#c6c6c6";
 
-const texture = "./brick.png";
-const normal = "./brick_normal.png";
-const ao = "./brick_ao.png";
+
+const texture = "./Brick_Wall_028_SD/Brick_Wall_028_basecolor.png";
+const normal = "./Brick_Wall_028_SD/Brick_Wall_028_normal.png";
+const ao = "./Brick_Wall_028_SD/Brick_Wall_028_ambientOcclusion.png";
+const roughness = "./Brick_Wall_028_SD/Brick_Wall_028_roughness.png";
+const height = "./Brick_Wall_028_SD/Brick_Wall_028_height.png";
 
 const cube = scene.addCube()
-cube.material = new StandardMaterial({ albedoTexture: texture, normalTexture: normal, aoTexture: ao })
+cube.material = new StandardMaterial({ 
+  albedoTexture: texture,
+  normalTexture: normal,
+  roughnessTexture: roughness,
+  aoTexture: ao,
+}
+)
 
 const ctrl = new CameraController(camera, "third-person", {
   target: cube,

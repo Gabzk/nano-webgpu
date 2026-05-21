@@ -1,5 +1,11 @@
 import { postProcessChunk } from "./chunks/post-process.chunk";
 
+/**
+ * WGSL source code driving fullscreen post processing pipeline passes.
+ * Uses a single oversized triangle covering NDC space to draw screen quad areas,
+ * samples intermediate frame buffer colors, runs optional FXAA filters, and applies
+ * linear-to-sRGB gamma adjustments (2.2 correction exponent).
+ */
 export const postProcessShader = /* wgsl */ `
     struct VertexOutput {
         @builtin(position) position: vec4<f32>,

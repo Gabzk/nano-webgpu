@@ -1,9 +1,8 @@
 /**
- * Chunk: fragment shader entry point — Godot-style PBR lighting.
+ * Chunk: fragment shader entry point — PBR lighting.
  *
- * Diffuse:  Disney Burley (same as Godot DIFFUSE_BURLEY).
+ * Diffuse:  Disney Burley PBR formulation.
  *           Rougher surfaces create a wider, flatter lobe — more natural than Lambert.
- *           Source: Godot scene_forward_lights_inc.glsl lines 238-244
  *
  *           Formula (artistic units, PI omitted so intensity=1 is visually normal):
  *             FD90 = 2 * LdotH² * roughness - 0.5
@@ -11,10 +10,10 @@
  *             FdL  = 1 + FD90 * (1-NdotL)^5
  *             diffuse = albedo * FdV * FdL * NdotL * (1 - metallic)
  *
- * Specular: GGX + Smith V (Hammon) + Schlick Fresnel — same as Godot SPECULAR_SCHLICK_GGX.
+ * Specular: GGX + Smith V (Hammon) + Schlick Fresnel approximation.
  *
  * Ambient:  Hemisphere sky/ground gradient, so surfaces NEVER go fully black even
- *           when the direct light faces away. Mimics Godot's ambient sky contribution.
+ *           when the direct light faces away. Provides a robust fill light.
  */
 export const lightingChunk = /* wgsl */ `
 
@@ -78,7 +77,7 @@ fn fs_main(in: VertexOutput, @builtin(front_facing) isFrontFace: bool) -> @locat
     // ------------------------------------------------------------------
     // Ambient light — hemisphere sky/ground gradient.
     // Ensures surfaces facing AWAY from the sun are never pitch-black.
-    // This is Godot's ambient sky contribution without a real sky texture.
+    // Provides a robust fill contribution when no environment map is bound.
     //
     //   upFactor=1  (N points up)   → receives full sky color
     //   upFactor=0  (N points down) → receives only dim ground bounce
@@ -89,7 +88,7 @@ fn fs_main(in: VertexOutput, @builtin(front_facing) isFrontFace: bool) -> @locat
     let ambient     = mix(groundColor, skyColor, upFactor) * baseColor * ao;
     finalColor     += ambient;
 
-    // f0: dialectric = 0.04, metallic = albedo (Godot F0 formula)
+    // f0: dialectric = 0.04, metallic = albedo
     let f0 = mix(vec3<f32>(0.04), baseColor, metallic);
 
     // ------------------------------------------------------------------
@@ -131,8 +130,7 @@ fn fs_main(in: VertexOutput, @builtin(front_facing) isFrontFace: bool) -> @locat
         let LdotH = max(dot(L, H), 0.0);
         let NdotH = max(dot(N, H), 0.0);
 
-        // ---- Disney Burley diffuse (Godot DIFFUSE_BURLEY) ---------------
-        // Source: Godot scene_forward_lights_inc.glsl lines 238-244
+        // ---- Disney Burley diffuse --------------------------------------
         // Rougher surfaces scatter light more uniformly → flatter lobe.
         // Back-lit faces still receive some diffuse via FD90 softening.
         // PI normalization is omitted → artistic light units where intensity=1
@@ -143,7 +141,7 @@ fn fs_main(in: VertexOutput, @builtin(front_facing) isFrontFace: bool) -> @locat
         let burley      = FdV * FdL * NdotL;
         let diffuse     = baseColor * burley * (1.0 - metallic);
 
-        // ---- GGX specular (Godot SPECULAR_SCHLICK_GGX) ------------------
+        // ---- GGX specular -----------------------------------------------
         // D: Trowbridge-Reitz (GGX) — Hammon formulation
         let a     = roughness * roughness;
         let a2    = a * a;

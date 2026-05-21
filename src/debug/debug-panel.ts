@@ -1,57 +1,78 @@
-/**
- * @module DebugPanel
- 
- * HTML overlay debug panel inspired by Godot's Debugger panel.
- * Displays real-time performance metrics, VRAM allocations, and scene stats
- * in a semi-transparent dark panel with tabs.
- *
- * Activated via scene.enableDebug() and toggled with F3.
- */
-
 import { PerformanceTracker } from "./performance-tracker";
 import { VRAMTracker } from "./vram-tracker";
 
+/**
+ * Options defining style and visibility behaviors for DebugPanel.
+ */
 export interface DebugPanelOptions {
-	/** Panel position: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' */
+	/** Screen position quadrant anchor. Defaults to `"top-left"`. */
 	position?: "top-left" | "top-right" | "bottom-left" | "bottom-right";
-	/** Default active tab */
+	/** Default active panel tab to display on init. Defaults to `"monitors"`. */
 	defaultTab?: "monitors" | "vram" | "scene";
-	/** Keyboard hotkey to toggle visibility */
+	/** Keyboard hotkey character string toggling panel visibility. Defaults to `"F3"`. */
 	hotkey?: string;
-	/** Panel opacity (0–1) */
+	/** Panel translucent opacity value (0 to 1). Defaults to `0.9`. */
 	opacity?: number;
 }
 
+/**
+ * Tab identification type.
+ */
 type TabName = "monitors" | "vram" | "scene";
 
+/**
+ * DebugPanel coordinates an HTML/CSS screen overlay debug dashboard.
+ * Generates tabbed views, captures rendering performance metrics, outlines active VRAM allocation sizes,
+ * registers key listeners (`F3` by default) to toggle overlay visibility, and draws historical FPS bars on a Canvas element.
+ */
 export class DebugPanel {
+	/** @internal Root container element appended to the canvas DOM parent. */
 	private container!: HTMLDivElement;
+	/** @internal Historical FPS chart canvas container. */
 	private fpsCanvas!: HTMLCanvasElement;
+	/** @internal 2D context drawing graph bars. */
 	private fpsCtx!: CanvasRenderingContext2D;
+	/** @internal Content div updated dynamically with active tab layouts. */
 	private tabContentEl!: HTMLDivElement;
+	/** @internal Active tab name. */
 	private activeTab: TabName = "monitors";
+	/** Visibility status flag. */
 	private visible: boolean = true;
+	/** Key binding toggling overlay visibility. */
 	private hotkey: string;
+	/** Reference to the performance tracker metrics source. */
 	private perf: PerformanceTracker;
+	/** Translucent panel opacity. */
 	private opacity: number;
 
-	// Tab button elements for styling
+	/** @internal Active tab buttons collections. */
 	private tabButtons: Map<TabName, HTMLButtonElement> = new Map();
 
-	// Throttle: avoid DOM thrashing at high FPS
+	/** @internal Timestamp of the last DOM repaint update. */
 	private lastUpdateTime: number = 0;
-	private readonly updateIntervalMs: number = 100; // Monitors refresh rate
-	private readonly slowUpdateIntervalMs: number = 500; // VRAM/Scene refresh rate
+	/** Refresh interval in milliseconds for fast metrics updates (FPS). Defaults to `100` ms. */
+	private readonly updateIntervalMs: number = 100;
+	/** Refresh interval in milliseconds for slow metrics updates (VRAM/Scene structures). Defaults to `500` ms. */
+	private readonly slowUpdateIntervalMs: number = 500;
 
-	// Scene stats callback
+	/** @internal Callback provider yielding active scene counts. */
 	private getSceneStats?: () => {
 		totalMeshes: number;
 		totalNodes: number;
 		lightCount: number;
 	};
 
+	/** Reference to the VRAM allocation tracking source. */
 	private vram: VRAMTracker;
 
+	/**
+	 * Instantiates a new DebugPanel, assembling HTML overlay DOM elements.
+	 *
+	 * @param canvas - Swapchain target canvas reference used to determine parent mount hierarchies.
+	 * @param perf - Active PerformanceTracker.
+	 * @param vramTracker - Active VRAMTracker.
+	 * @param options - UI styling options.
+	 */
 	constructor(
 		canvas: HTMLCanvasElement,
 		perf: PerformanceTracker,
@@ -69,7 +90,9 @@ export class DebugPanel {
 	}
 
 	/**
-	 * Provide a callback to retrieve live scene stats.
+	 * Configures callback providers querying active scene counts.
+	 *
+	 * @param fn - Query callback function.
 	 */
 	public setSceneStatsProvider(
 		fn: () => { totalMeshes: number; totalNodes: number; lightCount: number },
@@ -78,7 +101,8 @@ export class DebugPanel {
 	}
 
 	/**
-	 * Called each frame from Scene._renderFrame() to refresh the panel.
+	 * Triggers overlay repaints. Refresh rates are throttled based on active tab requirements
+	 * to prevent DOM thrashes and performance bottlenecks.
 	 */
 	public update(): void {
 		if (!this.visible) return;
@@ -105,21 +129,33 @@ export class DebugPanel {
 		}
 	}
 
+	/**
+	 * Toggles visibility states.
+	 */
 	public toggle(): void {
 		this.visible = !this.visible;
 		this.container.style.display = this.visible ? "block" : "none";
 	}
 
+	/**
+	 * Forces the panel to display.
+	 */
 	public show(): void {
 		this.visible = true;
 		this.container.style.display = "block";
 	}
 
+	/**
+	 * Forces the panel to hide.
+	 */
 	public hide(): void {
 		this.visible = false;
 		this.container.style.display = "none";
 	}
 
+	/**
+	 * Tears down active key listeners and deletes container elements from the document tree.
+	 */
 	public destroy(): void {
 		this.container.remove();
 		document.removeEventListener("keydown", this.onKeyDown);
@@ -127,6 +163,9 @@ export class DebugPanel {
 
 	// ─── DOM Construction ─────────────────────────────────────────
 
+	/**
+	 * @internal Programmatically builds the overlay tree.
+	 */
 	private createDOM(canvas: HTMLCanvasElement, position: string): void {
 		// Ensure parent is positioned
 		const parent = canvas.parentElement || document.body;
@@ -209,13 +248,16 @@ export class DebugPanel {
 			border-radius: 4px;
 			background: rgba(0,0,0,0.3);
 		`;
-		// biome-ignore lint/style/noNonNullAssertion: disable rule for now
+		// biome-ignore lint/style/noNonNullAssertion: canvas dimensions resolved synchronously
 		this.fpsCtx = this.fpsCanvas.getContext("2d")!;
 
 		this.container.appendChild(innerWrapper);
 		parent.appendChild(this.container);
 	}
 
+	/**
+	 * @internal Builds inline CSS strings matching specific screen anchors.
+	 */
 	private getContainerStyle(position: string): string {
 		const posMap: Record<string, string> = {
 			"top-left": "top: 10px; left: 10px;",
@@ -247,6 +289,9 @@ export class DebugPanel {
 		`;
 	}
 
+	/**
+	 * @internal Builds inline CSS strings matching active tab buttons.
+	 */
 	private getTabButtonStyle(active: boolean): string {
 		return `
 			background: ${active ? "rgba(160, 232, 255, 0.15)" : "transparent"};
@@ -260,6 +305,9 @@ export class DebugPanel {
 		`;
 	}
 
+	/**
+	 * @internal Changes active tab views.
+	 */
 	private switchTab(tab: TabName): void {
 		this.activeTab = tab;
 		for (const [name, btn] of this.tabButtons) {
@@ -269,6 +317,9 @@ export class DebugPanel {
 
 	// ─── Hotkey ───────────────────────────────────────────────────
 
+	/**
+	 * @internal Intercepts keyboard events, toggling the panel on key matches.
+	 */
 	private onKeyDown = (e: KeyboardEvent) => {
 		if (e.key === this.hotkey) {
 			e.preventDefault();
@@ -276,17 +327,22 @@ export class DebugPanel {
 		}
 	};
 
+	/**
+	 * @internal Registers event handlers.
+	 */
 	private setupHotkey(): void {
 		document.addEventListener("keydown", this.onKeyDown);
 	}
 
 	// ─── Tab Renderers ────────────────────────────────────────────
 
+	/**
+	 * @internal Repaints FPS, draw statistics, and metric history bars.
+	 */
 	private renderMonitorsTab(): void {
 		const p = this.perf;
 		const vram = this.vram.getSummary();
 
-		// FPS color: green > 50, yellow > 25, red <= 25
 		const fpsColor =
 			p.fps >= 50 ? "#4ade80" : p.fps >= 25 ? "#facc15" : "#f87171";
 
@@ -314,16 +370,17 @@ export class DebugPanel {
 			</div>
 		`;
 
-		// Append the FPS graph canvas
 		this.tabContentEl.appendChild(this.fpsCanvas);
 		this.drawFpsGraph();
 	}
 
+	/**
+	 * @internal Repaints active VRAM details in scroll lists, preserving scroll position.
+	 */
 	private renderVRAMTab(): void {
 		const entries = this.vram.getEntries();
 		const summary = this.vram.getSummary();
 
-		// Preserve scroll position so it doesn't jump to top on update
 		const scrollContainer = this.tabContentEl.querySelector(
 			".vram-scroll-container",
 		);
@@ -366,7 +423,6 @@ export class DebugPanel {
 			</div>
 		`;
 
-		// Restore scroll position
 		const newScrollContainer = this.tabContentEl.querySelector(
 			".vram-scroll-container",
 		);
@@ -375,6 +431,9 @@ export class DebugPanel {
 		}
 	}
 
+	/**
+	 * @internal Repaints generic scene parameters and resource counts.
+	 */
 	private renderSceneTab(): void {
 		const p = this.perf;
 		const vram = this.vram.getSummary();
@@ -405,6 +464,9 @@ export class DebugPanel {
 
 	// ─── Helpers ──────────────────────────────────────────────────
 
+	/**
+	 * @internal Helper function building standard key-value HTML metrics rows.
+	 */
 	private metricRow(label: string, value: string): string {
 		return `
 			<div style="color: #888; font-size: 11px;">${label}</div>
@@ -412,6 +474,9 @@ export class DebugPanel {
 		`;
 	}
 
+	/**
+	 * @internal Repaints active rolling FPS charts.
+	 */
 	private drawFpsGraph(): void {
 		const ctx = this.fpsCtx;
 		const w = this.fpsCanvas.width;
@@ -422,10 +487,7 @@ export class DebugPanel {
 
 		if (history.length < 2) return;
 
-		// Find max for normalization
 		const maxFps = Math.max(...history, 60);
-
-		// Draw bars
 		const barWidth = w / this.perf.fpsHistory.length;
 
 		for (let i = 0; i < history.length; i++) {
@@ -433,7 +495,6 @@ export class DebugPanel {
 			const ratio = val / maxFps;
 			const barH = ratio * (h - 4);
 
-			// Color gradient: green > yellow > red
 			let color: string;
 			if (val >= 50) color = "rgba(74, 222, 128, 0.7)";
 			else if (val >= 25) color = "rgba(250, 204, 21, 0.7)";
@@ -443,7 +504,6 @@ export class DebugPanel {
 			ctx.fillRect(i * barWidth, h - barH - 2, barWidth - 0.5, barH);
 		}
 
-		// 60 FPS reference line
 		const refY = h - (60 / maxFps) * (h - 4) - 2;
 		ctx.strokeStyle = "rgba(160, 232, 255, 0.3)";
 		ctx.lineWidth = 1;

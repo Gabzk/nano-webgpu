@@ -2,7 +2,13 @@ import type { Context } from "../core/context";
 import { Geometry } from "./geometry";
 
 /**
- * Creates a Geometry representing a Cube.
+ * Creates a Geometry representing a standardized Cube centered at the origin.
+ * Generates 24 unique vertices (4 per face) with appropriate surface normal coordinates
+ * and standard 0-to-1 texture coordinate mappings.
+ *
+ * @param ctx - Active context.
+ * @param size - Sizing dimension representing full edge length of the cube. Defaults to `1.0`.
+ * @returns An allocated Box Geometry instance.
  */
 export function createCubeGeometry(ctx: Context, size: number = 1.0): Geometry {
 	const s = size / 2;
@@ -257,7 +263,12 @@ export function createCubeGeometry(ctx: Context, size: number = 1.0): Geometry {
 }
 
 /**
- * Creates a Geometry representing a Plane.
+ * Creates a Geometry representing a flat horizontal plane centered at the origin facing upward along the Y axis.
+ *
+ * @param ctx - Active context.
+ * @param width - Span width of the plane along the X axis. Defaults to `1.0`.
+ * @param height - Span depth of the plane along the Z axis. Defaults to `1.0`.
+ * @returns An allocated Plane Geometry instance.
  */
 export function createPlaneGeometry(
 	ctx: Context,
@@ -314,7 +325,14 @@ export function createPlaneGeometry(
 }
 
 /**
- * Creates a Geometry representing a Sphere.
+ * Programmatically generates a UV sphere Geometry using standard spherical parameter equations.
+ * Calculates positions, normal components, and texture coordinate projections.
+ *
+ * @param ctx - Active context.
+ * @param radius - Radial size of the sphere. Defaults to `1.0`.
+ * @param widthSegments - Horizontal subdivision segments. Defaults to `16`.
+ * @param heightSegments - Vertical subdivision segments. Defaults to `16`.
+ * @returns An allocated Sphere Geometry instance.
  */
 export function createSphereGeometry(
 	ctx: Context,

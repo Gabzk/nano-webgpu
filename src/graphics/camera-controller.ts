@@ -3,99 +3,126 @@ import type { Node3D } from "../core/node3d";
 import { Vec3 } from "../math/vec3";
 import type { Camera } from "./camera";
 
+/** Supported camera control styles. */
 export type CameraMode = "third-person" | "first-person" | "orbit";
 
+/** Parameters for configuring a third-person camera controller tracking a node from a distance. */
 export interface ThirdPersonOptions {
-	/** The Node3D the camera follows */
+	/** The target Node3D node that the camera orbits and tracks. */
 	target: Node3D;
-	/** Distance from the camera to the target */
+	/** Distance offset from the target node. Defaults to `8`. */
 	distance?: number;
-	/** Height above the target */
+	/** Height offset above the target node (e.g. shoulder level). Defaults to `3`. */
 	height?: number;
-	/** Mouse sensitivity (radians per pixel) */
+	/** Mouse rotation sensitivity (radians per mouse pixel movement). Defaults to `0.003`. */
 	sensitivity?: number;
-	/** Minimum pitch angle in degrees (looking down) */
+	/** Minimum pitch angle in degrees (prevents looking directly down). Defaults to `-80`. */
 	minPitch?: number;
-	/** Maximum pitch angle in degrees (looking up) */
+	/** Maximum pitch angle in degrees (prevents looking directly up). Defaults to `60`. */
 	maxPitch?: number;
 }
 
+/** Parameters for configuring a first-person camera controller sitting inside a target node. */
 export interface FirstPersonOptions {
-	/** The Node3D whose position the camera sits at */
+	/** The target Node3D node whose spatial position is shared with the camera view. */
 	target: Node3D;
-	/** Height offset for the "eyes" */
+	/** Vertical eyes offset height from target origin. Defaults to `1.7`. */
 	eyeHeight?: number;
-	/** Mouse sensitivity (radians per pixel) */
+	/** Mouse rotation sensitivity. Defaults to `0.003`. */
 	sensitivity?: number;
-	/** Minimum pitch angle in degrees */
+	/** Minimum pitch angle in degrees. Defaults to `-80`. */
 	minPitch?: number;
-	/** Maximum pitch angle in degrees */
+	/** Maximum pitch angle in degrees. Defaults to `60`. */
 	maxPitch?: number;
 }
 
+/** Parameters for configuring a standard orbiting camera around a static spatial focal point. */
 export interface OrbitOptions {
-	/** The center point to orbit around */
+	/** The central focal coordinates vector to orbit around. Defaults to `(0,0,0)`. */
 	center?: Vec3 | number[];
-	/** Distance from the center */
+	/** Orbit radius distance. Defaults to `8`. */
 	distance?: number;
-	/** Mouse sensitivity (radians per pixel) */
+	/** Mouse rotation sensitivity. Defaults to `0.003`. */
 	sensitivity?: number;
-	/** Whether the camera auto-rotates */
+	/** Toggle auto-rotation. Defaults to `false`. */
 	autoRotate?: boolean;
-	/** Speed of auto-rotation (radians/sec) */
+	/** Velocity of auto-rotation in radians per second. Defaults to `1.0`. */
 	autoRotateSpeed?: number;
-	/** Minimum pitch angle in degrees */
+	/** Minimum pitch angle in degrees. Defaults to `-80`. */
 	minPitch?: number;
-	/** Maximum pitch angle in degrees */
+	/** Maximum pitch angle in degrees. Defaults to `60`. */
 	maxPitch?: number;
 }
 
 /**
- * @module CameraController
- 
- * Pre-built camera behaviors that eliminate trigonometry for the developer.
- * Inspired by Godot's SpringArm3D + pivot node pattern, but condensed into
- * a single component that attaches to a Camera.
- *
- * Usage:
- * ```typescript
- * const ctrl = camera.addController("third-person", { target: player, distance: 10 });
- * ```
+ * CameraController implements spatial movement algorithms that drive Camera positions
+ * and projection directions without requiring developers to write complex trigonometric calculations.
+ * Supports orbital, first-person, and third-person camera schemes.
  */
 export class CameraController {
+	/** Active camera scheme mode. */
 	public mode: CameraMode;
+	/** Yaw rotation angle in radians (horizontal rotation around Y axis). */
 	public yaw: number = 0;
+	/** Pitch rotation angle in radians (vertical lookup/downwards rotation). */
 	public pitch: number = 0;
 
-	// References
+	/** @internal Camera reference driven by this controller. */
 	private camera: Camera;
+
+	/** Target Node3D object (utilized by first-person and third-person modes). */
 	public target: Node3D | null = null;
+
+	/** Bounding focal center point in 3D space (utilized by orbit mode). */
 	public center: Vec3;
 
-	// Parameters
+	/** Radial orbit distance from the focal look-at target. */
 	public distance: number;
+
+	/** Orbit height offset above target (third-person mode). */
 	public height: number;
+
+	/** Vertical offset relative to target pivot for eye placement (first-person mode). */
 	public eyeHeight: number;
+
+	/** Mouse sensitivity multiplier. */
 	public sensitivity: number;
+
+	/** Minimum clamped pitch angle in radians. */
 	public minPitch: number;
+
+	/** Maximum clamped pitch angle in radians. */
 	public maxPitch: number;
+
+	/** Auto-rotation toggle (orbit mode). */
 	public autoRotate: boolean;
+
+	/** Auto-rotation velocity in radians per second. */
 	public autoRotateSpeed: number;
 
-	// Internal scratch vectors (avoid GC)
+	/** @internal Cached forward horizontal vector. */
 	private _forward: Vec3 = new Vec3();
+
+	/** @internal Cached right horizontal vector. */
 	private _right: Vec3 = new Vec3();
 
+	/**
+	 * Creates a CameraController instance.
+	 *
+	 * @param camera - Driven Camera instance.
+	 * @param mode - Operational style (orbit, first-person, or third-person).
+	 * @param options - Configuration mapping parameters matching the selected mode.
+	 */
 	constructor(
 		camera: Camera,
 		mode: CameraMode,
-		// biome-ignore lint/suspicious/noExplicitAny: disable rule for now
+		// biome-ignore lint/suspicious/noExplicitAny: type matching distinct option subsets
 		options: ThirdPersonOptions | FirstPersonOptions | OrbitOptions = {} as any,
 	) {
 		this.camera = camera;
 		this.mode = mode;
 
-		// biome-ignore lint/suspicious/noExplicitAny: disable rule for now
+		// biome-ignore lint/suspicious/noExplicitAny: type matching distinct option subsets
 		const opts = options as any;
 		this.target = opts.target ?? null;
 		this.center = opts.center ? Vec3.from(opts.center) : new Vec3(0, 0, 0);
@@ -110,9 +137,11 @@ export class CameraController {
 	}
 
 	/**
-	 * Called automatically by Scene._renderFrame() every frame.
-	 * Reads Input.mouseMovement and updates the camera's position/target.
-	 * @param dt - Delta time in seconds (used for auto-rotate)
+	 * Automatically invoked by the Scene update routines every frame.
+	 * Resolves mouse input coordinate differentials, clamps angular pitches,
+	 * and re-projects camera view matrix target vectors.
+	 *
+	 * @param dt - Delta frame time in seconds.
 	 */
 	public update(dt: number): void {
 		// Read mouse deltas
@@ -147,6 +176,9 @@ export class CameraController {
 		this._right.set(-Math.cos(this.yaw), 0, Math.sin(this.yaw));
 	}
 
+	/**
+	 * @internal Executes third-person orbiting and follow-look matrix updates.
+	 */
 	private updateThirdPerson(): void {
 		if (!this.target) return;
 
@@ -158,7 +190,6 @@ export class CameraController {
 		const lookAtY = ty + this.height;
 
 		// Pure spherical orbit: camera is always exactly `distance` from the look-at point.
-		// cos(pitch) shrinks XZ, sin(pitch) adds Y — total distance stays constant.
 		const cosPitch = Math.cos(this.pitch);
 		this.camera.position.set(
 			tx + Math.sin(this.yaw) * cosPitch * this.distance,
@@ -169,6 +200,9 @@ export class CameraController {
 		this.camera.target.set(tx, lookAtY, tz);
 	}
 
+	/**
+	 * @internal Executes first-person eye positioning and target vector re-projection.
+	 */
 	private updateFirstPerson(): void {
 		if (!this.target) return;
 
@@ -186,6 +220,11 @@ export class CameraController {
 		);
 	}
 
+	/**
+	 * @internal Executes standard orbital camera positioning with optional auto-rotation.
+	 *
+	 * @param dt - Frame delta time in seconds.
+	 */
 	private updateOrbit(dt: number): void {
 		if (this.autoRotate) {
 			this.yaw += this.autoRotateSpeed * dt;
@@ -206,20 +245,20 @@ export class CameraController {
 	}
 
 	/**
-	 * Returns the forward direction relative to the camera (XZ plane, no Y component).
-	 * Use this for WASD movement:
-	 * ```typescript
-	 * cube.position.add(ctrl.getForward().scaled(speed * dt));
-	 * ```
-	 * Returns a **new** Vec3 each call — safe to modify.
+	 * Computes and returns the forward direction vector aligned with the horizontal XZ plane (Y component zeroed).
+	 * Extremely useful for driving character forward movements using keyboard controls.
+	 *
+	 * @returns A newly instantiated horizontal forward vector Vec3.
 	 */
 	public getForward(): Vec3 {
 		return new Vec3(this._forward.x, 0, this._forward.z);
 	}
 
 	/**
-	 * Returns the right direction relative to the camera (XZ plane, no Y component).
-	 * Returns a **new** Vec3 each call — safe to modify.
+	 * Computes and returns the rightward direction vector aligned with the horizontal XZ plane.
+	 * Useful for character strafing and sideways movements.
+	 *
+	 * @returns A newly instantiated horizontal right vector Vec3.
 	 */
 	public getRight(): Vec3 {
 		return new Vec3(this._right.x, 0, this._right.z);

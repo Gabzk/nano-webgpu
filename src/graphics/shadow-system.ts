@@ -6,33 +6,60 @@ import type { Light, ShadowConfig } from "./light";
 import { isStandardMaterial } from "./materials/material";
 import type { Mesh } from "./mesh";
 
-/** Internal batch record shared with BatchManager. */
+/**
+ * Internal batch record shared with BatchManager.
+ */
 export interface InstanceBatch {
+	/** GPUBuffer containing model matrices array for instancing. */
 	buffer: GPUBuffer;
+	/** GPUBindGroup mapping the instanced storage buffer. */
 	bindGroup: GPUBindGroup;
+	/** Allocated matrix capacity of this batch. */
 	capacity: number;
 }
 
 /**
- * Manages the directional shadow map pass.
- * Extracted from Renderer to satisfy Single Responsibility Principle.
- * Owns: shadow texture, sampler, uniform buffer, bind group, frustum math.
+ * ShadowSystem coordinates standard orthographic shadow depth map passes for directional lights.
+ * Handles shadow map resource allocations (depth textures, comparison samplers, uniform buffers),
+ * computes orthographic camera matrices aligned with directional vectors, implements texel-snapping
+ * to eliminate crawling shadow boundaries, and handles instanced batch drawing.
  */
 export class ShadowSystem {
+	/** Target context reference. */
 	private ctx: Context;
 
+	/** Allocated GPU depth texture. */
 	public texture!: GPUTexture;
+
+	/** Dedicated comparison sampler checking depth values. */
 	public sampler!: GPUSampler;
+
+	/** GPUBuffer containing light view-projection matrices and texel sizes. */
 	public uniformBuffer!: GPUBuffer;
+
+	/** GPUBindGroup mapping shadow uniforms to group 0. */
 	public bindGroup!: GPUBindGroup;
+
+	/** Resolution size (width/height) of the square shadow map texture. Defaults to `2048`. */
 	public textureSize = 2048;
+
+	/** Computed combined view-projection matrix from the light source's viewpoint. */
 	public matrix: Mat4 = new Mat4();
 
+	/**
+	 * Instantiates a new ShadowSystem.
+	 *
+	 * @param ctx - Active context.
+	 */
 	constructor(ctx: Context) {
 		this.ctx = ctx;
 		this.init();
 	}
 
+	/**
+	 * @internal Initializes physical GPU depth attachments, comparison samplers,
+	 * uniform buffers, and bind groups.
+	 */
 	private init(): void {
 		this.texture = this.ctx.device.createTexture({
 			size: [this.textureSize, this.textureSize, 1],
@@ -55,7 +82,7 @@ export class ShadowSystem {
 		});
 
 		this.uniformBuffer = this.ctx.device.createBuffer({
-			size: 80, // mat4x4 (64) + texelSize (4) + _pad1..3 (12)
+			size: 80, // mat4x4 (64 bytes) + texelSize (4 bytes) + padding (12 bytes)
 			usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
 		});
 		this.ctx.vramTracker.register(
@@ -82,8 +109,11 @@ export class ShadowSystem {
 	}
 
 	/**
-	 * Recreates the shadow texture if the requested size changed.
-	 * Returns true if the texture was recreated (signals globals bind group is dirty).
+	 * Re-allocates shadow depth texture if resolution settings changed.
+	 * Returns true if new assets were allocated, signaling parent systems to mark bind groups as dirty.
+	 *
+	 * @param newSize - Requested resolution.
+	 * @returns True if texture was re-created, false otherwise.
 	 */
 	public reinitIfNeeded(newSize: number): boolean {
 		if (newSize === this.textureSize && this.texture) return false;
@@ -107,8 +137,11 @@ export class ShadowSystem {
 	}
 
 	/**
-	 * Stamps the usePCF variant flag on every StandardMaterial in the mesh list.
-	 * Called once per frame so each material routes to the correct compiled pipeline variant.
+	 * Propagates active PCF filtering settings to standard materials.
+	 * Ensure that materials use the correct shader variant during final draw calls.
+	 *
+	 * @param meshes - Active mesh array.
+	 * @param usePCF - Toggle PCF.
 	 */
 	public propagateVariant(meshes: ReadonlyArray<Mesh>, usePCF: boolean): void {
 		for (const mesh of meshes) {
@@ -122,8 +155,18 @@ export class ShadowSystem {
 	}
 
 	/**
-	 * Renders the shadow depth pass.
-	 * Returns true if a shadow-casting directional light was found and rendered.
+	 * Renders shadow map depth passes.
+	 * Locates the first active shadow-casting directional light, calculates frustum matrices,
+	 * executes texel-snapping transformations to stabilize shadow border artifacts, and submits
+	 * drawing commands.
+	 *
+	 * @param commandEncoder - GPU command encoder pipeline interface.
+	 * @param lights - Current scene lights array.
+	 * @param camera - Current active viewport camera.
+	 * @param batchGroups - Grouped meshes sorted by instancing batch keys.
+	 * @param instanceBatches - Allocated matrix buffer batches.
+	 * @param meshes - Active scene meshes array.
+	 * @returns True if depth rendering was completed, false otherwise.
 	 */
 	public renderPass(
 		commandEncoder: GPUCommandEncoder,
@@ -146,9 +189,7 @@ export class ShadowSystem {
 		}
 		if (!shadowCaster || !config) return false;
 
-		if (this.reinitIfNeeded(config.shadowMapSize)) {
-			// Caller should mark globals bind group as dirty
-		}
+		this.reinitIfNeeded(config.shadowMapSize);
 
 		// Compute shadow frustum
 		const shadowRadius = config.shadowRadius;

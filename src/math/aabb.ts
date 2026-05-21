@@ -3,10 +3,9 @@ import { Vec3 } from "./vec3";
 
 /**
  * @module AABB
- 
+ *
  * Axis-Aligned Bounding Box used for broad-phase collision detection.
  * This is a pure math struct with no dependencies on the GPU or scene graph.
- * Inspired by Godot's AABB class.
  */
 export class AABB {
 	/** Minimum corner of the box (left, bottom, back) */
@@ -102,7 +101,7 @@ export class AABB {
 
 	/**
 	 * Checks if this AABB overlaps with another AABB.
-	 * Uses the Separating Axis Theorem on 3 axes (same as Godot).
+	 * Uses the standard Axis-Aligned Bounding Box intersection algorithm.
 	 */
 	public intersects(other: AABB): boolean {
 		return (
@@ -163,7 +162,6 @@ export class AABB {
 	/**
 	 * Returns a new AABB transformed into world-space by a Mat4.
 	 * Uses the "8-corner transform" technique — correct for any affine transform.
-	 * This is how Godot computes AABB.transformed().
 	 */
 	public transformed(matrix: Mat4): AABB {
 		const corners = [

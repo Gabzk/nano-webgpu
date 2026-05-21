@@ -1,8 +1,6 @@
 /**
- * @module Loader
- *
  * Asset loader for shaders, textures, and 3D models.
- * Model loading is now driven by a pluggable ModelParser registry (OCP):
+ * Model loading is driven by a pluggable ModelParser registry (Open/Closed Principle):
  * new formats can be added externally via `loader.registerParser(parser)`
  * without modifying this file.
  */
@@ -11,11 +9,29 @@ import type { ModelData, ModelParser, ModelPart } from "./loader-parser";
 
 // ─── Built-in parsers ──────────────────────────────────────────────────────
 
+/**
+ * Built-in parser for GLTF and GLB (binary GLTF) 3D assets.
+ * Parses nodes, meshes, primitives, interleaved accessors, textures, and physical PBR materials.
+ * Handles automatic object URL creation/revocation for embedded asset streams.
+ */
 class GLTFParser implements ModelParser {
+	/**
+	 * Determines if this parser can decode the specified URL based on extension.
+	 *
+	 * @param url - The target resource address.
+	 * @returns True if target is a `.gltf` or `.glb` file, false otherwise.
+	 */
 	canParse(url: string): boolean {
 		return url.endsWith(".gltf") || url.endsWith(".glb");
 	}
 
+	/**
+	 * Asynchronously parses a raw GLTF/GLB network response into standard ModelData.
+	 *
+	 * @param url - The web address of the asset.
+	 * @param response - The raw, unconsumed network response.
+	 * @returns Standardized ModelData structures with primitives separated into ModelParts.
+	 */
 	async parse(url: string, response: Response): Promise<ModelData> {
 		let jsonStr: string;
 		let binBuffer: ArrayBuffer | null = null;
@@ -150,7 +166,7 @@ class GLTFParser implements ModelParser {
 				if (bc) out.albedoTexture = bc;
 
 				// Base color factor — used as albedoColor when there is no texture,
-				// or as a tint multiplier when there is one.
+				// or as a multiplier tint when there is one.
 				if (pbr.baseColorFactor) {
 					const [r, g, b, a] = pbr.baseColorFactor as number[];
 					// Convert to hex string for StandardMaterialOptions compatibility
@@ -270,16 +286,40 @@ class GLTFParser implements ModelParser {
 	}
 }
 
+/**
+ * Built-in parser for OBJ (Wavefront) 3D model assets.
+ * Parses lines representing vertex coordinates (`v`), normal components (`vn`), texture coordinates (`vt`),
+ * and polygons (`f`), constructing index buffers and resolving standard interleaved vertex arrays.
+ */
 class OBJParser implements ModelParser {
+	/**
+	 * Determines if this parser can decode the specified URL based on extension.
+	 *
+	 * @param url - The target resource address.
+	 * @returns True if target is a `.obj` file, false otherwise.
+	 */
 	canParse(url: string): boolean {
 		return url.endsWith(".obj");
 	}
 
+	/**
+	 * Asynchronously parses a raw OBJ text network response into standard ModelData.
+	 *
+	 * @param _url - The web address of the asset.
+	 * @param response - The raw, unconsumed network response.
+	 * @returns Standardized ModelData structures with raw interleaved buffers.
+	 */
 	async parse(_url: string, response: Response): Promise<ModelData> {
 		const text = await response.text();
 		return this.parseOBJ(text);
 	}
 
+	/**
+	 * Internal procedural parser for parsing Wavefront OBJ file lines.
+	 *
+	 * @param text - The raw text content of the OBJ file.
+	 * @returns Standard format-agnostic model data structure.
+	 */
 	private parseOBJ(text: string): ModelData {
 		const inputVertices: number[] = [];
 		const inputNormals: number[] = [];
@@ -357,7 +397,7 @@ class OBJParser implements ModelParser {
 							if (vtIdx >= 0 && inputUVs.length > vtIdx) {
 								interleavedVertices.push(
 									inputUVs[vtIdx],
-									1.0 - inputUVs[vtIdx + 1], // Invert V for WebGPU
+									1.0 - inputUVs[vtIdx + 1], // Invert V component for WebGPU
 								);
 							} else {
 								interleavedVertices.push(0, 0);
@@ -391,33 +431,46 @@ class OBJParser implements ModelParser {
 
 // ─── Loader ────────────────────────────────────────────────────────────────
 
+/**
+ * Loader class fetches, decodes, and manages 3D assets, textures, and shader modules.
+ * Extensible through pluggable ModelParser registration.
+ */
 export class Loader {
 	/**
-	 * The GPUDevice used for creating GPU resources (textures, shaders).
+	 * Active WebGPU GPUDevice instance used to compile shader modules and initialize GPUTextures.
 	 */
 	private device: GPUDevice;
 
 	/**
-	 * Ordered list of model parsers. First matching parser wins.
-	 * Built-in GLTF and OBJ parsers are registered by default.
-	 * External parsers registered via registerParser() are prepended (higher priority).
+	 * Internal list of registered model format parsers.
+	 * Evaluated in order, with newly prepended custom parsers taking highest priority.
 	 */
 	private parsers: ModelParser[] = [new GLTFParser(), new OBJParser()];
 
+	/**
+	 * Creates a Loader instance associated with a GPUDevice.
+	 *
+	 * @param device - Standard WebGPU device interface.
+	 */
 	constructor(device: GPUDevice) {
 		this.device = device;
 	}
 
 	/**
-	 * Register a custom model format parser.
-	 * The new parser takes priority over built-in parsers.
+	 * Prepend a custom ModelParser instance to the internal parser list.
+	 * Allows custom formats (e.g. FBX, Collada) to take loading precedence.
+	 *
+	 * @param parser - The ModelParser implementation.
 	 */
 	public registerParser(parser: ModelParser): void {
 		this.parsers.unshift(parser);
 	}
 
 	/**
-	 * Load a shader module from a URL.
+	 * Fetches and compiles a WGSL shader code file from a URL.
+	 *
+	 * @param url - Web address pointing to the WGSL shader file.
+	 * @returns A Promise resolving to a GPUShaderModule.
 	 */
 	public async loadShader(url: string): Promise<GPUShaderModule> {
 		const response = await fetch(url);
@@ -435,7 +488,11 @@ export class Loader {
 	}
 
 	/**
-	 * Load a texture from a URL.
+	 * Fetches an image file, decodes it into an ImageBitmap, and uploads it to WebGPU VRAM.
+	 *
+	 * @param url - Web address pointing to the image resource.
+	 * @param options - Custom configuration format and texture usage flags.
+	 * @returns A Promise resolving to an allocated GPUTexture.
 	 */
 	public async loadTexture(
 		url: string,
@@ -476,9 +533,10 @@ export class Loader {
 	}
 
 	/**
-	 * Load a 3D model from a URL.
-	 * Delegates to the first registered parser whose canParse() returns true.
-	 * Register additional parsers via registerParser() for new formats.
+	 * Fetches and delegates parsing of a 3D model file to the first compatible parser.
+	 *
+	 * @param url - The web address of the 3D model asset.
+	 * @returns A Promise resolving to format-agnostic ModelData.
 	 */
 	public async loadModel(url: string): Promise<ModelData> {
 		const response = await fetch(url);

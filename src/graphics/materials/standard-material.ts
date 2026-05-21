@@ -7,53 +7,84 @@ import {
 	resolveCullMode,
 } from "../cull-mode";
 import { Texture } from "../texture";
-import { Material } from "./material";
+import { Material, type MaterialOptions } from "./material";
 
-export interface StandardMaterialOptions {
+/**
+ * Configuration options utilized when instantiating a physically-based StandardMaterial.
+ */
+export interface StandardMaterialOptions extends MaterialOptions {
+	/** Solid base color value or hex string representation. Defaults to white. */
 	albedoColor?: Color | string;
+	/** Map containing surface color data, or file path. */
 	albedoTexture?: Texture | string;
 
+	/** Tangent-space normal map detailing high-frequency surface folds, or file path. */
 	normalTexture?: Texture | string;
+	/** Scaling factor applied to normal tangent values. Defaults to `1.0`. */
 	normalScale?: number;
 
+	/** Surface roughness microfacet scattering coefficient. Defaults to `0.5`. */
 	roughness?: number;
+	/** Map detailing roughness values, or file path. */
 	roughnessTexture?: Texture | string;
 
+	/** Surface metallic conduction microfacet value. Defaults to `0.0`. */
 	metallic?: number;
+	/** Map detailing metallic coefficients, or file path. */
 	metallicTexture?: Texture | string;
 
+	/** Map containing ambient occlusion details, or file path. */
 	aoTexture?: Texture | string;
+	/** Intensity multiplier of ambient occlusion shadows. Defaults to `1.0`. */
 	aoIntensity?: number;
 
+	/** Map containing packed Ambient Occlusion, Roughness, and Metallic (ORM) values, or file path. */
 	ormTexture?: Texture | string;
 
-	/** When true, renders and lights both sides of the surface. */
+	/** When true, disables face culling so back and front polygons are rendered. */
 	doubleSided?: boolean;
-	/** Cull mode (Godot-style): "back", "front", or "disabled". */
-	cullMode?: CullMode;
 }
 
+/**
+ * StandardMaterial represents a Physically-Based Rendering (PBR) metallic-roughness material.
+ * Manages material parameter uniform structures, linear samplers, lazy-loading sequences for texture assets,
+ * handles shadow filtering variant compilation keys, and supports double-sided material rendering.
+ */
 export class StandardMaterial extends Material {
+	/** @internal Solid base color coefficients. */
 	private _albedoColor: Color = new Color();
+	/** Map containing surface color data. */
 	public albedoTexture: Texture | null = null;
 
+	/** Tangent-space normal map detailing surface folds. */
 	public normalTexture: Texture | null = null;
+	/** @internal Scaling factor applied to normal tangent values. */
 	private _normalScale: number = 1.0;
 
+	/** @internal Surface roughness microfacet scattering coefficient. */
 	private _roughness: number = 0.5;
+	/** Map detailing roughness values. */
 	public roughnessTexture: Texture | null = null;
 
+	/** @internal Surface metallic conduction microfacet value. */
 	private _metallic: number = 0.0;
+	/** Map detailing metallic coefficients. */
 	public metallicTexture: Texture | null = null;
 
+	/** Map containing ambient occlusion details. */
 	public aoTexture: Texture | null = null;
+	/** @internal Intensity multiplier of ambient occlusion shadows. */
 	private _aoIntensity: number = 1.0;
 
+	/** Map containing packed Ambient Occlusion, Roughness, and Metallic (ORM) values. */
 	public ormTexture: Texture | null = null;
 
+	/** Gets the base albedo color. */
 	get albedoColor(): Color {
 		return this._albedoColor;
 	}
+
+	/** Sets the base albedo color, setting dirty status upon color component modifications. */
 	set albedoColor(val: Color) {
 		this._albedoColor = val;
 		this._albedoColor.onChange = () => {
@@ -62,49 +93,67 @@ export class StandardMaterial extends Material {
 		this.isDirty = true;
 	}
 
+	/** Gets the normal tangent scale. */
 	get normalScale(): number {
 		return this._normalScale;
 	}
+
+	/** Sets the normal tangent scale and marks the material parameters as dirty. */
 	set normalScale(val: number) {
 		this._normalScale = val;
 		this.isDirty = true;
 	}
 
+	/** Gets the microfacet roughness factor. */
 	get roughness(): number {
 		return this._roughness;
 	}
+
+	/** Sets the microfacet roughness factor and marks the material parameters as dirty. */
 	set roughness(val: number) {
 		this._roughness = val;
 		this.isDirty = true;
 	}
 
+	/** Gets the microfacet metallic factor. */
 	get metallic(): number {
 		return this._metallic;
 	}
+
+	/** Sets the microfacet metallic factor and marks the material parameters as dirty. */
 	set metallic(val: number) {
 		this._metallic = val;
 		this.isDirty = true;
 	}
 
+	/** Gets the ambient occlusion shadow intensity multiplier. */
 	get aoIntensity(): number {
 		return this._aoIntensity;
 	}
+
+	/** Sets the ambient occlusion shadow intensity multiplier and marks the material parameters as dirty. */
 	set aoIntensity(val: number) {
 		this._aoIntensity = val;
 		this.isDirty = true;
 	}
 
+	/** Gets the cull mode settings. */
 	public override get cullMode(): CullMode | undefined {
 		return this._cullMode;
 	}
+
+	/** Sets the cull mode settings and marks the material parameters as dirty. */
 	public override set cullMode(value: CullMode | undefined) {
 		this._cullMode = value;
 		this.isDirty = true;
 	}
 
+	/** Gets the double-sided rendering state. */
 	get doubleSided(): boolean {
 		return isCullDisabled(this._cullMode);
 	}
+
+	/** Sets the double-sided rendering state, adjusting internal cull modes accordingly. */
 	set doubleSided(val: boolean) {
 		if (val) {
 			this.cullMode = "disabled";
@@ -114,19 +163,30 @@ export class StandardMaterial extends Material {
 		this.isDirty = true;
 	}
 
+	/** @internal Path names of textures queued to load asynchronously in the background. */
 	private pendingTextures: { [key: string]: string } = {};
 
+	/** @internal Physical uniform buffer allocated in VRAM containing material parameters. */
 	private uniformBuffer!: GPUBuffer;
+	/** @internal Standard PBR bind group 2 containing parameter and texture bindings. */
 	private bindGroup: GPUBindGroup | null = null;
+	/** @internal Anisotropic filtering sampler. */
 	private sampler: GPUSampler | null = null;
+	/** @internal Float array cache containing sequentially packed parameters ready for GPU copies. */
 	private bufferData!: Float32Array;
 
-	/** Tracks which PCF variant the current bindGroup was built for. */
+	/** @internal Tracks which PCF shadow variant the current bindGroup was built for. */
 	private _bindGroupPCFVariant: boolean | null = null;
+	/** @internal Tracks current pipeline-level culling status to match material parameter bindings. */
 	private _lightingCullMode: GPUCullMode | undefined = undefined;
 
+	/**
+	 * Instantiates a PBR StandardMaterial, registering defaults and allocating float parameter arrays.
+	 *
+	 * @param options - PBR coefficients, texture assets, and spatial configurations.
+	 */
 	constructor(options: StandardMaterialOptions = {}) {
-		super();
+		super(options);
 		this.type = "StandardMaterial";
 
 		let initialColor: Color;
@@ -186,6 +246,9 @@ export class StandardMaterial extends Material {
 		this.bufferData = new Float32Array(16);
 	}
 
+	/**
+	 * @internal Packages PBR coefficient scalars and map activation statuses sequentially into uniform float arrays.
+	 */
 	private updateBufferData() {
 		this.bufferData[0] = this.albedoColor.r;
 		this.bufferData[1] = this.albedoColor.g;
@@ -213,17 +276,15 @@ export class StandardMaterial extends Material {
 		this.bufferData[15] = 0.0;
 	}
 
-	/**
-	 * Selects which shadow variant pipeline this material uses.
-	 * Set by the scene when the shadow-casting directional light's usePCF is known.
-	 * Changing this automatically invalidates the cached bind group so it is
-	 * rebuilt against the correct pipeline layout.
-	 */
+	/** @internal Active shadow PCF option key. */
 	private _usePCF: boolean = true;
 
+	/** Gets active shadow PCF option key. */
 	public get usePCF(): boolean {
 		return this._usePCF;
 	}
+
+	/** Sets active shadow PCF option key, invalidating active cached bind groups if changed. */
 	public set usePCF(value: boolean) {
 		if (this._usePCF !== value) {
 			this._usePCF = value;
@@ -233,6 +294,15 @@ export class StandardMaterial extends Material {
 		}
 	}
 
+	/**
+	 * Retrieves or compiles standard PBR pipelines matching specific primitive topology layouts.
+	 *
+	 * @param ctx - Active context.
+	 * @param topology - Target geometry topology.
+	 * @param indexFormat - Target index format.
+	 * @param cullMode - Culling mode parameter.
+	 * @returns Compiled render pipeline instance.
+	 */
 	public getPipeline(
 		ctx: Context,
 		topology: GPUPrimitiveTopology = "triangle-list",
@@ -249,16 +319,26 @@ export class StandardMaterial extends Material {
 			topology,
 			indexFormat,
 			cullMode,
+			this.depthWriteEnabled,
+			this.depthCompare,
 		);
 	}
 
+	/**
+	 * Allocates uniform buffers and packages textures, generating a standard bind group (index 2).
+	 * Triggers asynchronous load sequences for string texture paths. Reuses dummy white/normal maps
+	 * if optional texture arguments are omitted.
+	 *
+	 * @param ctx - Active context.
+	 * @returns Standard bind group 2 instance.
+	 */
 	public getBindGroup(ctx: Context): GPUBindGroup {
 		if (Object.keys(this.pendingTextures).length > 0) {
 			if (this.pendingTextures.albedo)
 				this.albedoTexture = Texture.loadBackground(
 					ctx,
 					this.pendingTextures.albedo,
-					{ format: "rgba8unorm-srgb" }
+					{ format: "rgba8unorm-srgb" },
 				);
 			if (this.pendingTextures.normal)
 				this.normalTexture = Texture.loadBackground(

@@ -12,35 +12,84 @@ import {
 } from "./materials/standard-material";
 import { Texture } from "./texture";
 
+/**
+ * Configuration options utilized during direct Mesh node instantiation.
+ */
 export interface MeshOptions {
+	/** Underlying GPU vertex/index buffer geometry interface. */
 	geometry: Geometry;
+	/** Legacy shorthand option to load and assign a simple albedo texture. */
 	texture?: string | Texture;
+	/** Explicit Material instance or configuration properties for StandardMaterial. */
 	material?: Material | StandardMaterialOptions;
-	position?: number[];
-	rotation?: number[];
-	scale?: number | number[];
+	/** Initial spatial position coordinate vector. */
+	position?: number[] | Vec3;
+	/** Initial spatial Euler rotation vector in radians. */
+	rotation?: number[] | Vec3;
+	/** Initial spatial Euler rotation vector in degrees. */
+	rotationDegrees?: number[] | Vec3;
+	/** Initial spatial scale multiplier or component scale vector. */
+	scale?: number | number[] | Vec3;
 }
 
+/**
+ * Configuration options utilized during programmatic mesh construction via `Mesh.build()`.
+ */
 export interface BuildMeshOptions {
+	/** Ordering layout identifying attributes (e.g. `['position', 'normal', 'uv']`). */
 	vertexFormat: string[];
+	/** Raw vertex array containing sequence of attributes defined by format. */
 	vertexBuffer: number[];
+	/** Index element buffer array. If omitted, sequential indices are auto-generated. */
 	indices?: number[];
+	/** GPU primitive assembly topology. Defaults to `"triangle-list"`. */
 	topology?: GPUPrimitiveTopology;
-	/** Override face culling. Defaults to "back" for triangle-list, "none"/"disabled" for everything else. */
+	/** Custom culling specification. Defaults to normal back-face culling for triangles. */
 	cullMode?: CullMode;
-	material?: Material;
+	/** Material instance or configuration parameters. */
+	material?: Material | StandardMaterialOptions;
+	/** Initial spatial position coordinate vector. */
 	position?: number[] | Vec3;
+	/** Initial spatial Euler rotation vector in radians. */
 	rotation?: number[] | Vec3;
+	/** Initial spatial Euler rotation vector in degrees. */
 	rotationDegrees?: number[] | Vec3;
-	scale?: number | number[];
+	/** Initial spatial scale multiplier or component scale vector. */
+	scale?: number | number[] | Vec3;
+	/** Automatically append the compiled mesh to the active scene graph. Defaults to `true`. */
 	addToScene?: boolean;
 }
 
+/**
+ * Mesh represents a physical, renderable 3D entity within the scene graph.
+ * It couples geometric vertex/index buffers (Geometry) with shading parameter bindings (Material)
+ * and maintains spatial Node3D transforms.
+ */
 export class Mesh extends Node3D {
-	public ctx: Context;
-	public geometry: Geometry;
-	public material: Material;
+	/** Type identifier used for fast polymorphic runtime checks. */
+	public readonly isMesh = true;
 
+	/** Parent Context reference. */
+	public ctx: Context;
+
+	/** Underlying geometry instance holding vertex and index buffers. */
+	public geometry: Geometry;
+
+	/** @internal Assigned Material shader instance. */
+	private _material!: Material;
+
+	/** Gets the active Material shader instance. */
+	public override get material(): Material {
+		return this._material;
+	}
+
+	/** Sets the active Material shader instance and marks the node transform as dirty. */
+	public override set material(value: Material) {
+		this._material = value;
+		this.isDirty = true;
+	}
+
+	/** Mapping of standard vertex attributes to their component size (float count). */
 	public static readonly FORMAT_SIZES: Record<string, number> = {
 		position: 3,
 		normal: 3,
@@ -50,8 +99,13 @@ export class Mesh extends Node3D {
 	};
 
 	/**
-	 * Build a mesh from raw vertex data.
-	 * Inspired by OpenGL's immediate mode but using modern buffer-based approach.
+	 * Programmatically compiles a new Mesh from raw floating-point arrays.
+	 * Decodes arbitrary interleaved arrays, re-aligns them to standard 11-float vertices
+	 * (pos:3, norm:3, uv:2, color:3), creates dedicated GPUBuffers, and resolves materials.
+	 *
+	 * @param ctx - Active framework context.
+	 * @param config - Mesh assembly and transformation configurations.
+	 * @returns The newly assembled Mesh instance.
 	 */
 	public static build(ctx: Context, config: BuildMeshOptions): Mesh {
 		const {
@@ -170,8 +224,14 @@ export class Mesh extends Node3D {
 		});
 
 		// Resolve material
-		const finalMaterial =
-			material instanceof Material ? material : new StandardMaterial();
+		let finalMaterial: Material;
+		if (material instanceof Material) {
+			finalMaterial = material;
+		} else if (material) {
+			finalMaterial = new StandardMaterial(material as StandardMaterialOptions);
+		} else {
+			finalMaterial = new StandardMaterial();
+		}
 
 		// Create Mesh
 		const mesh = new Mesh(ctx, { geometry, material: finalMaterial });
@@ -180,6 +240,12 @@ export class Mesh extends Node3D {
 		return mesh;
 	}
 
+	/**
+	 * Instantiates a renderable Mesh node coupling geometric buffers and material settings.
+	 *
+	 * @param ctx - Parent context.
+	 * @param options - Instantiation options containing geometry, material details, and legacy texture fallbacks.
+	 */
 	constructor(ctx: Context, options: MeshOptions) {
 		super();
 		this.ctx = ctx;
@@ -208,10 +274,10 @@ export class Mesh extends Node3D {
 	}
 
 	/**
-	 * Removes the mesh from its parent (and consequently from the scene)
-	 * and optionally frees its geometry. Similar to Godot's queue_free().
-	 * @param destroyGeometry Should we also destroy the shared geometry? Defaults to false
-	 *   to avoid accidentally breaking instanced copies.
+	 * Detaches the Mesh from its hierarchy parent and optionally destroys associated GPUBuffers.
+	 *
+	 * @param destroyGeometry - If true, releases GPU vertex/index buffer allocations immediately.
+	 *   Defaults to false to allow shared geometric allocations across instanced Mesh clones.
 	 */
 	public destroy(destroyGeometry: boolean = false): void {
 		if (this.parent) {
@@ -222,15 +288,17 @@ export class Mesh extends Node3D {
 		}
 	}
 
-	// --- Static Helpers ---
 	/**
-	 * Applies transform options to a mesh.
+	 * Extracts and copies translation, rotation, and scaling coordinates from an options block.
+	 *
+	 * @param mesh - Target Mesh node.
+	 * @param options - Raw spatial option configurations.
 	 */
 	public static applyTransformOptions(
 		mesh: Mesh,
 		options: {
 			position?: number[] | Vec3;
-			scale?: number | number[];
+			scale?: number | number[] | Vec3;
 			rotation?: number[] | Vec3;
 			rotationDegrees?: number[] | Vec3;
 		},
@@ -261,11 +329,13 @@ export class Mesh extends Node3D {
 		}
 	}
 
-	// --- Static Factory Methods ---
-
 	/**
-	 * Creates a cube mesh.
-	 * Uses ctx.primitives for a typed, per-context geometry cache.
+	 * Factory method to instantiate a Cube mesh.
+	 * Automatically generates and assigns box CollisionShapes.
+	 *
+	 * @param ctx - Parent context.
+	 * @param options - Material parameters and sizing options.
+	 * @returns The newly allocated Cube Mesh.
 	 */
 	public static createCube(
 		ctx: Context,
@@ -284,6 +354,13 @@ export class Mesh extends Node3D {
 		return mesh;
 	}
 
+	/**
+	 * Factory method to instantiate a horizontal Plane mesh.
+	 *
+	 * @param ctx - Parent context.
+	 * @param options - Material parameters and width/height dimensions.
+	 * @returns The newly allocated Plane Mesh.
+	 */
 	public static createPlane(
 		ctx: Context,
 		options: StandardMaterialOptions & {
@@ -305,6 +382,14 @@ export class Mesh extends Node3D {
 		return mesh;
 	}
 
+	/**
+	 * Factory method to instantiate a Sphere mesh.
+	 * Automatically generates and assigns spherical CollisionShapes.
+	 *
+	 * @param ctx - Parent context.
+	 * @param options - Material parameters, radius dimension, and segment resolution.
+	 * @returns The newly allocated Sphere Mesh.
+	 */
 	public static createSphere(
 		ctx: Context,
 		options: StandardMaterialOptions & {
@@ -328,10 +413,20 @@ export class Mesh extends Node3D {
 		return mesh;
 	}
 
+	/**
+	 * Asynchronously fetches a 3D model asset from a URL, decodes it using a compatible ModelParser,
+	 * allocates GPU vertex and index buffers, resolves standard physical materials, and generates
+	 * appropriate CollisionShapes. Handles single-part OBJ geometries and hierarchical multi-part GLTF structures.
+	 *
+	 * @param ctx - Parent context.
+	 * @param url - Web address or file path pointing to the 3D model.
+	 * @param options - Material options or physical configurations.
+	 * @returns A promise resolving to a container Node3D holding the loaded mesh segment nodes.
+	 */
 	public static async load(
 		ctx: Context,
 		url: string,
-		// biome-ignore lint/suspicious/noExplicitAny: options are passed through to StandardMaterial
+		// biome-ignore lint/suspicious/noExplicitAny: options are passed directly to sub-components
 		options: any,
 	): Promise<Node3D> {
 		const modelData = await ctx.loader.loadModel(url);

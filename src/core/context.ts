@@ -5,68 +5,78 @@ import { Input } from "./input";
 import { Loader } from "./loader";
 
 /**
- * @module Context
- *
- * Holds all per-canvas WebGPU state: the GPU device, canvas context,
- * preferred format, and shared engine singletons (pipeline manager,
- * asset loader, VRAM tracker, primitive geometry cache).
+ * Context acts as the primary orchestrator for a WebGPU instance on a target HTMLCanvasElement.
+ * It encapsulates the GPUDevice connection, the GPUCanvasContext configuration, and aggregates
+ * key framework singletons such as the PipelineManager, asset Loader, VRAMTracker, and PrimitivesFactory.
  */
 export class Context {
 	/**
-	 * The logical device interface to the GPU.
+	 * The logical GPU device interface representing a connection to the physical GPU.
+	 * Utilized for resource allocation (buffers, textures, pipelines).
 	 */
 	public device!: GPUDevice;
 
 	/**
-	 * The WebGPU context associated with the canvas.
+	 * The WebGPU-specific canvas rendering context.
+	 * Configured to represent presentable textures rendered directly into the DOM canvas.
 	 */
 	public context!: GPUCanvasContext;
 
 	/**
-	 * The preferred canvas format for the user's system.
+	 * The preferred color format optimized for display on the local system (usually 'bgra8unorm' or 'rgba8unorm').
 	 */
 	public format!: GPUTextureFormat;
 
 	/**
-	 * Per-context pipeline manager (non-static, supports multiple canvases).
+	 * Pipeline manager associated with this context.
+	 * Manages WebGPU pipeline compilations and cached bind group layouts.
 	 */
 	public pipelineManager!: PipelineManager;
 
 	/**
-	 * Per-context asset loader. Use ctx.loader.loadTexture / loadModel / loadShader.
-	 * Supports custom model parsers via ctx.loader.registerParser().
+	 * Asset loader instance associated with this context.
+	 * Manages network loading, parsing of GLB/GLTF models, textures, and custom formats.
 	 */
 	public loader!: Loader;
 
 	/**
-	 * Per-context VRAM tracker. All GPU resource allocations are registered here
-	 * so the debug panel can display accurate memory usage.
+	 * VRAM tracker instance.
+	 * Monitored inside the context to log, register, and analyze VRAM allocations
+	 * for debug visualizer purposes.
 	 */
 	public vramTracker: VRAMTracker = new VRAMTracker();
 
 	/**
-	 * Per-context typed cache for built-in primitive geometries (cube, plane, sphere).
+	 * Primitive geometry generator and cache.
+	 * Avoids redundant pipeline / vertex allocations for standard geometric shapes like cubes, planes, or spheres.
 	 */
 	public primitives: PrimitivesFactory = new PrimitivesFactory();
 
 	/**
-	 * Cached dummy textures (white 1×1, flat-normal 1×1). Keyed by "white" | "normal".
-	 * Stored as unknown to avoid a circular import with graphics/texture.ts.
+	 * Shared fallback textures representing solid white colors and flat normal vectors.
+	 * Declared as `unknown` to avoid direct circular dependencies with the `Texture` class.
 	 */
 	public defaultTextures: {
+		/** Standard solid white 1x1 pixels texture. */
 		white?: unknown;
+		/** Default tangent-space normal map fallback (128, 128, 255). */
 		normal?: unknown;
 	} = {};
 
 	/**
-	 * Check if WebGPU is supported.
+	 * Assesses whether the active navigator environment implements standard WebGPU interfaces.
+	 *
+	 * @returns True if WebGPU is supported, false otherwise.
 	 */
 	public static isSupported(): boolean {
 		return !!navigator.gpu;
 	}
 
 	/**
-	 * Express initialization of a Context from a CSS selector string or canvas element.
+	 * High-level initialization routine that resolves a canvas element and boots WebGPU services.
+	 *
+	 * @param selector - A CSS query selector string or a direct HTMLCanvasElement reference.
+	 * @returns A Promise resolving to an initialized Context.
 	 */
 	public static async init(
 		selector: string | HTMLCanvasElement,
@@ -86,7 +96,10 @@ export class Context {
 	}
 
 	/**
-	 * Initialize the WebGPU context on a given canvas element.
+	 * Configures the HTML5 canvas for WebGPU, requests physical adapter connections,
+	 * initializes GPUDevice capabilities, and instantiates shared managers.
+	 *
+	 * @param canvas - Target HTMLCanvasElement for WebGPU swapchain presentation.
 	 */
 	public async initCanvas(canvas: HTMLCanvasElement): Promise<void> {
 		if (!Context.isSupported()) {
@@ -116,7 +129,10 @@ export class Context {
 	}
 
 	/**
-	 * Runs a render loop, calling loopFunction each frame with delta time in seconds.
+	 * Executes a standard high-performance requestAnimationFrame render loop.
+	 * Automatically calculates and supplies delta times while resetting frame-transient inputs.
+	 *
+	 * @param loopFunction - Callback invoked every render frame, receiving the frame delta time in seconds.
 	 */
 	public run(loopFunction: (dt: number) => void): void {
 		let lastTime = performance.now();

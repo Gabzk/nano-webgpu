@@ -7,18 +7,23 @@ import {
 } from "./primitives";
 
 /**
- * Per-context cache for built-in primitive geometries (cube, plane, sphere).
- * Replaces the loosely-typed `ctx.defaultGeometries: { cube?: unknown }` pattern.
- * Stored on Context as `ctx.primitives`.
+ * PrimitivesFactory manages a per-context lazy-loaded cache of standard geometric shapes.
+ * Promotes high-performance vertex/index buffer resource sharing and avoids redundant GPU allocations.
  */
 export class PrimitivesFactory {
+	/** @internal Cached cube geometry block. */
 	private _cube: Geometry | null = null;
+	/** @internal Cached plane geometry block. */
 	private _plane: Geometry | null = null;
+	/** @internal Cached sphere geometry block. */
 	private _sphere: Geometry | null = null;
 
 	/**
-	 * Returns the shared unit cube geometry, creating it once per context.
-	 * @param size - Only used on the very first call; subsequent calls return the cached geometry.
+	 * Returns the shared unit cube geometry, instantiating it on the very first call.
+	 *
+	 * @param ctx - Active context.
+	 * @param size - Sizing dimension. Only applied if the cube is first instantiated here. Defaults to `1.0`.
+	 * @returns The cached or newly allocated Cube Geometry.
 	 */
 	public getCube(ctx: Context, size = 1.0): Geometry {
 		if (!this._cube) {
@@ -28,7 +33,12 @@ export class PrimitivesFactory {
 	}
 
 	/**
-	 * Returns the shared unit plane geometry, creating it once per context.
+	 * Returns the shared unit plane geometry, instantiating it on the very first call.
+	 *
+	 * @param ctx - Active context.
+	 * @param width - Span width along the X axis. Defaults to `1.0`.
+	 * @param height - Span depth along the Z axis. Defaults to `1.0`.
+	 * @returns The cached or newly allocated Plane Geometry.
 	 */
 	public getPlane(ctx: Context, width = 1.0, height = 1.0): Geometry {
 		if (!this._plane) {
@@ -38,7 +48,13 @@ export class PrimitivesFactory {
 	}
 
 	/**
-	 * Returns the shared unit sphere geometry, creating it once per context.
+	 * Returns the shared sphere geometry, instantiating it on the very first call.
+	 *
+	 * @param ctx - Active context.
+	 * @param radius - Radial size of the sphere. Defaults to `1.0`.
+	 * @param widthSegments - Horizontal subdivision segments. Defaults to `16`.
+	 * @param heightSegments - Vertical subdivision segments. Defaults to `16`.
+	 * @returns The cached or newly allocated Sphere Geometry.
 	 */
 	public getSphere(
 		ctx: Context,

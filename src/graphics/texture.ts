@@ -1,26 +1,42 @@
 import type { Context } from "../core/context";
 
 /**
- * A wrapper for GPUTexture that handles asynchronous loading.
+ * Texture is a high-level wrapper around the native WebGPU `GPUTexture`.
+ * Handles asynchronous background texture fetching and allocation while immediately supplying
+ * lightweight fallback pixel placeholders (solid white or flat normal vectors) to avoid
+ * blocking rendering pipelines during network transfers.
  */
 export class Texture {
+	/** Active native WebGPU GPUTexture resource. */
 	public gpuTexture!: GPUTexture;
+
+	/** Flag indicating whether the real image asset has successfully finished loading. */
 	public isLoaded: boolean = false;
+
+	/** Source web address or file path of the image asset. */
 	public url: string = "";
+
+	/** @internal Collection of callback hooks triggered immediately upon resource completion. */
 	private listeners: (() => void)[] = [];
 
 	/**
-	 * Called when the texture finishes loading.
+	 * Registers a callback routine invoked when the asynchronous texture load successfully completes.
+	 *
+	 * @param cb - The update callback function.
 	 */
 	public onUpdate(cb: () => void): void {
 		this.listeners.push(cb);
 	}
 
 	/**
-	 * Loads a texture synchronously, substituting a white pixel until finished.
-	 * If `url` is a Blob URL (created by the GLTF loader for embedded textures),
-	 * it will be automatically revoked after the GPU upload completes.
-	 * Uses ctx.loader (singleton) instead of creating a new Loader instance per call.
+	 * Spawns a Texture loading sequence in the background, immediately returning a container holding
+	 * a 1x1 solid white pixel. Replaces the placeholder texture in-place once loading finishes,
+	 * triggering all update listeners. Revokes Blob URLs automatically to prevent memory leaks.
+	 *
+	 * @param ctx - Active context.
+	 * @param url - Source address of the texture image.
+	 * @param options - Custom format configurations.
+	 * @returns The newly allocated Texture instance.
 	 */
 	public static loadBackground(
 		ctx: Context,
@@ -85,8 +101,11 @@ export class Texture {
 	}
 
 	/**
-	 * Returns a cached 1×1 white dummy texture for the given context.
-	 * Created once per context and reused — safe across multiple Scene instances.
+	 * Resolves a global, cached 1x1 solid white pixel placeholder texture.
+	 * Reuses the same instance across the entire context lifetime to optimize memory.
+	 *
+	 * @param ctx - Active context.
+	 * @returns The white placeholder Texture.
 	 */
 	public static getDummyWhite(ctx: Context): Texture {
 		if (ctx.defaultTextures.white) return ctx.defaultTextures.white as Texture;
@@ -121,8 +140,12 @@ export class Texture {
 	}
 
 	/**
-	 * Returns a cached 1×1 flat normal dummy texture for the given context.
-	 * (128, 128, 255) → straight-Z normal. Created once per context and reused.
+	 * Resolves a global, cached 1x1 neutral normal map texture.
+	 * Returns a straight-up vector (128, 128, 255, 255) representing (0, 0, 1) tangent coordinates.
+	 * Reuses the same instance across the entire context lifetime.
+	 *
+	 * @param ctx - Active context.
+	 * @returns The flat normal map fallback Texture.
 	 */
 	public static getDummyNormal(ctx: Context): Texture {
 		if (ctx.defaultTextures.normal)

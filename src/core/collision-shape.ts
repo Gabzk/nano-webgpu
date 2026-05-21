@@ -2,28 +2,41 @@ import { AABB } from "../math/aabb";
 import { Vec3 } from "../math/vec3";
 
 /**
- * @module CollisionShape
- 
- * Defines the collision shape associated with a Node3D.
- * Inspired by Godot's CollisionShape3D node — here simplified as a plain data class
- * that is set on the Node3D directly instead of being a child node.
+ * Supported types of collision shapes for spatial bounding representation.
+ * - `"box"`: An axis-aligned rectangular cuboid.
+ * - `"sphere"`: A spherical bounding volume.
  */
 export type ShapeType = "box" | "sphere";
 
+/**
+ * CollisionShape represents a bounding volume used for basic collision queries and overlap checks.
+ * Centered locally around its parent Node3D's origin, it provides local-space AABB bounds that
+ * are transformed into world-space when resolving intersections.
+ */
 export class CollisionShape {
+	/** The specific bounding geometry type represented by this shape. */
 	public type: ShapeType;
 
 	/**
-	 * For "box": half-extents on each axis.
-	 * A cube of size 1 has half-extents (0.5, 0.5, 0.5).
+	 * Bounding half-extents (dimensions divided by two) along local X, Y, and Z axes.
+	 * Primarily utilized when shape type is `"box"`.
 	 */
 	public halfExtents: Vec3;
 
 	/**
-	 * For "sphere": the radius.
+	 * Radius of the bounding sphere.
+	 * Primarily utilized when shape type is `"sphere"`.
 	 */
 	public radius: number;
 
+	/**
+	 * Internal constructor to initialize a CollisionShape with given attributes.
+	 * Use static factory methods `.box()` or `.sphere()` to instantiate.
+	 *
+	 * @param type - Bounding shape type.
+	 * @param halfExtents - Initial half-extents vector.
+	 * @param radius - Initial radius factor.
+	 */
 	private constructor(type: ShapeType, halfExtents: Vec3, radius: number) {
 		this.type = type;
 		this.halfExtents = halfExtents;
@@ -31,8 +44,10 @@ export class CollisionShape {
 	}
 
 	/**
-	 * Creates a box collision shape from a size (full extent) or a Vec3 of sizes.
-	 * @param size - Full size on each axis. Can be a number (cube) or Vec3.
+	 * Factory method to instantiate a box-shaped bounding volume.
+	 *
+	 * @param size - Full dimension size. Can be a single scalar for cubes or a Vec3 specifying width, height, and depth.
+	 * @returns A newly created box CollisionShape.
 	 */
 	public static box(size: Vec3 | number = 1.0): CollisionShape {
 		let he: Vec3;
@@ -45,8 +60,10 @@ export class CollisionShape {
 	}
 
 	/**
-	 * Creates a sphere collision shape.
-	 * @param radius - The radius of the sphere.
+	 * Factory method to instantiate a sphere-shaped bounding volume.
+	 *
+	 * @param radius - Radius dimension of the bounding sphere.
+	 * @returns A newly created sphere CollisionShape.
 	 */
 	public static sphere(radius: number = 0.5): CollisionShape {
 		return new CollisionShape(
@@ -57,8 +74,10 @@ export class CollisionShape {
 	}
 
 	/**
-	 * Computes this shape's local-space AABB (centered at origin, before any transform).
-	 * The AABB for a sphere is the bounding cube that wraps it.
+	 * Computes the local axis-aligned bounding box (AABB) centered at origin (0, 0, 0) for this shape,
+	 * before any spatial node transformations are applied.
+	 *
+	 * @returns The calculated local-space AABB.
 	 */
 	public getLocalAABB(): AABB {
 		const he = this.halfExtents;

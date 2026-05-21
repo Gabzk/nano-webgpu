@@ -7,34 +7,62 @@ import type { Light } from "./light";
 import type { Scene } from "./scene";
 import { ShadowSystem } from "./shadow-system";
 
+/**
+ * Renderer coordinates the forward rendering pipeline.
+ * It manages core presentation textures (depth attachments, HDR color buffers), aggregates and uploads
+ * light properties to storage buffers, compiles global viewport/ambient uniform bind groups, drives instanced
+ * drawing via `BatchManager`, runs directional shadow map passes via `ShadowSystem`, supports multi-pass overlays
+ * (using the `.nextPass` material feature), and applies fullscreen post-processing FXAA filters.
+ */
 export class Renderer {
+	/** Parent context reference. */
 	public ctx: Context;
 
+	/** @internal Scene depth buffer texture. */
 	private depthTexture!: GPUTexture;
+	/** @internal Storage buffer holding packed light characteristics. */
 	private lightsBuffer!: GPUBuffer;
 
+	/** @internal CPU-side float cache mapping light fields. */
 	private lightsDataFloat!: Float32Array;
+	/** @internal CPU-side unsigned integer view mapping light count fields. */
 	private lightsDataUint32!: Uint32Array;
 
+	/** @internal Resolved global variables bind group containing camera and lights uniforms. */
 	private globalsBindGroup!: GPUBindGroup;
+	/** Flag indicating if global uniform matrices or light properties changed, requiring bind group re-creation. */
 	public globalsBindGroupDirty: boolean = true;
 
 	// --- Post Processing ---
+	/** @internal Fullscreen color buffer captured prior to post-processing passes. */
 	private sceneTexture!: GPUTexture;
+	/** @internal Color buffer interpolation sampler. */
 	private postProcessSampler!: GPUSampler;
+	/** @internal Post-processing bind group containing scene color and sampler structures. */
 	private postProcessBindGroup!: GPUBindGroup;
+	/** Uniform buffer containing FXAA configuration flags and accumulated frame time. */
 	public renderSettingsBuffer!: GPUBuffer;
-	// renderSettingsFloat[0] → fxaa_enabled (u32 written via renderSettingsUint32)
-	// renderSettingsFloat[1] → time (f32)
+	/** float32 render settings array. [0] = FXAA enable flag, [1] = elapsed seconds. */
 	public renderSettingsFloat = new Float32Array(4);
-	public renderSettingsUint32 = new Uint32Array(this.renderSettingsFloat.buffer);
-	/** Accumulated render time in seconds. Updated each frame by Scene. */
+	/** uint32 render settings array mapping the float array buffer directly. */
+	public renderSettingsUint32 = new Uint32Array(
+		this.renderSettingsFloat.buffer,
+	);
+	/** Accumulated rendering time in seconds. Driving shader animations. */
 	public elapsedTime = 0;
 
 	// --- Subsystems ---
+	/** Directional orthographic shadow pass controller. */
 	private shadow: ShadowSystem;
+	/** Instanced geometry batching coordinator. */
 	private batcher: BatchManager;
 
+	/**
+	 * Instantiates a new Renderer, allocating uniform buffers, depth attachments,
+	 * and post-processing dependencies.
+	 *
+	 * @param ctx - Active context.
+	 */
 	constructor(ctx: Context) {
 		this.ctx = ctx;
 		this.shadow = new ShadowSystem(ctx);
@@ -44,6 +72,9 @@ export class Renderer {
 		this.ensureLightsBufferSize(0);
 	}
 
+	/**
+	 * @internal Allocates fullscreen post processing render parameters.
+	 */
 	private initPostProcess() {
 		this.renderSettingsBuffer = this.ctx.device.createBuffer({
 			size: 16,
@@ -63,6 +94,10 @@ export class Renderer {
 		});
 	}
 
+	/**
+	 * Re-allocates presentation targets (depth textures, intermediate color buffers)
+	 * to match updated canvas sizes.
+	 */
 	public resizeDepthTexture() {
 		if (this.depthTexture) {
 			this.ctx.vramTracker.unregister(this.depthTexture);
@@ -116,6 +151,10 @@ export class Renderer {
 		});
 	}
 
+	/**
+	 * @internal Dynamically enlarges the light storage buffer in memory if the active light count
+	 * exceeds current allocations. Allocates in increments of 16 lights.
+	 */
 	private ensureLightsBufferSize(lightCount: number) {
 		const currentLimit = this.lightsDataFloat
 			? (this.lightsDataFloat.length - 4) / 8
@@ -162,8 +201,9 @@ export class Renderer {
 	}
 
 	/**
-	 * Uploads all light data to the GPU lights buffer.
-	 * Uses polymorphic getLightData() — no instanceof checks.
+	 * Extracts light properties and updates the GPU storage buffers.
+	 *
+	 * @param lights - Current list of active lights in the scene.
 	 */
 	public updateLightsBuffer(lights: ReadonlyArray<Light>) {
 		const limit = lights.length;
@@ -193,6 +233,16 @@ export class Renderer {
 		);
 	}
 
+	/**
+	 * Computes and submits the complete rendering pass commands for the active frame.
+	 * Groups meshes into instanced batches, executes shadow passes, resolves global variables,
+	 * draws PBR base passes, runs secondary overlay passes (outline shaders), and draws fullscreen FXAA quads.
+	 *
+	 * @param scene - Source Scene node hierarchy.
+	 * @param camera - Active viewport camera.
+	 * @param perfTracker - Performance statistics recorder.
+	 * @param dt - Delta time in seconds since the last frame.
+	 */
 	public render(
 		scene: Scene,
 		camera: Camera,
@@ -202,7 +252,13 @@ export class Renderer {
 		// Update elapsed time for shader animations (settings.time_bits = bitcast of f32 seconds)
 		this.elapsedTime += dt;
 		this.renderSettingsFloat[1] = this.elapsedTime;
-		this.ctx.device.queue.writeBuffer(this.renderSettingsBuffer, 4, this.renderSettingsFloat.buffer, 4, 4);
+		this.ctx.device.queue.writeBuffer(
+			this.renderSettingsBuffer,
+			4,
+			this.renderSettingsFloat.buffer,
+			4,
+			4,
+		);
 		if (
 			camera.aspect !==
 			this.ctx.context.canvas.width / this.ctx.context.canvas.height
@@ -218,7 +274,7 @@ export class Renderer {
 			colorAttachments: [
 				{
 					view: this.sceneTexture.createView(),
-					// biome-ignore lint/suspicious/noExplicitAny: Color.toFloat32Array() returns compatible type
+					// biome-ignore lint/suspicious/noExplicitAny: native clear array translation
 					clearValue: scene.backgroundColor.toFloat32Array() as any,
 					loadOp: "clear",
 					storeOp: "store",
@@ -309,12 +365,82 @@ export class Renderer {
 				2,
 				representative.material.getBindGroup(this.ctx),
 			);
+			// Group 3: custom shader uniforms (ShaderMaterial only — null for StandardMaterial)
+			const paramsGroup = representative.material.getParamsBindGroup(this.ctx);
+			if (paramsGroup) passEncoder.setBindGroup(3, paramsGroup);
+
 			passEncoder.setVertexBuffer(0, representative.geometry.vertexBuffer);
 			passEncoder.setIndexBuffer(
 				representative.geometry.indexBuffer,
 				representative.geometry.indexFormat,
 			);
 
+			passEncoder.drawIndexed(
+				representative.geometry.indexCount,
+				instanceCount,
+			);
+
+			if (perfTracker) {
+				perfTracker.recordDraw(
+					representative.geometry.vertexCount * instanceCount,
+					representative.geometry.indexCount * instanceCount,
+				);
+			}
+		}
+
+		// 5b. Next pass.
+		// Re-renders each batch whose primary material has a `.nextPass` set,
+		// using the next-pass material with the same instance matrices and geometry.
+		for (const [batchKey, batchMeshes] of this.batcher.getGroups()) {
+			if (batchMeshes.length === 0) continue;
+			const representative = batchMeshes[0];
+			const nextPass = representative.material.nextPass;
+			if (!nextPass) continue;
+
+			const batch = this.batcher.getBatch(batchKey);
+			if (!batch) continue;
+
+			const instanceCount = batchMeshes.length;
+			const topology = representative.geometry.topology;
+			const indexFormat = representative.geometry.indexFormat;
+			const materialCull = normalizeCullMode(nextPass.cullMode);
+			const geometryCull = normalizeCullMode(representative.geometry.cullMode);
+			const cullMode = materialCull ?? geometryCull;
+
+			// Configure safe overlay defaults for the next pass so it renders cleanly on top of the base mesh
+			const originalDepthWrite = nextPass.depthWriteEnabled;
+			const originalDepthCompare = nextPass.depthCompare;
+
+			// If the user hasn't customized the next pass depth settings, use overlay defaults
+			if (nextPass.depthCompare === "less") {
+				nextPass.depthCompare = "less-equal";
+			}
+			nextPass.depthWriteEnabled = false;
+
+			const nextPipeline = nextPass.getPipeline(
+				this.ctx,
+				topology,
+				indexFormat,
+				cullMode,
+			);
+
+			// Restore original material depth properties
+			nextPass.depthWriteEnabled = originalDepthWrite;
+			nextPass.depthCompare = originalDepthCompare;
+
+			passEncoder.setPipeline(nextPipeline);
+			if (perfTracker) perfTracker.recordMaterialChange();
+
+			passEncoder.setBindGroup(1, batch.bindGroup);
+			passEncoder.setBindGroup(2, nextPass.getBindGroup(this.ctx));
+			const nextParamsGroup = nextPass.getParamsBindGroup(this.ctx);
+			if (nextParamsGroup) passEncoder.setBindGroup(3, nextParamsGroup);
+
+			passEncoder.setVertexBuffer(0, representative.geometry.vertexBuffer);
+			passEncoder.setIndexBuffer(
+				representative.geometry.indexBuffer,
+				indexFormat,
+			);
 			passEncoder.drawIndexed(
 				representative.geometry.indexCount,
 				instanceCount,

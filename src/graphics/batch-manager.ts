@@ -2,40 +2,52 @@ import type { Context } from "../core/context";
 import type { PerformanceTracker } from "../debug/performance-tracker";
 import type { Mesh } from "./mesh";
 
+/**
+ * Internal batch record tracking instanced render metrics and buffers.
+ */
 export interface InstanceBatch {
+	/** GPUBuffer containing sequence of model matrices array. */
 	buffer: GPUBuffer;
+	/** GPUBindGroup mapping this instance batch storage resource. */
 	bindGroup: GPUBindGroup;
+	/** Allocated matrix count limit capacity. */
 	capacity: number;
 }
 
 /**
- * Manages GPU instance storage buffers and batch grouping for instanced rendering.
- * Extracted from Renderer to satisfy Single Responsibility Principle.
- *
- * Responsibilities:
- * - Groups visible meshes by geometry+material key (batchGroups)
- * - Allocates and grows GPU storage buffers per batch (instanceBatches)
- * - Uploads per-instance world matrices each frame
+ * BatchManager organizes visible scene meshes into discrete material/geometry instanced batches.
+ * Allocates and grows GPU STORAGE buffers containing transformation matrix arrays to drive
+ * instanced draw calls, drastically optimizing drawing bottlenecks. Reuses data buffers
+ * to prevent garbage collector memory churning pressure.
  */
 export class BatchManager {
+	/** Parent context reference. */
 	private ctx: Context;
 
-	/** Persistent batch-group map. Arrays are cleared/refilled each frame (no GC allocs). */
+	/** @internal Map of active batch groups sorted by material+geometry composite keys. */
 	private batchGroups: Map<string, Mesh[]> = new Map();
 
-	/** Per-batch GPU storage buffers and their bind groups. */
+	/** @internal Map of allocated GPU InstanceBatch storage structures. */
 	private instanceBatches: Map<string, InstanceBatch> = new Map();
 
-	/** Reusable scratch buffer for matrix uploads. Grows as needed, never shrinks. */
+	/** @internal Persistent scratch array used to bundle world transformation values for GPU uploads. */
 	private instanceMatrixScratch: Float32Array = new Float32Array(16 * 64);
 
+	/**
+	 * Instantiates a new BatchManager.
+	 *
+	 * @param ctx - Active context.
+	 */
 	constructor(ctx: Context) {
 		this.ctx = ctx;
 	}
 
 	/**
-	 * Groups visible meshes by geometry+material, reusing existing array objects to
-	 * avoid per-frame GC pressure. Call once per frame before any render pass.
+	 * Scans visible mesh configurations and partitions them into instanced batches.
+	 * Reuses array collections from previous frames to eliminate garbage collection allocations.
+	 * Must be executed every frame prior to rendering sequences.
+	 *
+	 * @param meshes - Flat list of all meshes in the scene.
 	 */
 	public rebuild(meshes: ReadonlyArray<Mesh>): void {
 		for (const group of this.batchGroups.values()) {
@@ -53,24 +65,39 @@ export class BatchManager {
 		}
 	}
 
-	/** Read-only access to the batch groups for render passes. */
+	/**
+	 * Exposes visible batch groupings sorted by instanced keys.
+	 *
+	 * @returns Read-only Map of mesh groups.
+	 */
 	public getGroups(): Map<string, Mesh[]> {
 		return this.batchGroups;
 	}
 
-	/** Read-only access to the instance GPU batches (bind groups + buffers). */
+	/**
+	 * Exposes instanced storage buffers allocated in VRAM.
+	 *
+	 * @returns Map of InstanceBatches.
+	 */
 	public getInstanceBatches(): Map<string, InstanceBatch> {
 		return this.instanceBatches;
 	}
 
-	/** Returns the GPU batch for a given batch key, or undefined if not yet allocated. */
+	/**
+	 * Resolves the InstanceBatch details mapped to the specified key.
+	 *
+	 * @param key - The batch identification key.
+	 * @returns The target InstanceBatch, or undefined if not allocated.
+	 */
 	public getBatch(key: string): InstanceBatch | undefined {
 		return this.instanceBatches.get(key);
 	}
 
 	/**
-	 * Uploads world matrices for all batches and grows/allocates GPU buffers as needed.
-	 * Must be called after rebuild() and before any render pass that reads instance data.
+	 * Bundles and uploads coordinate arrays for active batches, growing GPU STORAGE buffers as needed.
+	 * Propagates updated visible mesh statistics into performance trackers.
+	 *
+	 * @param perfTracker - Optional PerformanceTracker to update.
 	 */
 	public uploadMatrices(perfTracker: PerformanceTracker | null): void {
 		for (const [batchKey, batchMeshes] of this.batchGroups) {

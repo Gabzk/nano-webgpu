@@ -1,27 +1,57 @@
 import type { Context } from "../core/context";
 import type { CullMode } from "./cull-mode";
 
+/**
+ * Geometry encapsulates physical vertex and index GPUBuffers allocated in VRAM,
+ * standardizing heterogeneous coordinate data into uniform 11-float vertex formats.
+ */
 export class Geometry {
+	/** @internal Sequential static counter generating unique geometry identifiers. */
 	private static _nextId = 0;
+
+	/** Unique runtime geometry block identifier. */
 	public readonly id: number;
 
+	/** GPUBuffer instance containing interleaved vertex attribute components. */
 	public vertexBuffer!: GPUBuffer;
+
+	/** GPUBuffer instance containing index element arrays. */
 	public indexBuffer!: GPUBuffer;
+
+	/** Total vertex elements present in the vertex buffer. */
 	public vertexCount: number = 0;
+
+	/** Total index elements present in the index buffer. */
 	public indexCount: number = 0;
+
+	/** Boolean flag showing if the source array contained UV coordinate components. */
 	public hasUVs: boolean = false;
+
+	/** Boolean flag showing if the source array contained surface normal components. */
 	public hasNormals: boolean = false;
 
+	/** Index mapping format (either `"uint16"` or `"uint32"`). */
 	public indexFormat: GPUIndexFormat = "uint16";
 
+	/** Boolean flag showing if the source array contained vertex color components. */
 	public hasColors: boolean = false;
 
-	/** WebGPU primitive topology used when rendering this geometry. */
+	/** GPU primitive assembly topology configuration. */
 	public topology: GPUPrimitiveTopology = "triangle-list";
 
-	/** Optional cull mode override. When undefined, the pipeline picks a sensible default based on topology. */
+	/** Optional culling mode override. Defaults to pipeline/topology preferences when undefined. */
 	public cullMode: CullMode | undefined = undefined;
 
+	/**
+	 * Instantiates a new Geometry resource block, allocating and writing vertex and index buffers.
+	 * Programmatically expands and translates raw coordinates into standard 11-float GPU formats
+	 * (pos:3, norm:3, uv:2, color:3).
+	 *
+	 * @param ctx - Active framework context.
+	 * @param vertices - Source raw float vertex components.
+	 * @param indices - Source index arrays.
+	 * @param options - Attribute specifications and topology overrides.
+	 */
 	constructor(
 		ctx: Context,
 		vertices: Float32Array,
@@ -110,7 +140,7 @@ export class Geometry {
 			size: gpuVertices.byteLength,
 			usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
 		});
-		// biome-ignore lint/suspicious/noExplicitAny: disable rule for now
+		// biome-ignore lint/suspicious/noExplicitAny: native typed array copy
 		ctx.device.queue.writeBuffer(this.vertexBuffer, 0, gpuVertices as any);
 		ctx.vramTracker.register(
 			this.vertexBuffer,
@@ -137,7 +167,7 @@ export class Geometry {
 			);
 			ctx.device.queue.writeBuffer(this.indexBuffer, 0, padded);
 		} else {
-			// biome-ignore lint/suspicious/noExplicitAny: disable rule for now
+			// biome-ignore lint/suspicious/noExplicitAny: native typed array copy
 			ctx.device.queue.writeBuffer(this.indexBuffer, 0, indices as any);
 		}
 		ctx.vramTracker.register(
@@ -150,13 +180,9 @@ export class Geometry {
 	}
 
 	/**
-	 * Frees the GPU buffers associated with this geometry.
-	 * Be careful: only destroy a geometry if no other meshes are sharing it.
-	 */
-	/**
-	 * Frees the GPU buffers associated with this geometry.
-	 * Requires the Context to unregister from the VRAM tracker.
-	 * Be careful: only destroy a geometry if no other meshes are sharing it.
+	 * Releases vertex and index buffers from GPU memory and unregisters resources from VRAM trackers.
+	 *
+	 * @param ctx - Shared context instance.
 	 */
 	public destroy(ctx: Context): void {
 		if (this.vertexBuffer) {

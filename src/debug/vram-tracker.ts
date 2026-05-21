@@ -1,39 +1,44 @@
 /**
- * @module VRAMTracker
- *
- * Tracks GPU memory allocations (buffers and textures) created by the engine.
- * WebGPU does not expose a native API for querying total VRAM, so this uses
- * manual bookkeeping — every createBuffer/createTexture in the engine calls
- * ctx.vramTracker.register(), and every .destroy() calls ctx.vramTracker.unregister().
- *
- * Inspired by Godot's "Video RAM" debugger tab.
- *
- * Now an instance class stored on Context to support multiple canvases and testability.
+ * Struct representing a single tracked VRAM allocation entry.
  */
-
 export interface VRAMEntry {
-	/** Auto-increment unique ID */
+	/** Unique identification number incremented on registration. */
 	id: number;
-	/** 'buffer' or 'texture' */
+	/** Resource classification choice (`"buffer"` or `"texture"`). */
 	type: "buffer" | "texture";
-	/** WebGPU label (e.g. "Geometry Vertex Buffer") */
+	/** WebGPU label description assigned to the allocation block. */
 	label: string;
-	/** Size in bytes */
+	/** Size of the allocated resource block in bytes. */
 	sizeBytes: number;
-	/** Owning class name (e.g. "Geometry", "Mesh", "Camera") */
+	/** Owning class name that initiated the allocation. */
 	owner: string;
-	/** performance.now() at registration */
+	/** Epoch timestamp in milliseconds indicating when the resource was registered. */
 	createdAt: number;
-	/** The GPU resource reference (used as map key) */
+	/** Reference to the native WebGPU resource key. */
 	resource: GPUBuffer | GPUTexture;
 }
 
+/**
+ * VRAMTracker tracks GPU memory allocations (buffers and textures) created by the engine.
+ * WebGPU does not expose a native API for querying total VRAM, so this uses
+ * manual bookkeeping — every createBuffer/createTexture in the engine calls
+ * `ctx.vramTracker.register()`, and every `.destroy()` calls `ctx.vramTracker.unregister()`.
+ * An instance class stored on Context to support multiple canvases and testability.
+ */
 export class VRAMTracker {
+	/** @internal Active entries collection mapping native WebGPU resources. */
 	private entries: Map<GPUBuffer | GPUTexture, VRAMEntry> = new Map();
+	/** @internal Next allocation identification number. */
 	private nextId = 1;
 
 	/**
-	 * Register a newly created GPU resource.
+	 * Registers a newly created GPU resource allocation, caching timing and size details.
+	 *
+	 * @param resource - Native WebGPU buffer or texture object.
+	 * @param type - Resource classification category.
+	 * @param label - Resource description label.
+	 * @param sizeBytes - Resource size in bytes.
+	 * @param owner - Name of the owning class.
 	 */
 	public register(
 		resource: GPUBuffer | GPUTexture,
@@ -54,7 +59,9 @@ export class VRAMTracker {
 	}
 
 	/**
-	 * Unregister a GPU resource that has been destroyed.
+	 * Unregisters a GPU resource that has been released or destroyed.
+	 *
+	 * @param resource - Native WebGPU buffer or texture reference.
 	 */
 	public unregister(resource: GPUBuffer | GPUTexture): void {
 		this.entries.delete(resource);
@@ -62,6 +69,8 @@ export class VRAMTracker {
 
 	/**
 	 * Returns all tracked entries sorted by size (largest first).
+	 *
+	 * @returns Sorted array of tracked VRAMEntry items.
 	 */
 	public getEntries(): VRAMEntry[] {
 		return Array.from(this.entries.values()).sort(
@@ -70,7 +79,9 @@ export class VRAMTracker {
 	}
 
 	/**
-	 * Total estimated VRAM in bytes.
+	 * Estimates the total VRAM consumption across all registered entries.
+	 *
+	 * @returns Total estimated VRAM in bytes.
 	 */
 	public getTotalBytes(): number {
 		let total = 0;
@@ -81,7 +92,9 @@ export class VRAMTracker {
 	}
 
 	/**
-	 * Quick summary counts.
+	 * Extracts a concise summary count detailing active resource types and total byte sizes.
+	 *
+	 * @returns Metrics summary object.
 	 */
 	public getSummary(): {
 		buffers: number;
@@ -106,7 +119,10 @@ export class VRAMTracker {
 	}
 
 	/**
-	 * Formats bytes into human-readable string (e.g. "4.2 MB").
+	 * Formats raw byte counts into human-readable strings (e.g. `"4.25 MB"`).
+	 *
+	 * @param bytes - Size value in bytes.
+	 * @returns Formatted string.
 	 */
 	public static formatBytes(bytes: number): string {
 		if (bytes < 1024) return `${bytes} B`;
@@ -115,7 +131,7 @@ export class VRAMTracker {
 	}
 
 	/**
-	 * Clear all entries (useful for hot-reload / test scenarios).
+	 * Clears all active registrations.
 	 */
 	public clear(): void {
 		this.entries.clear();

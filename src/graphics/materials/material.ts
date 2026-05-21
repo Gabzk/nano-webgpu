@@ -3,35 +3,86 @@ import type { CullMode } from "../cull-mode";
 import type { ShaderMaterial } from "./shader-material";
 import type { StandardMaterial } from "./standard-material";
 
+/**
+ * Base configuration options common to all material types.
+ */
 export interface MaterialOptions {
+	/** If true, the material supports alpha transparency during rendering blending passes. */
 	transparent?: boolean;
+	/** Custom back-face/front-face/none culling mode selection. */
 	cullMode?: CullMode;
+	/** Toggle depth buffer writes. Defaults to `true`. */
+	depthWriteEnabled?: boolean;
+	/** Depth check comparison function. Defaults to `"less"`. */
+	depthCompare?: GPUCompareFunction;
 }
 
+/**
+ * Material represents the abstract shading template parent class.
+ * Defines standard interfaces for pipeline resolutions, binding parameter bind groups,
+ * and next-pass overlay layering (e.g. outline/highlight passes).
+ */
 export abstract class Material {
+	/** @internal Sequential static counter generating unique material instance identifiers. */
 	private static _nextId = 0;
 
+	/** Unique material identification key. */
 	public id: number;
+
+	/** Material class type string tag used for fast runtime polymorphism checks. */
 	public type: string = "Material";
+
+	/** Flag indicating if parameter properties are dirty, requiring a new bind group build. */
 	public isDirty: boolean = true;
+
+	/** Toggle depth buffer updates. Defaults to `true`. */
+	public depthWriteEnabled: boolean = true;
+
+	/** Depth check comparison function. Defaults to `"less"`. */
+	public depthCompare: GPUCompareFunction = "less";
+
+	/** @internal Material back/front face culling settings. */
 	protected _cullMode: CullMode | undefined = undefined;
 
-	constructor() {
+	/**
+	 * Secondary material rendered on top of the current pass.
+	 * Assign a ShaderMaterial here to layer a second render pass (e.g., outline effect) over the primary material.
+	 * The next pass automatically uses the same geometry and instance matrices, drawn immediately after.
+	 */
+	public nextPass: Material | null = null;
+
+	/**
+	 * Instantiates a new Material.
+	 *
+	 * @param options - Material base configuration options.
+	 */
+	constructor(options: MaterialOptions = {}) {
 		this.id = Material._nextId++;
+		if (options.cullMode !== undefined) this._cullMode = options.cullMode;
+		if (options.depthWriteEnabled !== undefined)
+			this.depthWriteEnabled = options.depthWriteEnabled;
+		if (options.depthCompare !== undefined)
+			this.depthCompare = options.depthCompare;
 	}
 
+	/** Gets the culling mode settings. */
 	public get cullMode(): CullMode | undefined {
 		return this._cullMode;
 	}
+
+	/** Sets the culling mode settings. */
 	public set cullMode(value: CullMode | undefined) {
 		this._cullMode = value;
 	}
 
 	/**
-	 * Rebuilds or fetches the WebGPU Render Pipeline for this material architecture.
-	 * @param topology - The primitive topology of the geometry being rendered (default: "triangle-list").
-	 * @param indexFormat - The index buffer format (relevant for strip topologies).
-	 * @param cullMode - Optional cull mode override. When undefined, the pipeline picks a default based on topology.
+	 * Abstract method compiling or retrieving the cached GPURenderPipeline matching specified topologies.
+	 *
+	 * @param ctx - Active context.
+	 * @param topology - Primitive assembly topology option. Defaults to `"triangle-list"`.
+	 * @param indexFormat - Index element data format. Defaults to `"uint16"`.
+	 * @param cullMode - Pipeline culling override.
+	 * @returns The resolved GPURenderPipeline.
 	 */
 	public abstract getPipeline(
 		ctx: Context,
@@ -41,21 +92,40 @@ export abstract class Material {
 	): GPURenderPipeline;
 
 	/**
-	 * Generates or fetches the Material's bound properties (like textures/colors) BindGroup.
+	 * Abstract method compiling or fetching the primary GPUBindGroup (group index 2) representing PBR parameters.
+	 *
+	 * @param ctx - Active context.
+	 * @returns The resolved material GPUBindGroup.
 	 */
 	public abstract getBindGroup(ctx: Context): GPUBindGroup;
+
+	/**
+	 * Custom parameter bind group (group index 3) utilized by custom ShaderMaterials.
+	 * Returns null by default for StandardMaterial.
+	 *
+	 * @param _ctx - Active context.
+	 * @returns The resolved custom parameters bind group or null.
+	 */
+	public getParamsBindGroup(_ctx: Context): GPUBindGroup | null {
+		return null;
+	}
 }
 
 /**
- * Type guard — returns true if the material is a StandardMaterial.
- * Prefer this over `instanceof` or duck-typing with `as any`.
+ * Type guard function to safely assert if a Material is a StandardMaterial.
+ *
+ * @param mat - Target Material node.
+ * @returns True if the material is a StandardMaterial, false otherwise.
  */
 export function isStandardMaterial(mat: Material): mat is StandardMaterial {
 	return mat.type === "StandardMaterial";
 }
 
 /**
- * Type guard — returns true if the material is a ShaderMaterial.
+ * Type guard function to safely assert if a Material is a ShaderMaterial.
+ *
+ * @param mat - Target Material node.
+ * @returns True if the material is a ShaderMaterial, false otherwise.
  */
 export function isShaderMaterial(mat: Material): mat is ShaderMaterial {
 	return mat.type === "ShaderMaterial";

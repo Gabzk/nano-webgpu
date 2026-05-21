@@ -153,13 +153,13 @@ export class Color {
 	 */
 	public toLinear(): Color {
 		const srgbToLinear = (c: number) => {
-			return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+			return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
 		};
 		return new Color(
 			srgbToLinear(this._r),
 			srgbToLinear(this._g),
 			srgbToLinear(this._b),
-			this._a
+			this._a,
 		);
 	}
 
