@@ -11,7 +11,6 @@ scene.addLight({ type: "directional", rotationDegrees: [45, 45, 0], intensity: 1
 scene.addPlane({ scale: 4 })
 
 const highlight = new ShaderMaterial({
-    cullMode: "none",
     shaderCode: highlightShader,
     parameters: {
         color: [1.0, 1, 1, 1.0],    // vec4 — white shimmer tint + alpha

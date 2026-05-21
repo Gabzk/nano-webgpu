@@ -15,9 +15,6 @@ const tri = scene.buildMesh({
     0, 1, 0, 0, 0, 1,
   ],
   topology: "triangle-list",
-  material: new StandardMaterial({
-    cullMode: "back",
-  }), 
 });
 
 const sun = scene.addLight({

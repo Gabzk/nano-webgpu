@@ -220,7 +220,6 @@ export class Mesh extends Node3D {
 			hasUVs: true,
 			hasColors: hasColors,
 			topology,
-			cullMode,
 		});
 
 		// Resolve material
@@ -231,6 +230,20 @@ export class Mesh extends Node3D {
 			finalMaterial = new StandardMaterial(material as StandardMaterialOptions);
 		} else {
 			finalMaterial = new StandardMaterial();
+		}
+
+		// Apply cullMode or default to "none" (unless a custom material/option already specified cullMode)
+		if (cullMode !== undefined) {
+			finalMaterial.cullMode = cullMode;
+		} else {
+			const hasMaterialCull =
+				material instanceof Material
+					? material.cullMode !== undefined
+					: material &&
+						(material as StandardMaterialOptions).cullMode !== undefined;
+			if (!hasMaterialCull) {
+				finalMaterial.cullMode = "none";
+			}
 		}
 
 		// Create Mesh

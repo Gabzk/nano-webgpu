@@ -1,5 +1,4 @@
 import type { Context } from "../core/context";
-import type { CullMode } from "./cull-mode";
 
 /**
  * Geometry encapsulates physical vertex and index GPUBuffers allocated in VRAM,
@@ -39,9 +38,6 @@ export class Geometry {
 	/** GPU primitive assembly topology configuration. */
 	public topology: GPUPrimitiveTopology = "triangle-list";
 
-	/** Optional culling mode override. Defaults to pipeline/topology preferences when undefined. */
-	public cullMode: CullMode | undefined = undefined;
-
 	/**
 	 * Instantiates a new Geometry resource block, allocating and writing vertex and index buffers.
 	 * Programmatically expands and translates raw coordinates into standard 11-float GPU formats
@@ -61,7 +57,6 @@ export class Geometry {
 			hasNormals?: boolean;
 			hasColors?: boolean;
 			topology?: GPUPrimitiveTopology;
-			cullMode?: CullMode;
 		} = {},
 	) {
 		this.id = Geometry._nextId++;
@@ -69,7 +64,6 @@ export class Geometry {
 		this.hasNormals = options.hasNormals ?? false;
 		this.hasColors = options.hasColors ?? false;
 		this.topology = options.topology ?? "triangle-list";
-		this.cullMode = options.cullMode;
 
 		const inputStride =
 			3 +

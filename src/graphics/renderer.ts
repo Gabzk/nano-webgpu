@@ -345,9 +345,7 @@ export class Renderer {
 
 			const topology = representative.geometry.topology;
 			const indexFormat = representative.geometry.indexFormat;
-			const materialCull = normalizeCullMode(representative.material.cullMode);
-			const geometryCull = normalizeCullMode(representative.geometry.cullMode);
-			const cullMode = materialCull ?? geometryCull;
+			const cullMode = normalizeCullMode(representative.material.cullMode);
 			const pipeline = representative.material.getPipeline(
 				this.ctx,
 				topology,
@@ -403,9 +401,7 @@ export class Renderer {
 			const instanceCount = batchMeshes.length;
 			const topology = representative.geometry.topology;
 			const indexFormat = representative.geometry.indexFormat;
-			const materialCull = normalizeCullMode(nextPass.cullMode);
-			const geometryCull = normalizeCullMode(representative.geometry.cullMode);
-			const cullMode = materialCull ?? geometryCull;
+			const cullMode = normalizeCullMode(nextPass.cullMode);
 
 			// Configure safe overlay defaults for the next pass so it renders cleanly on top of the base mesh
 			const originalDepthWrite = nextPass.depthWriteEnabled;
