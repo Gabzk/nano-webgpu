@@ -11,7 +11,7 @@ scene.defaultDir = "./assets";
 scene.addPlane({
 	position: [0, -0.94, -3],
 	scale: 10,
-	color: "#339933",
+	color: "forestgreen",
 });
 
 const shiba = await scene.loadMesh(`./shiba.glb`, {
@@ -28,7 +28,7 @@ scene.addInstance(shiba, {
 scene.addLight({
 	type: "directional",
 	rotationDegrees: [-135, 0, 0],
-	color: "#ffffff",
+	color: "#ffffffff",
 	intensity: 0.5,
 });
 

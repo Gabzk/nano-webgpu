@@ -66,9 +66,49 @@ describe("Color", () => {
 	});
 
 	it("should throw an error if the hex color is invalid", () => {
-		expect(() => Color.fromHex("FF000000")).toThrow("Invalid hex color");
-		expect(() => Color.fromHex("FF000")).toThrow("Invalid hex color");
+		expect(() => Color.fromHex("FF0000000")).toThrow("Invalid hex color length");
+		expect(() => Color.fromHex("FF000")).toThrow("Invalid hex color length");
 		expect(() => Color.fromHex("FF000G")).toThrow("Invalid hex color");
+	});
+
+	it("should create a color from short 3-digit hex", () => {
+		const color = Color.fromHex("#f00");
+		expect(color.r).toBe(1.0);
+		expect(color.g).toBe(0.0);
+		expect(color.b).toBe(0.0);
+		expect(color.a).toBe(1.0);
+	});
+
+	it("should create a color from short 4-digit hex with alpha", () => {
+		const color = Color.fromHex("#f00f");
+		expect(color.r).toBe(1.0);
+		expect(color.g).toBe(0.0);
+		expect(color.b).toBe(0.0);
+		expect(color.a).toBe(1.0);
+	});
+
+	it("should create a color from 8-digit hex with alpha", () => {
+		const color = Color.fromHex("#ff000080");
+		expect(color.r).toBe(1.0);
+		expect(color.g).toBe(0.0);
+		expect(color.b).toBe(0.0);
+		expect(color.a).toBeCloseTo(0.5);
+	});
+
+	it("should create a color from standard CSS name", () => {
+		const color = Color.fromHex("royalblue");
+		expect(color.r).toBeCloseTo(0.2549);
+		expect(color.g).toBeCloseTo(0.4117);
+		expect(color.b).toBeCloseTo(0.8823);
+		expect(color.a).toBe(1.0);
+	});
+
+	it("should support mixed-case CSS names with whitespace", () => {
+		const color = Color.fromHex("  RoyalBlue  ");
+		expect(color.r).toBeCloseTo(0.2549);
+		expect(color.g).toBeCloseTo(0.4117);
+		expect(color.b).toBeCloseTo(0.8823);
+		expect(color.a).toBe(1.0);
 	});
 
 	it("should create a linear interpolated color", () => {
