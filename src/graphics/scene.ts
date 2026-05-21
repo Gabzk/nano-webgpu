@@ -3,7 +3,7 @@ import { Node } from "../core/node";
 import { Node3D } from "../core/node3d";
 import type { DebugPanel } from "../debug/debug-panel";
 import { PerformanceTracker } from "../debug/performance-tracker";
-import { Color } from "../math/color";
+import { Color, type ColorLike } from "../math/color";
 import { Vec3 } from "../math/vec3";
 import { Camera, type CameraOptions } from "./camera";
 import {
@@ -41,7 +41,7 @@ export interface SceneLightOptions extends LightOptions {
  */
 export interface SceneGeometryOptions extends StandardMaterialOptions {
 	/** Solid base color value. */
-	color?: Color | string;
+	color?: ColorLike;
 	/** Custom Material or standard options. */
 	material?: Material | StandardMaterialOptions;
 	/** Initial position coordinates. */
@@ -138,7 +138,7 @@ export class Scene extends Node {
 	}
 
 	/** Sets the background clear color, parsing hex strings automatically. */
-	public set backgroundColor(color: Color | string) {
+	public set backgroundColor(color: ColorLike) {
 		if (!color) {
 			console.warn("nano-webgpu: backgroundColor cannot be null. Ignoring");
 			return;

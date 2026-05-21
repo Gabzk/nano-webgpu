@@ -11,7 +11,7 @@ scene.defaultDir = "./assets";
 scene.addPlane({
 	position: [0, -0.94, -3],
 	scale: 10,
-	color: "forestgreen",
+	color: "green",
 });
 
 const shiba = await scene.loadMesh(`./shiba.glb`, {

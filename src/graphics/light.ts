@@ -1,5 +1,5 @@
 import { Node3D } from "../core/node3d";
-import { Color } from "../math/color";
+import { Color, type ColorLike } from "../math/color";
 import { Vec3 } from "../math/vec3";
 
 /**
@@ -7,7 +7,7 @@ import { Vec3 } from "../math/vec3";
  */
 export interface LightOptions {
 	/** Color of emitted light. Can be a Color instance, hex string, or RGB array. Defaults to `#ffffff`. */
-	color?: Color | string | number[];
+	color?: ColorLike | number[];
 	/** Scalar multiplier for light emission intensity. Defaults to `1.0`. */
 	intensity?: number;
 	/** Optional initial position of the light node in 3D space. */

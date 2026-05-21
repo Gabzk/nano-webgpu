@@ -62,7 +62,7 @@ export {
 export { ShadowSystem } from "./graphics/shadow-system";
 export { Texture } from "./graphics/texture";
 export { AABB } from "./math/aabb";
-export { Color } from "./math/color";
+export { Color, type ColorLike, type ColorName } from "./math/color";
 export { Mat4 } from "./math/mat4";
 export { Vec2 } from "./math/vec2";
 export { Vec3 } from "./math/vec3";

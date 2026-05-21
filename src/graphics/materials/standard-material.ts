@@ -1,5 +1,5 @@
 import type { Context } from "../../core/context";
-import { Color } from "../../math/color";
+import { Color, type ColorLike } from "../../math/color";
 import type { CullMode } from "../cull-mode";
 import {
 	isCullDisabled,
@@ -14,7 +14,7 @@ import { Material, type MaterialOptions } from "./material";
  */
 export interface StandardMaterialOptions extends MaterialOptions {
 	/** Solid base color value or hex string representation. Defaults to white. */
-	albedoColor?: Color | string;
+	albedoColor?: ColorLike;
 	/** Map containing surface color data, or file path. */
 	albedoTexture?: Texture | string;
 
