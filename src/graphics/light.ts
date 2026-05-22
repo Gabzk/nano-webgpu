@@ -32,6 +32,8 @@ export interface DirectionalLightOptions extends LightOptions {
 	shadowRadius?: number;
 	/** Total depth range along the Z axis of the shadow projection frustum. Defaults to `200.0`. */
 	shadowDepthRange?: number;
+	/** Custom depth bias to avoid shadow acne or peter panning. Defaults to `0.0001`. */
+	shadowBias?: number;
 }
 
 /**
@@ -87,6 +89,8 @@ export interface ShadowConfig {
 	shadowRadius: number;
 	/** Linear depth range utilized by the orthographic shadow matrix projection. */
 	shadowDepthRange: number;
+	/** Shadow depth bias. */
+	shadowBias: number;
 }
 
 /**
@@ -182,6 +186,8 @@ export class DirectionalLight extends Light {
 	public shadowRadius: number = 20.0;
 	/** Near/Far depth boundary limits of the shadow projection volume. */
 	public shadowDepthRange: number = 200.0;
+	/** Custom depth bias to avoid shadow acne or peter panning. Defaults to `0.0001`. */
+	public shadowBias: number = 0.0001;
 
 	/**
 	 * Instantiates a new DirectionalLight node.
@@ -198,6 +204,7 @@ export class DirectionalLight extends Light {
 			this.shadowRadius = options.shadowRadius;
 		if (options.shadowDepthRange !== undefined)
 			this.shadowDepthRange = options.shadowDepthRange;
+		if (options.shadowBias !== undefined) this.shadowBias = options.shadowBias;
 	}
 
 	/**
@@ -232,6 +239,7 @@ export class DirectionalLight extends Light {
 			usePCF: this.usePCF,
 			shadowRadius: this.shadowRadius,
 			shadowDepthRange: this.shadowDepthRange,
+			shadowBias: this.shadowBias,
 		};
 	}
 }

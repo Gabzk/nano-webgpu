@@ -30,7 +30,7 @@ fn getShadow(shadowPos: vec4<f32>, bias: f32, texelSize: f32) -> f32 {
     let shadow = visibility / 9.0;
 
     // Outside shadow frustum = fully lit
-    let inBounds = step(0.0, uv.x) * step(uv.x, 1.0) * step(0.0, uv.y) * step(uv.y, 1.0);
+    let inBounds = step(0.0, uv.x) * step(uv.x, 1.0) * step(0.0, uv.y) * step(uv.y, 1.0) * step(currentDepth, 1.0);
     return mix(1.0, shadow, inBounds);
 }
 `;
@@ -48,7 +48,7 @@ fn getShadow(shadowPos: vec4<f32>, bias: f32, _texelSize: f32) -> f32 {
     let shadow = textureSampleCompare(shadowMap, shadowSampler, clampedUV, currentDepth - bias);
 
     // Outside shadow frustum = fully lit
-    let inBounds = step(0.0, uv.x) * step(uv.x, 1.0) * step(0.0, uv.y) * step(uv.y, 1.0);
+    let inBounds = step(0.0, uv.x) * step(uv.x, 1.0) * step(0.0, uv.y) * step(uv.y, 1.0) * step(currentDepth, 1.0);
     return mix(1.0, shadow, inBounds);
 }
 `;

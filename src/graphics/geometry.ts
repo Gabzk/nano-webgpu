@@ -140,7 +140,7 @@ export class Geometry {
 			this.vertexBuffer,
 			"buffer",
 			"Geometry Vertex Buffer",
-			vertices.byteLength,
+			gpuVertices.byteLength,
 			"Geometry",
 		);
 

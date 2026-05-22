@@ -34,6 +34,8 @@ export interface SceneLightOptions extends LightOptions {
 	shadowMapSize?: number;
 	/** Enable PCF filtering. */
 	usePCF?: boolean;
+	/** Shadow depth bias. */
+	shadowBias?: number;
 }
 
 /**

@@ -18,12 +18,12 @@ export { BatchManager } from "./graphics/batch-manager";
 export { Camera, type CameraOptions } from "./graphics/camera";
 export {
 	CameraController,
-	OrbitCameraController,
-	FirstPersonCameraController,
-	ThirdPersonCameraController,
 	type CameraMode,
+	FirstPersonCameraController,
 	type FirstPersonOptions,
+	OrbitCameraController,
 	type OrbitOptions,
+	ThirdPersonCameraController,
 	type ThirdPersonOptions,
 } from "./graphics/camera-controller";
 export type { CullMode } from "./graphics/cull-mode";

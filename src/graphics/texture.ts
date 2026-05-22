@@ -21,11 +21,19 @@ export class Texture {
 
 	/**
 	 * Registers a callback routine invoked when the asynchronous texture load successfully completes.
+	 * Returns an unsubscribe function to safely detach the callback and prevent memory leaks.
 	 *
 	 * @param cb - The update callback function.
+	 * @returns A function to unsubscribe this callback.
 	 */
-	public onUpdate(cb: () => void): void {
+	public onUpdate(cb: () => void): () => void {
 		this.listeners.push(cb);
+		return () => {
+			const idx = this.listeners.indexOf(cb);
+			if (idx !== -1) {
+				this.listeners.splice(idx, 1);
+			}
+		};
 	}
 
 	/**

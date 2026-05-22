@@ -184,6 +184,12 @@ export class StandardMaterial extends Material {
 	/** @internal Path names of textures queued to load asynchronously in the background. */
 	private pendingTextures: { [key: string]: string } = {};
 
+	/** @internal Collection of active texture load listener unsubscribes. */
+	private _textureUnsubscribes: Map<Texture, () => void> = new Map();
+
+	/** @internal Collection of texture assets created internally from string paths that this material owns. */
+	private _ownedTextures: Set<Texture> = new Set();
+
 	/** @internal Physical uniform buffer allocated in VRAM containing material parameters. */
 	private uniformBuffer!: GPUBuffer;
 	/** @internal Standard PBR bind group 2 containing parameter and texture bindings. */
@@ -353,35 +359,48 @@ export class StandardMaterial extends Material {
 	 * if optional texture arguments are omitted.
 	 *
 	 * @param ctx - Active context.
+	 * @param topology - Geometry topology.
+	 * @param indexFormat - Geometry index format.
 	 * @returns Standard bind group 2 instance.
 	 */
-	public getBindGroup(ctx: Context): GPUBindGroup {
+	public getBindGroup(
+		ctx: Context,
+		_topology?: GPUPrimitiveTopology,
+		_indexFormat?: GPUIndexFormat,
+	): GPUBindGroup {
 		if (Object.keys(this.pendingTextures).length > 0) {
-			if (this.pendingTextures.albedo)
-				this.albedoTexture = Texture.loadBackground(
-					ctx,
-					this.pendingTextures.albedo,
-					{ format: "rgba8unorm-srgb" },
-				);
-			if (this.pendingTextures.normal)
-				this.normalTexture = Texture.loadBackground(
-					ctx,
-					this.pendingTextures.normal,
-				);
-			if (this.pendingTextures.roughness)
-				this.roughnessTexture = Texture.loadBackground(
-					ctx,
-					this.pendingTextures.roughness,
-				);
-			if (this.pendingTextures.metallic)
-				this.metallicTexture = Texture.loadBackground(
-					ctx,
-					this.pendingTextures.metallic,
-				);
-			if (this.pendingTextures.ao)
-				this.aoTexture = Texture.loadBackground(ctx, this.pendingTextures.ao);
-			if (this.pendingTextures.orm)
-				this.ormTexture = Texture.loadBackground(ctx, this.pendingTextures.orm);
+			if (this.pendingTextures.albedo) {
+				const tex = Texture.loadBackground(ctx, this.pendingTextures.albedo, {
+					format: "rgba8unorm-srgb",
+				});
+				this.albedoTexture = tex;
+				this._ownedTextures.add(tex);
+			}
+			if (this.pendingTextures.normal) {
+				const tex = Texture.loadBackground(ctx, this.pendingTextures.normal);
+				this.normalTexture = tex;
+				this._ownedTextures.add(tex);
+			}
+			if (this.pendingTextures.roughness) {
+				const tex = Texture.loadBackground(ctx, this.pendingTextures.roughness);
+				this.roughnessTexture = tex;
+				this._ownedTextures.add(tex);
+			}
+			if (this.pendingTextures.metallic) {
+				const tex = Texture.loadBackground(ctx, this.pendingTextures.metallic);
+				this.metallicTexture = tex;
+				this._ownedTextures.add(tex);
+			}
+			if (this.pendingTextures.ao) {
+				const tex = Texture.loadBackground(ctx, this.pendingTextures.ao);
+				this.aoTexture = tex;
+				this._ownedTextures.add(tex);
+			}
+			if (this.pendingTextures.orm) {
+				const tex = Texture.loadBackground(ctx, this.pendingTextures.orm);
+				this.ormTexture = tex;
+				this._ownedTextures.add(tex);
+			}
 			this.pendingTextures = {}; // clear and only do this once
 			this.isDirty = true;
 		}
@@ -461,10 +480,20 @@ export class StandardMaterial extends Material {
 		// Listen for async texture loading — rebuild the bind group when a texture is ready
 		for (const tex of textures) {
 			if (tex && !tex.isLoaded) {
-				tex.onUpdate(() => {
-					this.bindGroup = null;
-					this._bindGroupPCFVariant = null;
-				});
+				if (!this._textureUnsubscribes.has(tex)) {
+					const unsub = tex.onUpdate(() => {
+						this.bindGroup = null;
+						this._bindGroupPCFVariant = null;
+						if (tex.isLoaded) {
+							const u = this._textureUnsubscribes.get(tex);
+							if (u) {
+								u();
+								this._textureUnsubscribes.delete(tex);
+							}
+						}
+					});
+					this._textureUnsubscribes.set(tex, unsub);
+				}
 			}
 		}
 
@@ -478,6 +507,12 @@ export class StandardMaterial extends Material {
 	 * @param ctx - Active context.
 	 */
 	public destroy(ctx: Context): void {
+		// Unsubscribe all active loading listeners
+		for (const unsub of this._textureUnsubscribes.values()) {
+			unsub();
+		}
+		this._textureUnsubscribes.clear();
+
 		if (this.uniformBuffer) {
 			ctx.vramTracker.unregister(this.uniformBuffer);
 			this.uniformBuffer.destroy();
@@ -485,19 +520,11 @@ export class StandardMaterial extends Material {
 			this.uniformBuffer = null;
 		}
 
-		const textures = [
-			this.albedoTexture,
-			this.normalTexture,
-			this.roughnessTexture,
-			this.metallicTexture,
-			this.aoTexture,
-			this.ormTexture,
-		];
-		for (const tex of textures) {
-			if (tex && tex.url !== "dummy_white" && tex.url !== "dummy_normal") {
-				tex.destroy(ctx);
-			}
+		// Only destroy owned textures
+		for (const tex of this._ownedTextures) {
+			tex.destroy(ctx);
 		}
+		this._ownedTextures.clear();
 
 		this.albedoTexture = null;
 		this.normalTexture = null;

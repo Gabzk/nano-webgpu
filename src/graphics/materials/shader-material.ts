@@ -3,10 +3,34 @@ import { Texture } from "../texture";
 import { Material, type MaterialOptions } from "./material";
 
 /**
- * A record mapping custom WGSL parameter names to their numeric floating point arrays.
- * Packed sequentially to match structural layout alignments.
+ * A record mapping custom WGSL parameter names to their numeric values, arrays, or Float32Arrays.
+ *
+ * > [!IMPORTANT]
+ * > **Uniform Packing & Alignment**:
+ * > WebGPU uniform buffers require strict layout alignment (std140 standard).
+ * > For float-based structures in WGSL:
+ * > - `f32` requires 4-byte alignment (1 float)
+ * > - `vec2<f32>` requires 8-byte alignment (2 floats)
+ * > - `vec3<f32>` and `vec4<f32>` require 16-byte alignment (4 floats)
+ * > - `mat4x4<f32>` requires 64-byte alignment (16 floats)
+ * >
+ * > Parameters are packed sequentially based on the object's key insertion order.
+ * > Ensure that your parameters object keys match the exact sequence and type alignment declared in your WGSL struct.
+ * > You can use flat Float32Arrays or pad values manually to ensure alignment.
+ *
+ * @example
+ * ```typescript
+ * const material = new ShaderMaterial({
+ *   shaderCode: myShader,
+ *   parameters: {
+ *     color: [1.0, 0.0, 0.0, 1.0], // vec4<f32> - 16 bytes
+ *     intensity: 1.5,             // f32       - 4 bytes
+ *     _padding: [0.0, 0.0, 0.0],  // pad to 16-byte boundary (12 bytes)
+ *   }
+ * });
+ * ```
  */
-export type ShaderParameters = Record<string, number | number[]>;
+export type ShaderParameters = Record<string, number | number[] | Float32Array>;
 /** @deprecated Use ShaderParameters instead. Provided for backward compatibility. */
 export type ShaderUniforms = ShaderParameters;
 
@@ -77,14 +101,20 @@ export class ShaderMaterial extends Material {
 	// ─── Parameters helpers ───────────────────────────────────────────────────
 
 	/**
-	 * @internal Packs key-value parameter sets into single sequential Float32Array streams.
+	 * Packs key-value parameter sets into single sequential Float32Array streams.
 	 * Pads data automatically to comply with 16-byte alignment limits required by WebGPU.
+	 * Supports numbers, number arrays, and Float32Array inputs.
+	 *
+	 * @param params - Map of parameters to pack.
+	 * @returns The packed Float32Array.
 	 */
 	private static _packParams(params: ShaderParameters): Float32Array {
 		const floats: number[] = [];
 		for (const value of Object.values(params)) {
 			if (Array.isArray(value)) {
 				floats.push(...value);
+			} else if (value instanceof Float32Array) {
+				floats.push(...Array.from(value));
 			} else {
 				floats.push(value);
 			}
@@ -174,7 +204,7 @@ export class ShaderMaterial extends Material {
 	 * @param indexFormat - Geometry index format.
 	 * @returns Baseline material GPUBindGroup.
 	 */
-	public getBindGroup(
+	public override getBindGroup(
 		ctx: Context,
 		topology: GPUPrimitiveTopology = "triangle-list",
 		indexFormat: GPUIndexFormat = "uint16",

@@ -36,6 +36,10 @@ export class Renderer {
 	// --- Post Processing ---
 	/** @internal Fullscreen color buffer captured prior to post-processing passes. */
 	private sceneTexture!: GPUTexture;
+	/** @internal Cached view of sceneTexture. */
+	private sceneTextureView!: GPUTextureView;
+	/** @internal Cached view of depthTexture. */
+	private depthTextureView!: GPUTextureView;
 	/** @internal Color buffer interpolation sampler. */
 	private postProcessSampler!: GPUSampler;
 	/** @internal Post-processing bind group containing scene color and sampler structures. */
@@ -125,6 +129,7 @@ export class Renderer {
 			w * h * 4,
 			"Renderer",
 		);
+		this.depthTextureView = this.depthTexture.createView();
 
 		this.sceneTexture = this.ctx.device.createTexture({
 			size: [w, h, 1],
@@ -140,12 +145,13 @@ export class Renderer {
 			w * h * 4,
 			"Renderer",
 		);
+		this.sceneTextureView = this.sceneTexture.createView();
 
 		this.postProcessBindGroup = this.ctx.device.createBindGroup({
 			layout: this.ctx.pipelineManager.getPostProcessBindGroupLayout(),
 			entries: [
 				{ binding: 0, resource: this.postProcessSampler },
-				{ binding: 1, resource: this.sceneTexture.createView() },
+				{ binding: 1, resource: this.sceneTextureView },
 				{ binding: 2, resource: { buffer: this.renderSettingsBuffer } },
 			],
 		});
@@ -273,7 +279,7 @@ export class Renderer {
 		const renderPassDescriptor: GPURenderPassDescriptor = {
 			colorAttachments: [
 				{
-					view: this.sceneTexture.createView(),
+					view: this.sceneTextureView,
 					// biome-ignore lint/suspicious/noExplicitAny: native clear array translation
 					clearValue: scene.backgroundColor.toFloat32Array() as any,
 					loadOp: "clear",
@@ -281,7 +287,7 @@ export class Renderer {
 				},
 			],
 			depthStencilAttachment: {
-				view: this.depthTexture.createView(),
+				view: this.depthTextureView,
 				depthClearValue: 1.0,
 				depthLoadOp: "clear",
 				depthStoreOp: "store",
@@ -361,7 +367,7 @@ export class Renderer {
 			passEncoder.setBindGroup(1, batch.bindGroup);
 			passEncoder.setBindGroup(
 				2,
-				representative.material.getBindGroup(this.ctx),
+				representative.material.getBindGroup(this.ctx, topology, indexFormat),
 			);
 			// Group 3: custom shader uniforms (ShaderMaterial only — null for StandardMaterial)
 			const paramsGroup = representative.material.getParamsBindGroup(this.ctx);
@@ -428,7 +434,10 @@ export class Renderer {
 			if (perfTracker) perfTracker.recordMaterialChange();
 
 			passEncoder.setBindGroup(1, batch.bindGroup);
-			passEncoder.setBindGroup(2, nextPass.getBindGroup(this.ctx));
+			passEncoder.setBindGroup(
+				2,
+				nextPass.getBindGroup(this.ctx, topology, indexFormat),
+			);
 			const nextParamsGroup = nextPass.getParamsBindGroup(this.ctx);
 			if (nextParamsGroup) passEncoder.setBindGroup(3, nextParamsGroup);
 
@@ -501,6 +510,10 @@ export class Renderer {
 			// @ts-expect-error - allow cleanup reference assignment
 			this.lightsBuffer = null;
 		}
+		// @ts-expect-error - allow cleanup reference assignment
+		this.sceneTextureView = null;
+		// @ts-expect-error - allow cleanup reference assignment
+		this.depthTextureView = null;
 		if (this.renderSettingsBuffer) {
 			this.renderSettingsBuffer.destroy();
 			// @ts-expect-error - allow cleanup reference assignment

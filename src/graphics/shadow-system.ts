@@ -82,23 +82,27 @@ export class ShadowSystem {
 		});
 
 		this.uniformBuffer = this.ctx.device.createBuffer({
-			size: 80, // mat4x4 (64 bytes) + texelSize (4 bytes) + padding (12 bytes)
+			size: 96, // mat4x4 (64 bytes) + texelSize (4 bytes) + hasShadow (4 bytes) + lightDir (12 bytes) + padding (12 bytes)
 			usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
 		});
 		this.ctx.vramTracker.register(
 			this.uniformBuffer,
 			"buffer",
 			"Shadow Camera Matrix",
-			80,
+			96,
 			"ShadowSystem",
 		);
 
 		// Write default texelSize so the shader never sees 0 on the first frame
 		const defaultParams = new Float32Array([
-			1.0 / this.textureSize,
-			0, // _pad1
-			0, // _pad2
-			0, // _pad3
+			1.0 / this.textureSize, // texelSize
+			0.0, // hasShadow
+			0.0, // lightDirX
+			0.0, // lightDirY
+			0.0, // lightDirZ
+			0.0, // bias (formerly _pad1)
+			0.0, // _pad2
+			0.0, // _pad3
 		]);
 		this.ctx.device.queue.writeBuffer(this.uniformBuffer, 64, defaultParams);
 
@@ -187,7 +191,20 @@ export class ShadowSystem {
 				break;
 			}
 		}
-		if (!shadowCaster || !config) return false;
+		if (!shadowCaster || !config) {
+			const shadowParams = new Float32Array([
+				1.0 / this.textureSize, // texelSize
+				0.0, // hasShadow
+				0.0, // lightDirX
+				0.0, // lightDirY
+				0.0, // lightDirZ
+				0.0, // bias (formerly _pad1)
+				0.0, // _pad2
+				0.0, // _pad3
+			]);
+			this.ctx.device.queue.writeBuffer(this.uniformBuffer, 64, shadowParams);
+			return false;
+		}
 
 		this.reinitIfNeeded(config.shadowMapSize);
 
@@ -201,7 +218,10 @@ export class ShadowSystem {
 
 		const center = camera.target.clone();
 
-		const worldUp = new Vec3(0, 1, 0);
+		let worldUp = new Vec3(0, 1, 0);
+		if (Math.abs(lightDir.dot(worldUp)) > 0.99) {
+			worldUp = new Vec3(0, 0, 1);
+		}
 		const lightRight = worldUp.clone().cross(lightDir).normalize();
 		const lightUp = lightDir.clone().cross(lightRight).normalize();
 
@@ -242,7 +262,16 @@ export class ShadowSystem {
 			this.matrix.values.buffer,
 		);
 
-		const shadowParams = new Float32Array([1.0 / this.textureSize, 0, 0, 0]);
+		const shadowParams = new Float32Array([
+			1.0 / this.textureSize, // texelSize
+			1.0, // hasShadow = 1.0 (active)
+			lightDir.x,
+			lightDir.y,
+			lightDir.z,
+			config.shadowBias, // bias (formerly _pad1)
+			0.0, // _pad2
+			0.0, // _pad3
+		]);
 		this.ctx.device.queue.writeBuffer(this.uniformBuffer, 64, shadowParams);
 
 		// Propagate PCF variant

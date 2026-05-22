@@ -95,9 +95,15 @@ export abstract class Material {
 	 * Abstract method compiling or fetching the primary GPUBindGroup (group index 2) representing PBR parameters.
 	 *
 	 * @param ctx - Active context.
+	 * @param topology - Geometry topology.
+	 * @param indexFormat - Geometry index format.
 	 * @returns The resolved material GPUBindGroup.
 	 */
-	public abstract getBindGroup(ctx: Context): GPUBindGroup;
+	public abstract getBindGroup(
+		ctx: Context,
+		topology?: GPUPrimitiveTopology,
+		indexFormat?: GPUIndexFormat,
+	): GPUBindGroup;
 
 	/**
 	 * Custom parameter bind group (group index 3) utilized by custom ShaderMaterials.

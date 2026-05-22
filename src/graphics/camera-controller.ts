@@ -6,7 +6,12 @@ import { FirstPersonCameraController } from "./controllers/first-person";
 import { OrbitCameraController } from "./controllers/orbit";
 import { ThirdPersonCameraController } from "./controllers/third-person";
 
-export { BaseCameraController, FirstPersonCameraController, OrbitCameraController, ThirdPersonCameraController };
+export {
+	BaseCameraController,
+	FirstPersonCameraController,
+	OrbitCameraController,
+	ThirdPersonCameraController,
+};
 
 /** Supported camera control styles. */
 export type CameraMode = "third-person" | "first-person" | "orbit";
@@ -97,7 +102,7 @@ export class CameraController {
 	public set mode(val: CameraMode) {
 		if (val === this.impl.mode) return;
 		const camera = this.impl.camera;
-		
+
 		// Capture active state to carry over seamlessly
 		const savedYaw = this.impl.yaw;
 		const savedPitch = this.impl.pitch;
@@ -113,10 +118,10 @@ export class CameraController {
 			autoRotate: this.impl.autoRotate,
 			autoRotateSpeed: this.impl.autoRotateSpeed,
 		};
-		
+
 		// Clean up old canvas-level event listeners
 		this.impl.destroy();
-		
+
 		// Hot-swap the underlying subclass implementation
 		if (val === "orbit") {
 			this.impl = new OrbitCameraController(camera, opts);
@@ -125,7 +130,7 @@ export class CameraController {
 		} else {
 			this.impl = new ThirdPersonCameraController(camera, opts);
 		}
-		
+
 		// Restore active rotation state
 		this.impl.yaw = savedYaw;
 		this.impl.pitch = savedPitch;

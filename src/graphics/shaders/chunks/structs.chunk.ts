@@ -44,7 +44,11 @@ struct SceneLights {
 struct ShadowCameraUniform {
     viewProj: mat4x4<f32>,
     texelSize: f32,
-    _pad1: f32,
+    hasShadow: f32,
+    lightDirX: f32,
+    lightDirY: f32,
+    lightDirZ: f32,
+    bias: f32,
     _pad2: f32,
     _pad3: f32,
 }

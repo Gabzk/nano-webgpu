@@ -94,12 +94,13 @@ fn fs_main(in: VertexOutput, @builtin(front_facing) isFrontFace: bool) -> @locat
     // ------------------------------------------------------------------
     // Shadow — must be reached by ALL fragment invocations (WGSL rule).
     // ------------------------------------------------------------------
-    let shadowDir         = normalize(-scene.lights[0].position.xyz);
-    let shadowBias        = max(0.005 * (1.0 - dot(N, shadowDir)), 0.0005);
+    var shadowDir = vec3<f32>(0.0, 1.0, 0.0);
+    if (shadowCamera.hasShadow > 0.5) {
+        shadowDir = normalize(vec3<f32>(shadowCamera.lightDirX, shadowCamera.lightDirY, shadowCamera.lightDirZ));
+    }
+    let shadowBias        = max(shadowCamera.bias * (1.0 - dot(N, shadowDir)), shadowCamera.bias * 0.1);
     let shadowSample      = getShadow(in.shadow_pos, shadowBias, shadowCamera.texelSize);
-    let light0CastsShadow = scene.lights[0].position.w > 0.5 &&
-                            scene.lights[0].position.w < 1.5;
-    let shadowFactor      = select(1.0, shadowSample, light0CastsShadow);
+    let shadowFactor      = select(1.0, shadowSample, shadowCamera.hasShadow > 0.5);
 
     // ------------------------------------------------------------------
     // Direct lighting loop

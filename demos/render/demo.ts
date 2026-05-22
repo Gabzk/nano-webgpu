@@ -4,7 +4,7 @@ const scene = await Scene.init("#canvas");
 const canvasGetter = scene.canvas;
 const canvasMethod = scene.getCanvas();
 
-scene.setCamera({ position: [0, 2, 5] });
+const camera = scene.setCamera({ position: [0, 2, 5] });
 
 scene.defaultDir = "./assets";
 
@@ -27,9 +27,10 @@ scene.addInstance(shiba, {
 
 scene.addLight({
 	type: "directional",
-	rotationDegrees: [-135, 0, 0],
+	rotationDegrees: [-45, 0, 0],
 	color: "#ffffffff",
 	intensity: 0.5,
+	shadowBias: 0.0001,
 });
 
 scene.addLight({
@@ -44,8 +45,13 @@ scene.enableDebug({
 	position: "top-right",
 });
 
+camera.addController("orbit");
+
 scene.render(() => {
-	if (canvasGetter.width !== innerWidth || canvasGetter.height !== innerHeight) {
+	if (
+		canvasGetter.width !== innerWidth ||
+		canvasGetter.height !== innerHeight
+	) {
 		canvasGetter.width = innerWidth;
 		canvasGetter.height = innerHeight;
 	}
