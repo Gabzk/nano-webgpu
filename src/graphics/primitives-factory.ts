@@ -72,4 +72,24 @@ export class PrimitivesFactory {
 		}
 		return this._sphere;
 	}
+
+	/**
+	 * Releases all cached primitive geometries from GPU memory and unregisters them from the VRAM tracker.
+	 *
+	 * @param ctx - Active context.
+	 */
+	public destroy(ctx: Context): void {
+		if (this._cube) {
+			this._cube.destroy(ctx);
+			this._cube = null;
+		}
+		if (this._plane) {
+			this._plane.destroy(ctx);
+			this._plane = null;
+		}
+		if (this._sphere) {
+			this._sphere.destroy(ctx);
+			this._sphere = null;
+		}
+	}
 }

@@ -1,6 +1,6 @@
 /// <reference types="@webgpu/types" />
 import { describe, expect, it, vi } from "vitest";
-import { Context, Scene } from "../src/index";
+import { Context, Scene, Camera, InputManager } from "../src/index";
 
 // Mock WebGPU globals for Node test environment
 (globalThis as any).GPUTextureUsage = {
@@ -25,7 +25,7 @@ import { Context, Scene } from "../src/index";
 
 function createMockContext(): Context {
 	const mockDevice = {
-		createBuffer: vi.fn().mockReturnValue({}),
+		createBuffer: vi.fn().mockReturnValue({ destroy: vi.fn() }),
 		createSampler: vi.fn().mockReturnValue({}),
 		createTexture: vi.fn().mockReturnValue({
 			createView: vi.fn().mockReturnValue({}),
@@ -57,6 +57,8 @@ function createMockContext(): Context {
 			getPostProcessPipeline: vi.fn(),
 			getShadowBindGroupLayout: vi.fn(),
 		},
+		stop: vi.fn(),
+		destroy: vi.fn(),
 	} as unknown as Context;
 }
 
@@ -119,5 +121,36 @@ describe("Scene", () => {
 		expect(mesh.geometry).toBeDefined();
 		expect(mesh.geometry.hasColors).toBe(true);
 		expect(mesh.geometry.vertexCount).toBe(3);
+	});
+
+	it("should clean up and destroy camera controller and release canvas listeners upon scene destroy", () => {
+		const mockContext = createMockContext();
+		const scene = new Scene(mockContext);
+
+		const camera = new Camera();
+		scene.setCamera(camera);
+
+		// Mock canvas getContext and canvas element
+		const canvas = document.createElement("canvas");
+		(mockContext.context as any).canvas = canvas;
+		mockContext.input = new InputManager();
+		mockContext.input.init(canvas);
+
+		const controller = scene.camera.addController("orbit", {
+			center: [0, 0, 0],
+			distance: 10,
+		});
+
+		camera.initWebGPU(mockContext);
+
+		// Trigger rendering/update once to attach the canvas listeners
+		controller.update(0.016);
+		expect((controller.impl as any)._canvasListenersAttached).toBe(true);
+
+		// Now destroy the scene
+		scene.destroy();
+
+		// Controller canvas listeners should be detached
+		expect((controller.impl as any)._canvasListenersAttached).toBe(false);
 	});
 });

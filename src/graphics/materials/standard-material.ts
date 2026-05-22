@@ -280,8 +280,12 @@ export class StandardMaterial extends Material {
 		this.bufferData[offsets.AO_INTENSITY] = this.aoIntensity;
 
 		this.bufferData[offsets.HAS_NORMAL_MAP] = this.normalTexture ? 1.0 : 0.0;
-		this.bufferData[offsets.HAS_ROUGHNESS_MAP] = this.roughnessTexture ? 1.0 : 0.0;
-		this.bufferData[offsets.HAS_METALLIC_MAP] = this.metallicTexture ? 1.0 : 0.0;
+		this.bufferData[offsets.HAS_ROUGHNESS_MAP] = this.roughnessTexture
+			? 1.0
+			: 0.0;
+		this.bufferData[offsets.HAS_METALLIC_MAP] = this.metallicTexture
+			? 1.0
+			: 0.0;
 		this.bufferData[offsets.HAS_AO_MAP] = this.aoTexture ? 1.0 : 0.0;
 
 		const lightingCull =
@@ -480,6 +484,28 @@ export class StandardMaterial extends Material {
 			// @ts-expect-error - allow cleanup reference assignment
 			this.uniformBuffer = null;
 		}
+
+		const textures = [
+			this.albedoTexture,
+			this.normalTexture,
+			this.roughnessTexture,
+			this.metallicTexture,
+			this.aoTexture,
+			this.ormTexture,
+		];
+		for (const tex of textures) {
+			if (tex && tex.url !== "dummy_white" && tex.url !== "dummy_normal") {
+				tex.destroy(ctx);
+			}
+		}
+
+		this.albedoTexture = null;
+		this.normalTexture = null;
+		this.roughnessTexture = null;
+		this.metallicTexture = null;
+		this.aoTexture = null;
+		this.ormTexture = null;
+
 		this.bindGroup = null;
 		this.sampler = null;
 	}

@@ -1,7 +1,7 @@
 import { VRAMTracker } from "../debug/vram-tracker";
 import { PipelineManager } from "../graphics/pipeline";
 import { PrimitivesFactory } from "../graphics/primitives-factory";
-import { Input } from "./input";
+import { Input, InputManager, setActiveInput } from "./input";
 import { Loader } from "./loader";
 
 /**
@@ -51,6 +51,12 @@ export class Context {
 	 * Avoids redundant pipeline / vertex allocations for standard geometric shapes like cubes, planes, or spheres.
 	 */
 	public primitives: PrimitivesFactory = new PrimitivesFactory();
+
+	/** Local input manager instance for this context. */
+	public input!: InputManager;
+
+	/** @internal requestAnimationFrame recursion frame ID. */
+	private _frameId: number | null = null;
 
 	/**
 	 * Shared fallback textures representing solid white colors and flat normal vectors.
@@ -125,7 +131,9 @@ export class Context {
 		this.pipelineManager = new PipelineManager(this);
 		this.loader = new Loader(this.device);
 
-		Input.init();
+		this.input = new InputManager();
+		this.input.init(canvas);
+		setActiveInput(this.input);
 	}
 
 	/**
@@ -137,12 +145,58 @@ export class Context {
 	public run(loopFunction: (dt: number) => void): void {
 		let lastTime = performance.now();
 		const frame = (t: number) => {
-			requestAnimationFrame(frame);
+			this._frameId = requestAnimationFrame(frame);
 			const dt = (t - lastTime) / 1000;
 			lastTime = t;
+			setActiveInput(this.input);
 			loopFunction(dt);
-			Input.update();
+			this.input.update();
 		};
-		requestAnimationFrame(frame);
+		this._frameId = requestAnimationFrame(frame);
+	}
+
+	/**
+	 * Stops the active requestAnimationFrame render loop.
+	 */
+	public stop(): void {
+		if (this._frameId !== null) {
+			cancelAnimationFrame(this._frameId);
+			this._frameId = null;
+		}
+	}
+
+	/**
+	 * Releases context resources, stops render loop, destroys default textures,
+	 * and shuts down the logical GPU connection.
+	 */
+	public destroy(): void {
+		this.stop();
+
+		// Destroy default textures
+		if (this.defaultTextures.white) {
+			(this.defaultTextures.white as any).destroy(this);
+			this.defaultTextures.white = undefined;
+		}
+		if (this.defaultTextures.normal) {
+			(this.defaultTextures.normal as any).destroy(this);
+			this.defaultTextures.normal = undefined;
+		}
+
+		// Destroy primitives
+		if (this.primitives) {
+			this.primitives.destroy(this);
+		}
+
+		// Destroy Input
+		if (this.input) {
+			this.input.destroy();
+		}
+
+		// Destroy GPUDevice
+		if (this.device) {
+			this.device.destroy();
+			// @ts-expect-error - allow cleanup reference assignment
+			this.device = null;
+		}
 	}
 }

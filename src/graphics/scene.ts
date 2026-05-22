@@ -637,4 +637,36 @@ export class Scene extends Node {
 
 		if (this.debugPanel) this.debugPanel.update();
 	}
+
+	/**
+	 * Releases scene resources, stops the render loop, disables debug panels,
+	 * and cascades destruction to the renderer and context.
+	 */
+	public destroy(): void {
+		// Stop render loop
+		if (this.ctx) {
+			this.ctx.stop();
+		}
+
+		// Destroy camera controller to release local canvas event listeners
+		if (this.camera?.controller) {
+			this.camera.controller.destroy();
+		}
+
+		// Disable debug overlay UI panel
+		if (this.debugPanel) {
+			this.debugPanel.destroy();
+			this.debugPanel = null;
+		}
+
+		// Cascade destruction to renderer
+		if (this.renderer) {
+			this.renderer.destroy();
+		}
+
+		// Cascade destruction to context
+		if (this.ctx) {
+			this.ctx.destroy();
+		}
+	}
 }

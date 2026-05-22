@@ -1,7 +1,12 @@
-import { Input } from "../core/input";
 import type { Node3D } from "../core/node3d";
-import { Vec3 } from "../math/vec3";
+import type { Vec3 } from "../math/vec3";
 import type { Camera } from "./camera";
+import { BaseCameraController } from "./controllers/base";
+import { FirstPersonCameraController } from "./controllers/first-person";
+import { OrbitCameraController } from "./controllers/orbit";
+import { ThirdPersonCameraController } from "./controllers/third-person";
+
+export { BaseCameraController, FirstPersonCameraController, OrbitCameraController, ThirdPersonCameraController };
 
 /** Supported camera control styles. */
 export type CameraMode = "third-person" | "first-person" | "orbit";
@@ -57,54 +62,11 @@ export interface OrbitOptions {
 /**
  * CameraController implements spatial movement algorithms that drive Camera positions
  * and projection directions without requiring developers to write complex trigonometric calculations.
- * Supports orbital, first-person, and third-person camera schemes.
+ * Supports orbital, first-person, and third-person camera schemes by delegating to specialized controllers.
  */
 export class CameraController {
-	/** Active camera scheme mode. */
-	public mode: CameraMode;
-	/** Yaw rotation angle in radians (horizontal rotation around Y axis). */
-	public yaw: number = 0;
-	/** Pitch rotation angle in radians (vertical lookup/downwards rotation). */
-	public pitch: number = 0;
-
-	/** @internal Camera reference driven by this controller. */
-	private camera: Camera;
-
-	/** Target Node3D object (utilized by first-person and third-person modes). */
-	public target: Node3D | null = null;
-
-	/** Bounding focal center point in 3D space (utilized by orbit mode). */
-	public center: Vec3;
-
-	/** Radial orbit distance from the focal look-at target. */
-	public distance: number;
-
-	/** Orbit height offset above target (third-person mode). */
-	public height: number;
-
-	/** Vertical offset relative to target pivot for eye placement (first-person mode). */
-	public eyeHeight: number;
-
-	/** Mouse sensitivity multiplier. */
-	public sensitivity: number;
-
-	/** Minimum clamped pitch angle in radians. */
-	public minPitch: number;
-
-	/** Maximum clamped pitch angle in radians. */
-	public maxPitch: number;
-
-	/** Auto-rotation toggle (orbit mode). */
-	public autoRotate: boolean;
-
-	/** Auto-rotation velocity in radians per second. */
-	public autoRotateSpeed: number;
-
-	/** @internal Cached forward horizontal vector. */
-	private _forward: Vec3 = new Vec3();
-
-	/** @internal Cached right horizontal vector. */
-	private _right: Vec3 = new Vec3();
+	/** @internal The actual specialized implementation class instance. */
+	public impl: BaseCameraController;
 
 	/**
 	 * Creates a CameraController instance.
@@ -119,21 +81,150 @@ export class CameraController {
 		// biome-ignore lint/suspicious/noExplicitAny: type matching distinct option subsets
 		options: ThirdPersonOptions | FirstPersonOptions | OrbitOptions = {} as any,
 	) {
-		this.camera = camera;
-		this.mode = mode;
+		if (mode === "orbit") {
+			this.impl = new OrbitCameraController(camera, options);
+		} else if (mode === "first-person") {
+			this.impl = new FirstPersonCameraController(camera, options);
+		} else {
+			this.impl = new ThirdPersonCameraController(camera, options);
+		}
+	}
 
-		// biome-ignore lint/suspicious/noExplicitAny: type matching distinct option subsets
-		const opts = options as any;
-		this.target = opts.target ?? null;
-		this.center = opts.center ? Vec3.from(opts.center) : new Vec3(0, 0, 0);
-		this.distance = opts.distance ?? 8;
-		this.height = opts.height ?? 3;
-		this.eyeHeight = opts.eyeHeight ?? 1.7;
-		this.sensitivity = opts.sensitivity ?? 0.003;
-		this.minPitch = (opts.minPitch ?? -80) * (Math.PI / 180);
-		this.maxPitch = (opts.maxPitch ?? 60) * (Math.PI / 180);
-		this.autoRotate = opts.autoRotate ?? false;
-		this.autoRotateSpeed = opts.autoRotateSpeed ?? 1;
+	/** Active camera scheme mode. */
+	public get mode(): CameraMode {
+		return this.impl.mode;
+	}
+	public set mode(val: CameraMode) {
+		if (val === this.impl.mode) return;
+		const camera = this.impl.camera;
+		
+		// Capture active state to carry over seamlessly
+		const savedYaw = this.impl.yaw;
+		const savedPitch = this.impl.pitch;
+		const opts = {
+			target: this.impl.target,
+			center: this.impl.center,
+			distance: this.impl.distance,
+			height: this.impl.height,
+			eyeHeight: this.impl.eyeHeight,
+			sensitivity: this.impl.sensitivity,
+			minPitch: this.impl.minPitch * (180 / Math.PI),
+			maxPitch: this.impl.maxPitch * (180 / Math.PI),
+			autoRotate: this.impl.autoRotate,
+			autoRotateSpeed: this.impl.autoRotateSpeed,
+		};
+		
+		// Clean up old canvas-level event listeners
+		this.impl.destroy();
+		
+		// Hot-swap the underlying subclass implementation
+		if (val === "orbit") {
+			this.impl = new OrbitCameraController(camera, opts);
+		} else if (val === "first-person") {
+			this.impl = new FirstPersonCameraController(camera, opts);
+		} else {
+			this.impl = new ThirdPersonCameraController(camera, opts);
+		}
+		
+		// Restore active rotation state
+		this.impl.yaw = savedYaw;
+		this.impl.pitch = savedPitch;
+	}
+
+	/** Yaw rotation angle in radians (horizontal rotation around Y axis). */
+	public get yaw(): number {
+		return this.impl.yaw;
+	}
+	public set yaw(val: number) {
+		this.impl.yaw = val;
+	}
+
+	/** Pitch rotation angle in radians (vertical lookup/downwards rotation). */
+	public get pitch(): number {
+		return this.impl.pitch;
+	}
+	public set pitch(val: number) {
+		this.impl.pitch = val;
+	}
+
+	/** Target Node3D object (utilized by first-person and third-person modes). */
+	public get target(): Node3D | null {
+		return this.impl.target;
+	}
+	public set target(val: Node3D | null) {
+		this.impl.target = val;
+	}
+
+	/** Bounding focal center point in 3D space (utilized by orbit mode). */
+	public get center(): Vec3 {
+		return this.impl.center;
+	}
+	public set center(val: Vec3) {
+		this.impl.center = val;
+	}
+
+	/** Radial orbit distance from the focal look-at target. */
+	public get distance(): number {
+		return this.impl.distance;
+	}
+	public set distance(val: number) {
+		this.impl.distance = val;
+	}
+
+	/** Orbit height offset above target (third-person mode). */
+	public get height(): number {
+		return this.impl.height;
+	}
+	public set height(val: number) {
+		this.impl.height = val;
+	}
+
+	/** Vertical offset relative to target pivot for eye placement (first-person mode). */
+	public get eyeHeight(): number {
+		return this.impl.eyeHeight;
+	}
+	public set eyeHeight(val: number) {
+		this.impl.eyeHeight = val;
+	}
+
+	/** Mouse sensitivity multiplier. */
+	public get sensitivity(): number {
+		return this.impl.sensitivity;
+	}
+	public set sensitivity(val: number) {
+		this.impl.sensitivity = val;
+	}
+
+	/** Minimum clamped pitch angle in radians. */
+	public get minPitch(): number {
+		return this.impl.minPitch;
+	}
+	public set minPitch(val: number) {
+		this.impl.minPitch = val;
+	}
+
+	/** Maximum clamped pitch angle in radians. */
+	public get maxPitch(): number {
+		return this.impl.maxPitch;
+	}
+	public set maxPitch(val: number) {
+		this.impl.maxPitch = val;
+	}
+
+	/** Auto-rotation toggle (orbit mode). */
+	public get autoRotate(): boolean {
+		return this.impl.autoRotate;
+	}
+	public set autoRotate(val: boolean) {
+		this.impl.autoRotate = val;
+	}
+
+	/** Auto-rotation velocity in radians per second. */
+	public get autoRotateSpeed(): number {
+		return this.impl.autoRotateSpeed;
+	}
+	public set autoRotateSpeed(val: number) {
+		this.impl.autoRotateSpeed = val;
 	}
 
 	/**
@@ -144,104 +235,7 @@ export class CameraController {
 	 * @param dt - Delta frame time in seconds.
 	 */
 	public update(dt: number): void {
-		// Read mouse deltas
-		this.yaw -= Input.mouseMovement.x * this.sensitivity;
-
-		// Pitch direction depends on mode:
-		// Third-person: mouse up → camera orbits UP → += movementY
-		// First-person: mouse up → look UP → -= movementY (FPS convention)
-		if (this.mode === "first-person") {
-			this.pitch -= Input.mouseMovement.y * this.sensitivity;
-		} else {
-			this.pitch += Input.mouseMovement.y * this.sensitivity;
-		}
-
-		// Clamp pitch
-		this.pitch = Math.max(this.minPitch, Math.min(this.maxPitch, this.pitch));
-
-		switch (this.mode) {
-			case "third-person":
-				this.updateThirdPerson();
-				break;
-			case "first-person":
-				this.updateFirstPerson();
-				break;
-			case "orbit":
-				this.updateOrbit(dt);
-				break;
-		}
-
-		// Update internal direction vectors
-		this._forward.set(-Math.sin(this.yaw), 0, -Math.cos(this.yaw));
-		this._right.set(-Math.cos(this.yaw), 0, Math.sin(this.yaw));
-	}
-
-	/**
-	 * @internal Executes third-person orbiting and follow-look matrix updates.
-	 */
-	private updateThirdPerson(): void {
-		if (!this.target) return;
-
-		const tx = this.target.position.x;
-		const ty = this.target.position.y;
-		const tz = this.target.position.z;
-
-		// Look-at point = character position + height (e.g., shoulder level)
-		const lookAtY = ty + this.height;
-
-		// Pure spherical orbit: camera is always exactly `distance` from the look-at point.
-		const cosPitch = Math.cos(this.pitch);
-		this.camera.position.set(
-			tx + Math.sin(this.yaw) * cosPitch * this.distance,
-			lookAtY + Math.sin(this.pitch) * this.distance,
-			tz + Math.cos(this.yaw) * cosPitch * this.distance,
-		);
-
-		this.camera.target.set(tx, lookAtY, tz);
-	}
-
-	/**
-	 * @internal Executes first-person eye positioning and target vector re-projection.
-	 */
-	private updateFirstPerson(): void {
-		if (!this.target) return;
-
-		const tx = this.target.position.x;
-		const ty = this.target.position.y + this.eyeHeight;
-		const tz = this.target.position.z;
-
-		this.camera.position.set(tx, ty, tz);
-
-		// Look in the direction of yaw + pitch
-		this.camera.target.set(
-			tx - Math.sin(this.yaw) * Math.cos(this.pitch),
-			ty + Math.sin(this.pitch),
-			tz - Math.cos(this.yaw) * Math.cos(this.pitch),
-		);
-	}
-
-	/**
-	 * @internal Executes standard orbital camera positioning with optional auto-rotation.
-	 *
-	 * @param dt - Frame delta time in seconds.
-	 */
-	private updateOrbit(dt: number): void {
-		if (this.autoRotate) {
-			this.yaw += this.autoRotateSpeed * dt;
-		}
-
-		const cx = this.center.x;
-		const cy = this.center.y;
-		const cz = this.center.z;
-
-		const cosPitch = Math.cos(this.pitch);
-		this.camera.position.set(
-			cx + Math.sin(this.yaw) * cosPitch * this.distance,
-			cy + Math.sin(this.pitch) * this.distance,
-			cz + Math.cos(this.yaw) * cosPitch * this.distance,
-		);
-
-		this.camera.target.set(cx, cy, cz);
+		this.impl.update(dt);
 	}
 
 	/**
@@ -251,7 +245,7 @@ export class CameraController {
 	 * @returns A newly instantiated horizontal forward vector Vec3.
 	 */
 	public getForward(): Vec3 {
-		return new Vec3(this._forward.x, 0, this._forward.z);
+		return this.impl.getForward();
 	}
 
 	/**
@@ -261,6 +255,13 @@ export class CameraController {
 	 * @returns A newly instantiated horizontal right vector Vec3.
 	 */
 	public getRight(): Vec3 {
-		return new Vec3(this._right.x, 0, this._right.z);
+		return this.impl.getRight();
+	}
+
+	/**
+	 * Cleans up resources, including local canvas event listeners.
+	 */
+	public destroy(): void {
+		this.impl.destroy();
 	}
 }

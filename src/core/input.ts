@@ -39,6 +39,14 @@ export class InputManager {
 	/** @internal Target HTMLCanvasElement for context capture locks. */
 	private _canvas: HTMLCanvasElement | null = null;
 
+	/** @internal Listener callbacks stored for clean teardown. */
+	private keydownListener: ((e: KeyboardEvent) => void) | null = null;
+	private keyupListener: ((e: KeyboardEvent) => void) | null = null;
+	private mousedownListener: ((e: MouseEvent) => void) | null = null;
+	private mouseupListener: ((e: MouseEvent) => void) | null = null;
+	private mousemoveListener: ((e: MouseEvent) => void) | null = null;
+	private pointerlockchangeListener: (() => void) | null = null;
+
 	/** Determines whether the mouse pointer is currently locked/captured by the browser Pointer Lock API. */
 	public get isMouseCaptured(): boolean {
 		return (
@@ -54,33 +62,36 @@ export class InputManager {
 	/**
 	 * Registers event listeners on the global window scope to track keydown, keyup,
 	 * mousedown, mouseup, mousemove, and pointerlockchange events.
-	 * Automatically queries the active canvas to associate pointer lock targets.
+	 * Automatically associates with the target canvas element to scope event tracking.
 	 */
-	public init() {
+	public init(canvasElement?: HTMLCanvasElement) {
 		if (this.initialized) return;
 
-		// Auto-detect the canvas in the page
-		this._canvas = document.querySelector("canvas");
+		this._canvas = canvasElement || document.querySelector("canvas");
 
-		window.addEventListener("keydown", (e) => {
+		this.keydownListener = (e: KeyboardEvent) => {
 			if (!this.keys.has(e.code)) {
 				this.keysJustPressed.add(e.code);
 			}
 			this.keys.add(e.code);
-		});
+		};
 
-		window.addEventListener("keyup", (e) => {
+		this.keyupListener = (e: KeyboardEvent) => {
 			this.keys.delete(e.code);
 			this.keysJustReleased.add(e.code);
-		});
+		};
 
-		window.addEventListener("mousedown", (e) => {
+		this.mousedownListener = (e: MouseEvent) => {
+			if (this._canvas && !this._canvas.contains(e.target as Node)) {
+				return;
+			}
+			setActiveInput(this);
+
 			if (!this.mouseButtons.has(e.button)) {
 				this.mouseButtonsJustPressed.add(e.button);
 			}
 			this.mouseButtons.add(e.button);
-			// Request pointer lock here (inside the user gesture handler)
-			// so the browser allows it. Only if the mode is already "captured".
+
 			if (
 				this._mouseMode === "captured" &&
 				this._canvas &&
@@ -88,28 +99,83 @@ export class InputManager {
 			) {
 				this._canvas.requestPointerLock();
 			}
-		});
+		};
 
-		window.addEventListener("mouseup", (e) => {
+		this.mouseupListener = (e: MouseEvent) => {
 			this.mouseButtons.delete(e.button);
 			this.mouseButtonsJustReleased.add(e.button);
-		});
+		};
 
-		window.addEventListener("mousemove", (e) => {
+		this.mousemoveListener = (e: MouseEvent) => {
 			this.mousePosition.x = e.clientX;
 			this.mousePosition.y = e.clientY;
 			this.mouseMovement.x += e.movementX;
 			this.mouseMovement.y += e.movementY;
-		});
+		};
 
-		// Listen for pointer lock changes (e.g. user presses Escape)
-		document.addEventListener("pointerlockchange", () => {
-			if (!document.pointerLockElement) {
+		this.pointerlockchangeListener = () => {
+			if (document.pointerLockElement !== this._canvas) {
 				this._mouseMode = "visible";
 			}
-		});
+		};
+
+		window.addEventListener("keydown", this.keydownListener);
+		window.addEventListener("keyup", this.keyupListener);
+		window.addEventListener("mousedown", this.mousedownListener);
+		window.addEventListener("mouseup", this.mouseupListener);
+		window.addEventListener("mousemove", this.mousemoveListener);
+		document.addEventListener(
+			"pointerlockchange",
+			this.pointerlockchangeListener,
+		);
 
 		this.initialized = true;
+	}
+
+	/**
+	 * Tears down all registered event listeners on window and document.
+	 */
+	public destroy() {
+		if (!this.initialized) return;
+
+		if (this.keydownListener) {
+			window.removeEventListener("keydown", this.keydownListener);
+			this.keydownListener = null;
+		}
+		if (this.keyupListener) {
+			window.removeEventListener("keyup", this.keyupListener);
+			this.keyupListener = null;
+		}
+		if (this.mousedownListener) {
+			window.removeEventListener("mousedown", this.mousedownListener);
+			this.mousedownListener = null;
+		}
+		if (this.mouseupListener) {
+			window.removeEventListener("mouseup", this.mouseupListener);
+			this.mouseupListener = null;
+		}
+		if (this.mousemoveListener) {
+			window.removeEventListener("mousemove", this.mousemoveListener);
+			this.mousemoveListener = null;
+		}
+		if (this.pointerlockchangeListener) {
+			document.removeEventListener(
+				"pointerlockchange",
+				this.pointerlockchangeListener,
+			);
+			this.pointerlockchangeListener = null;
+		}
+
+		this.keys.clear();
+		this.keysJustPressed.clear();
+		this.keysJustReleased.clear();
+		this.mouseButtons.clear();
+		this.mouseButtonsJustPressed.clear();
+		this.mouseButtonsJustReleased.clear();
+		this.actions.clear();
+
+		this.initialized = false;
+		this._canvas = null;
 	}
 
 	/**
@@ -246,5 +312,48 @@ export class InputManager {
 	}
 }
 
-/** Global InputManager singleton instance for simplified client integration. */
-export const Input = new InputManager();
+/** Global input instance manager reference tracking. */
+let activeInput: InputManager | null = null;
+
+/**
+ * Sets the active InputManager instance.
+ *
+ * @param input - InputManager instance.
+ */
+export function setActiveInput(input: InputManager) {
+	activeInput = input;
+}
+
+/**
+ * Retrieves the currently active InputManager instance, falling back to a default singleton.
+ *
+ * @returns The active InputManager.
+ */
+export function getActiveInput(): InputManager {
+	if (!activeInput) {
+		activeInput = new InputManager();
+		activeInput.init();
+	}
+	return activeInput;
+}
+
+/**
+ * Global InputManager proxy singleton instance.
+ * Forwards all calls dynamically to the active context's InputManager.
+ */
+export const Input = new Proxy(new InputManager(), {
+	// biome-ignore lint/suspicious/noExplicitAny: proxy generic target
+	get(target: any, prop: string | symbol) {
+		const active = getActiveInput();
+		const val = Reflect.get(active, prop, active);
+		if (typeof val === "function") {
+			return val.bind(active);
+		}
+		return val;
+	},
+	// biome-ignore lint/suspicious/noExplicitAny: proxy generic target
+	set(target: any, prop: string | symbol, value: any) {
+		const active = getActiveInput();
+		return Reflect.set(active, prop, value, active);
+	},
+}) as unknown as InputManager;

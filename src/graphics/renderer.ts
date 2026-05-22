@@ -472,4 +472,45 @@ export class Renderer {
 
 		this.ctx.device.queue.submit([commandEncoder.finish()]);
 	}
+
+	/**
+	 * Releases depth targets, color buffers, lights storage buffers, and cascades destruction to subsystems.
+	 */
+	public destroy(): void {
+		if (this.shadow) {
+			this.shadow.destroy();
+		}
+		if (this.batcher) {
+			this.batcher.destroy();
+		}
+		if (this.depthTexture) {
+			this.ctx.vramTracker.unregister(this.depthTexture);
+			this.depthTexture.destroy();
+			// @ts-expect-error - allow cleanup reference assignment
+			this.depthTexture = null;
+		}
+		if (this.sceneTexture) {
+			this.ctx.vramTracker.unregister(this.sceneTexture);
+			this.sceneTexture.destroy();
+			// @ts-expect-error - allow cleanup reference assignment
+			this.sceneTexture = null;
+		}
+		if (this.lightsBuffer) {
+			this.ctx.vramTracker.unregister(this.lightsBuffer);
+			this.lightsBuffer.destroy();
+			// @ts-expect-error - allow cleanup reference assignment
+			this.lightsBuffer = null;
+		}
+		if (this.renderSettingsBuffer) {
+			this.renderSettingsBuffer.destroy();
+			// @ts-expect-error - allow cleanup reference assignment
+			this.renderSettingsBuffer = null;
+		}
+		// @ts-expect-error - allow cleanup reference assignment
+		this.globalsBindGroup = null;
+		// @ts-expect-error - allow cleanup reference assignment
+		this.postProcessBindGroup = null;
+		// @ts-expect-error - allow cleanup reference assignment
+		this.postProcessSampler = null;
+	}
 }

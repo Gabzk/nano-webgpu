@@ -18,6 +18,9 @@ export { BatchManager } from "./graphics/batch-manager";
 export { Camera, type CameraOptions } from "./graphics/camera";
 export {
 	CameraController,
+	OrbitCameraController,
+	FirstPersonCameraController,
+	ThirdPersonCameraController,
 	type CameraMode,
 	type FirstPersonOptions,
 	type OrbitOptions,

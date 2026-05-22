@@ -282,4 +282,26 @@ export class ShadowSystem {
 		passEncoder.end();
 		return true;
 	}
+
+	/**
+	 * Releases shadow depth maps and uniform buffer allocations from GPU memory.
+	 */
+	public destroy(): void {
+		if (this.texture) {
+			this.ctx.vramTracker.unregister(this.texture);
+			this.texture.destroy();
+			// @ts-expect-error - allow cleanup reference assignment
+			this.texture = null;
+		}
+		if (this.uniformBuffer) {
+			this.ctx.vramTracker.unregister(this.uniformBuffer);
+			this.uniformBuffer.destroy();
+			// @ts-expect-error - allow cleanup reference assignment
+			this.uniformBuffer = null;
+		}
+		// @ts-expect-error - allow cleanup reference assignment
+		this.sampler = null;
+		// @ts-expect-error - allow cleanup reference assignment
+		this.bindGroup = null;
+	}
 }

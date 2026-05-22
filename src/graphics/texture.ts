@@ -179,4 +179,18 @@ export class Texture {
 		ctx.defaultTextures.normal = tex;
 		return tex;
 	}
+
+	/**
+	 * Releases texture resources from GPU memory and unregisters entries from the VRAM tracker.
+	 *
+	 * @param ctx - Active context.
+	 */
+	public destroy(ctx: Context): void {
+		if (this.gpuTexture) {
+			ctx.vramTracker.unregister(this.gpuTexture);
+			this.gpuTexture.destroy();
+			// @ts-expect-error - allow cleanup reference assignment
+			this.gpuTexture = null;
+		}
+	}
 }

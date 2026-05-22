@@ -53,15 +53,31 @@ export class BatchManager {
 		for (const group of this.batchGroups.values()) {
 			group.length = 0;
 		}
+		const activeKeys = new Set<string>();
 		for (const mesh of meshes) {
 			if (!mesh.visible) continue;
 			const key = `${mesh.geometry.id}_${mesh.material.id}_${mesh.geometry.topology}`;
+			activeKeys.add(key);
 			let group = this.batchGroups.get(key);
 			if (!group) {
 				group = [];
 				this.batchGroups.set(key, group);
 			}
 			group.push(mesh);
+		}
+
+		// Evict inactive batch groups and instance buffers
+		for (const key of this.batchGroups.keys()) {
+			if (!activeKeys.has(key)) {
+				this.batchGroups.delete(key);
+			}
+		}
+		for (const [key, batch] of this.instanceBatches.entries()) {
+			if (!activeKeys.has(key)) {
+				this.ctx.vramTracker.unregister(batch.buffer);
+				batch.buffer.destroy();
+				this.instanceBatches.delete(key);
+			}
 		}
 	}
 
@@ -171,5 +187,17 @@ export class BatchManager {
 				0,
 			);
 		}
+	}
+
+	/**
+	 * Releases all allocated instanced storage buffers from GPU memory and unregisters from the VRAM tracker.
+	 */
+	public destroy(): void {
+		for (const batch of this.instanceBatches.values()) {
+			this.ctx.vramTracker.unregister(batch.buffer);
+			batch.buffer.destroy();
+		}
+		this.instanceBatches.clear();
+		this.batchGroups.clear();
 	}
 }

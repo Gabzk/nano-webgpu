@@ -1,4 +1,4 @@
-import { CameraController, Scene, StandardMaterial } from "nano-webgpu";
+import { OrbitCameraController, Scene, StandardMaterial } from "nano-webgpu";
 
 const scene = await Scene.init("#canvas");
 const camera = scene.setCamera({ position: [0, 2, 7] });
@@ -12,18 +12,16 @@ const roughness = "./Brick_Wall_028_SD/Brick_Wall_028_roughness.png";
 const height = "./Brick_Wall_028_SD/Brick_Wall_028_height.png";
 
 const cube = scene.addCube()
-cube.material = new StandardMaterial({ 
+cube.material = new StandardMaterial({
   albedoTexture: texture,
   normalTexture: normal,
   roughnessTexture: roughness,
   aoTexture: ao,
-}
-)
+});
 
-const ctrl = new CameraController(camera, "third-person", {
-  target: cube,
+const ctrl = camera.addController("orbit", {
+  center: cube.position,
   distance: 5,
-  height: 0
 });
 
 const sun = scene.addLight({
@@ -34,7 +32,6 @@ const sun = scene.addLight({
 });
 
 const canvas = scene.getCanvas();
-let time = 0;
 
 scene.render(() => {
   // Redimensiona o canvas para preencher a tela
@@ -45,6 +42,4 @@ scene.render(() => {
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
   }
-  ctrl.update(scene.getRenderInfo().dt)
-  // cube.rotationDegrees.y += 60 * scene.getRenderInfo().dt;
 });

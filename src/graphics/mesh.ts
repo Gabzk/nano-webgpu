@@ -294,7 +294,10 @@ export class Mesh extends Node3D {
 	 * @param destroyMaterial - If true, releases GPU uniform buffer allocations of the associated material immediately.
 	 *   Defaults to false to allow shared material allocations.
 	 */
-	public destroy(destroyGeometry: boolean = false, destroyMaterial: boolean = false): void {
+	public destroy(
+		destroyGeometry: boolean = false,
+		destroyMaterial: boolean = false,
+	): void {
 		if (this.parent) {
 			this.parent.remove(this);
 		}
