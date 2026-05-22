@@ -2,12 +2,16 @@
  * Specifies the behavior of the cursor within the viewport.
  * - `"visible"`: The default mouse pointer mode, cursor is visible and free.
  * - `"captured"`: Locks and hides the cursor within the target canvas using the Pointer Lock API.
+ *
+ * @group Input & Physics
  */
 export type MouseMode = "visible" | "captured";
 
 /**
  * InputManager coordinates keyboard and mouse input events, maintaining instantaneous button/key states,
  * delta movement values, and mapping physical keyboard keys to abstract semantic action bindings.
+ *
+ * @group Input & Physics
  */
 export class InputManager {
 	/** @internal Instantaneous keyboard keys down. */
@@ -340,6 +344,8 @@ export function getActiveInput(): InputManager {
 /**
  * Global InputManager proxy singleton instance.
  * Forwards all calls dynamically to the active context's InputManager.
+ *
+ * @group Input & Physics
  */
 export const Input = new Proxy(new InputManager(), {
 	// biome-ignore lint/suspicious/noExplicitAny: proxy generic target

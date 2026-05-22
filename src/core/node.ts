@@ -4,6 +4,8 @@ import { Mat4 } from "../math/mat4";
  * Base class for all nodes in the scene graph hierarchy.
  * Handles hierarchical parent-child relationships, traversal, and coordinate space transformations
  * by propagating dirty transform states down the tree.
+ *
+ * @group Core
  */
 export class Node {
 	/** Unique identifier or friendly name for the node. */

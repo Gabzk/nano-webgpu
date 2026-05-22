@@ -5,6 +5,8 @@ import type { StandardMaterial } from "./standard-material";
 
 /**
  * Base configuration options common to all material types.
+ *
+ * @group Materials
  */
 export interface MaterialOptions {
 	/** If true, the material supports alpha transparency during rendering blending passes. */
@@ -21,6 +23,8 @@ export interface MaterialOptions {
  * Material represents the abstract shading template parent class.
  * Defines standard interfaces for pipeline resolutions, binding parameter bind groups,
  * and next-pass overlay layering (e.g. outline/highlight passes).
+ *
+ * @group Materials
  */
 export abstract class Material {
 	/** @internal Sequential static counter generating unique material instance identifiers. */
@@ -129,6 +133,8 @@ export abstract class Material {
  *
  * @param mat - Target Material node.
  * @returns True if the material is a StandardMaterial, false otherwise.
+ *
+ * @group Materials
  */
 export function isStandardMaterial(mat: Material): mat is StandardMaterial {
 	return mat.type === "StandardMaterial";
@@ -139,6 +145,8 @@ export function isStandardMaterial(mat: Material): mat is StandardMaterial {
  *
  * @param mat - Target Material node.
  * @returns True if the material is a ShaderMaterial, false otherwise.
+ *
+ * @group Materials
  */
 export function isShaderMaterial(mat: Material): mat is ShaderMaterial {
 	return mat.type === "ShaderMaterial";

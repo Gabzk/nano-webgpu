@@ -11,6 +11,8 @@ import {
 	Light,
 	type LightOptions,
 	PointLight,
+	SpotLight,
+	type SpotLightOptions,
 } from "./light";
 import { Material } from "./materials/material";
 import {
@@ -22,10 +24,12 @@ import { Renderer } from "./renderer";
 
 /**
  * Scene specific options for adding light sources.
+ *
+ * @group Graphics
  */
 export interface SceneLightOptions extends LightOptions {
 	/** Light emitting style choice. Defaults to `"directional"`. */
-	type?: "point" | "directional";
+	type?: "point" | "directional" | "spotlight";
 	/** Radial size limit for point light attenuation. */
 	radius?: number;
 	/** Enable shadow depth map generation. */
@@ -36,10 +40,20 @@ export interface SceneLightOptions extends LightOptions {
 	usePCF?: boolean;
 	/** Shadow depth bias. */
 	shadowBias?: number;
+	/** Spotlight inner cone angle in degrees. */
+	innerAngle?: number;
+	/** Spotlight outer cone angle in degrees. */
+	outerAngle?: number;
+	/** Spotlight physical distance range limit. */
+	range?: number;
+	/** Near clipping plane for perspective shadow projection. */
+	shadowNear?: number;
 }
 
 /**
  * Configuration options utilized when programmatically creating primitive shapes in the scene.
+ *
+ * @group Graphics
  */
 export interface SceneGeometryOptions extends StandardMaterialOptions {
 	/** Solid base color value. */
@@ -60,6 +74,8 @@ export interface SceneGeometryOptions extends StandardMaterialOptions {
 
 /**
  * Information describing rendering and profiling statistics computed for the active frame.
+ *
+ * @group Graphics
  */
 export interface RenderInfo {
 	/** Delta time in seconds since the last frame. */
@@ -89,6 +105,8 @@ export interface RenderInfo {
  * It coordinates active camera properties, registered light sources, visible meshes,
  * background clear colors, and manages the high-performance requestAnimationFrame render loop,
  * integrating performance tracking and debugging panels.
+ *
+ * @group Graphics
  */
 export class Scene extends Node {
 	/** Active context reference. */
@@ -275,6 +293,8 @@ export class Scene extends Node {
 		} else {
 			if (options.type === "point") {
 				light = new PointLight(options);
+			} else if (options.type === "spotlight") {
+				light = new SpotLight(options);
 			} else {
 				light = new DirectionalLight(options);
 			}

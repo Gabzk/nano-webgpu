@@ -11,6 +11,8 @@ import { Material, type MaterialOptions } from "./material";
 
 /**
  * Configuration options utilized when instantiating a physically-based StandardMaterial.
+ *
+ * @group Materials
  */
 export interface StandardMaterialOptions extends MaterialOptions {
 	/** Solid base color value or hex string representation. Defaults to white. */
@@ -49,6 +51,8 @@ export interface StandardMaterialOptions extends MaterialOptions {
  * StandardMaterial represents a Physically-Based Rendering (PBR) metallic-roughness material.
  * Manages material parameter uniform structures, linear samplers, lazy-loading sequences for texture assets,
  * handles shadow filtering variant compilation keys, and supports double-sided material rendering.
+ *
+ * @group Materials
  */
 export class StandardMaterial extends Material {
 	/** Mappings of PBR parameters to Float32Array offsets matching the WGSL MaterialUniform struct layout. */
@@ -359,8 +363,8 @@ export class StandardMaterial extends Material {
 	 * if optional texture arguments are omitted.
 	 *
 	 * @param ctx - Active context.
-	 * @param topology - Geometry topology.
-	 * @param indexFormat - Geometry index format.
+	 * @param _topology - Geometry topology.
+	 * @param _indexFormat - Geometry index format.
 	 * @returns Standard bind group 2 instance.
 	 */
 	public getBindGroup(

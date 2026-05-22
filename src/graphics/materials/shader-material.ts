@@ -29,13 +29,21 @@ import { Material, type MaterialOptions } from "./material";
  *   }
  * });
  * ```
+ *
+ * @group Materials
  */
 export type ShaderParameters = Record<string, number | number[] | Float32Array>;
-/** @deprecated Use ShaderParameters instead. Provided for backward compatibility. */
+/**
+ * @deprecated Use ShaderParameters instead. Provided for backward compatibility.
+ *
+ * @group Materials
+ */
 export type ShaderUniforms = ShaderParameters;
 
 /**
  * Configuration options utilized when creating a new custom ShaderMaterial.
+ *
+ * @group Materials
  */
 export interface ShaderMaterialOptions extends MaterialOptions {
 	/** WGSL custom shader code containing `vs_main` and `fs_main` entries. */
@@ -54,6 +62,8 @@ export interface ShaderMaterialOptions extends MaterialOptions {
  * Enables integration of bespoke WGSL vertex and fragment shader scripts, providing
  * dynamic group 3 uniform buffers to drive animations and parameters. Automatically
  * maps dummy group 2 resources to fulfill baseline pipeline signatures.
+ *
+ * @group Materials
  */
 export class ShaderMaterial extends Material {
 	/** WGSL custom shader code containing entry points. */

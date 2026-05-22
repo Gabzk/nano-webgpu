@@ -1,10 +1,16 @@
+/**
+ * @module Mat4
+ * This module provides a 4x4 matrix representation, commonly used for
+ * 3D transformations, camera rotations, and projections.
+ */
+
 import { Vec3 } from "./vec3";
 
 /**
- * @module Mat4
- 
- * This module provides a 4x4 matrix representation, commonly used for
- * 3D transformations, camera rotations, and projections.
+ * 4x4 matrix representation, commonly used for 3D transformations,
+ * camera rotations, and projections.
+ *
+ * @group Math
  */
 export class Mat4 {
 	/** @public The 16 internal matrix values */

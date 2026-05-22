@@ -22,10 +22,10 @@ struct RenderSettings {
 @group(0) @binding(5) var <uniform> settings: RenderSettings;
 
 struct Light {
-    position: vec4<f32>, // xyz = pos or dir, w = type:
-                         // 0=directional no shadow, 1=directional with shadow
-                         // 2=point no shadow,       3=point with shadow
-    color: vec4<f32>,    // rgb = color, a = intensity
+    position: vec4<f32>,   // xyz = position, w = typeFlag (0=dir, 1=dir_shadow, 2=point, 3=point_shadow, 4=spot, 5=spot_shadow)
+    color: vec4<f32>,      // rgb = color, a = intensity
+    direction: vec4<f32>,  // xyz = direction, w = range/radius
+    params: vec4<f32>,     // x = innerAngleCos, y = outerAngleCos, zw = padding
 }
 
 struct SceneLights {

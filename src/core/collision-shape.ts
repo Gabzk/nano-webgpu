@@ -5,6 +5,8 @@ import { Vec3 } from "../math/vec3";
  * Supported types of collision shapes for spatial bounding representation.
  * - `"box"`: An axis-aligned rectangular cuboid.
  * - `"sphere"`: A spherical bounding volume.
+ *
+ * @group Input & Physics
  */
 export type ShapeType = "box" | "sphere";
 
@@ -12,6 +14,8 @@ export type ShapeType = "box" | "sphere";
  * CollisionShape represents a bounding volume used for basic collision queries and overlap checks.
  * Centered locally around its parent Node3D's origin, it provides local-space AABB bounds that
  * are transformed into world-space when resolving intersections.
+ *
+ * @group Input & Physics
  */
 export class CollisionShape {
 	/** The specific bounding geometry type represented by this shape. */

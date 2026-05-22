@@ -5,6 +5,8 @@ import type { Context } from "../core/context";
  * Handles asynchronous background texture fetching and allocation while immediately supplying
  * lightweight fallback pixel placeholders (solid white or flat normal vectors) to avoid
  * blocking rendering pipelines during network transfers.
+ *
+ * @group Graphics
  */
 export class Texture {
 	/** Active native WebGPU GPUTexture resource. */

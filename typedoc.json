@@ -8,5 +8,10 @@
 	"excludeProtected": false,
 	"excludeInternal": true,
 	"cleanOutputDir": true,
-	"githubPages": true
+	"githubPages": true,
+	"navigation": {
+		"includeGroups": true,
+		"includeCategories": true
+	},
+	"groupOrder": ["Core", "Graphics", "Lighting", "Materials", "Camera", "Input & Physics", "Math", "Debugging", "Variables", "*"]
 }

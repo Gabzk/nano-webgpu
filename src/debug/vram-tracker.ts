@@ -1,5 +1,7 @@
 /**
  * Struct representing a single tracked VRAM allocation entry.
+ *
+ * @group Debugging
  */
 export interface VRAMEntry {
 	/** Unique identification number incremented on registration. */
@@ -24,6 +26,8 @@ export interface VRAMEntry {
  * manual bookkeeping — every createBuffer/createTexture in the engine calls
  * `ctx.vramTracker.register()`, and every `.destroy()` calls `ctx.vramTracker.unregister()`.
  * An instance class stored on Context to support multiple canvases and testability.
+ *
+ * @group Debugging
  */
 export class VRAMTracker {
 	/** @internal Active entries collection mapping native WebGPU resources. */

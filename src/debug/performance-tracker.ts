@@ -2,6 +2,8 @@
  * PerformanceTracker aggregates frame timing and draw metrics.
  * Records FPS, frame processing duration (in milliseconds), total draw calls,
  * mesh counts, polygon indices, and maintains a rolling history to feed profiling graphs.
+ *
+ * @group Debugging
  */
 export class PerformanceTracker {
 	/** Estimated frames per second. */

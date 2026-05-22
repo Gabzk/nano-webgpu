@@ -4,6 +4,8 @@ import type { Mesh } from "./mesh";
 
 /**
  * Internal batch record tracking instanced render metrics and buffers.
+ *
+ * @group Graphics
  */
 export interface InstanceBatch {
 	/** GPUBuffer containing sequence of model matrices array. */
@@ -19,6 +21,8 @@ export interface InstanceBatch {
  * Allocates and grows GPU STORAGE buffers containing transformation matrix arrays to drive
  * instanced draw calls, drastically optimizing drawing bottlenecks. Reuses data buffers
  * to prevent garbage collector memory churning pressure.
+ *
+ * @group Graphics
  */
 export class BatchManager {
 	/** Parent context reference. */

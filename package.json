@@ -1,6 +1,6 @@
 {
 	"name": "nano-webgpu",
-	"version": "0.6.5",
+	"version": "0.7.0",
 	"description": "",
 	"type": "module",
 	"main": "dist/index.js",
@@ -12,9 +12,9 @@
 		}
 	},
 	"scripts": {
-		"sync-version": "node -e \"const fs = require('fs'); const pkg = require('./package.json'); fs.writeFileSync('./src/version.ts', 'export const VERSION = \\\"' + pkg.version + '\\\";\\n');\"",
-		"dev": "pnpm sync-version && BROWSER=google-chrome-stable vite",
-		"build": "pnpm sync-version && rollup -c",
+		"sync-version": "node scripts/sync-version.js",
+		"dev": "pnpm run sync-version && BROWSER=google-chrome-stable vite",
+		"build": "pnpm run sync-version && rollup -c && pnpm run docs",
 		"test": "vitest",
 		"test:run": "vitest run",
 		"check": "biome check --write ./src",

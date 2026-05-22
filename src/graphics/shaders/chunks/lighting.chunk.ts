@@ -115,12 +115,22 @@ fn fs_main(in: VertexOutput, @builtin(front_facing) isFrontFace: bool) -> @locat
         if (lightType < 1.5) {
             // Directional light
             L = normalize(-light.position.xyz);
-        } else {
+        } else if (lightType < 3.5) {
             // Point light — inverse-square with smooth cutoff
             let d    = light.position.xyz - in.frag_pos;
             let dist = length(d);
             L            = normalize(d);
             attenuation  = 1.0 / (1.0 + 0.09 * dist + 0.032 * dist * dist);
+        } else {
+            // Spotlight — positional with cone and distance attenuation
+            let d    = light.position.xyz - in.frag_pos;
+            let dist = length(d);
+            L            = normalize(d);
+            let distanceAttenuation = 1.0 / (1.0 + 0.09 * dist + 0.032 * dist * dist);
+            let rangeAtten = select(1.0, clamp(1.0 - dist / light.direction.w, 0.0, 1.0), light.direction.w > 0.0);
+            let cosAngle = dot(-L, light.direction.xyz);
+            let spotEffect = smoothstep(light.params.y, light.params.x, cosAngle);
+            attenuation = distanceAttenuation * rangeAtten * spotEffect;
         }
 
         let lightColor = light.color.rgb * light.color.a * attenuation;
@@ -156,8 +166,8 @@ fn fs_main(in: VertexOutput, @builtin(front_facing) isFrontFace: bool) -> @locat
         let F        = f0 + (vec3<f32>(1.0) - f0) * schlick5(LdotH);
         let specular = NdotL * D * G * F;
 
-        // Shadow only on the directional shadow-casting light (type == 1.0)
-        let shadow = select(1.0, shadowFactor, lightType > 0.5 && lightType < 1.5);
+        // Shadow only on directional shadow-casting (type == 1.0) and spotlight shadow-casting (type == 5.0)
+        let shadow = select(1.0, shadowFactor, (lightType > 0.5 && lightType < 1.5) || (lightType > 4.5 && lightType < 5.5));
 
         finalColor += (diffuse + specular) * lightColor * shadow;
     }

@@ -13,10 +13,18 @@ export {
 	ThirdPersonCameraController,
 };
 
-/** Supported camera control styles. */
+/**
+ * Supported camera control styles.
+ *
+ * @group Camera
+ */
 export type CameraMode = "third-person" | "first-person" | "orbit";
 
-/** Parameters for configuring a third-person camera controller tracking a node from a distance. */
+/**
+ * Parameters for configuring a third-person camera controller tracking a node from a distance.
+ *
+ * @group Camera
+ */
 export interface ThirdPersonOptions {
 	/** The target Node3D node that the camera orbits and tracks. */
 	target: Node3D;
@@ -32,7 +40,11 @@ export interface ThirdPersonOptions {
 	maxPitch?: number;
 }
 
-/** Parameters for configuring a first-person camera controller sitting inside a target node. */
+/**
+ * Parameters for configuring a first-person camera controller sitting inside a target node.
+ *
+ * @group Camera
+ */
 export interface FirstPersonOptions {
 	/** The target Node3D node whose spatial position is shared with the camera view. */
 	target: Node3D;
@@ -46,7 +58,11 @@ export interface FirstPersonOptions {
 	maxPitch?: number;
 }
 
-/** Parameters for configuring a standard orbiting camera around a static spatial focal point. */
+/**
+ * Parameters for configuring a standard orbiting camera around a static spatial focal point.
+ *
+ * @group Camera
+ */
 export interface OrbitOptions {
 	/** The central focal coordinates vector to orbit around. Defaults to `(0,0,0)`. */
 	center?: Vec3 | number[];
@@ -68,6 +84,8 @@ export interface OrbitOptions {
  * CameraController implements spatial movement algorithms that drive Camera positions
  * and projection directions without requiring developers to write complex trigonometric calculations.
  * Supports orbital, first-person, and third-person camera schemes by delegating to specialized controllers.
+ *
+ * @group Camera
  */
 export class CameraController {
 	/** @internal The actual specialized implementation class instance. */

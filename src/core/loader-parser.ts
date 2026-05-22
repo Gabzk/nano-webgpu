@@ -7,6 +7,8 @@
  * Represents a single logical partition or primitive segment of a 3D model.
  * In complex multi-material models, each primitive mesh is stored as a distinct ModelPart
  * to allow different material configurations, vertex structures, or drawing commands.
+ *
+ * @group Core
  */
 export interface ModelPart {
 	/**
@@ -31,6 +33,8 @@ export interface ModelPart {
 
 /**
  * Container holding the aggregate geometry data and material configurations parsed from a 3D asset file.
+ *
+ * @group Core
  */
 export interface ModelData {
 	/**
@@ -60,6 +64,8 @@ export interface ModelData {
 /**
  * ModelParser defines the interface for standardizing third-party 3D file formats
  * (e.g. GLTF, OBJ, FBX) into a format-agnostic `ModelData` hierarchy.
+ *
+ * @group Core
  */
 export interface ModelParser {
 	/**

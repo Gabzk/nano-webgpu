@@ -1,7 +1,13 @@
 /**
  * @module Vec2
- 
  * This module provides a 2D vector representation.
+ */
+
+/**
+ * 2D vector representation containing x and y components.
+ * Used for positional and texture coordinate calculations.
+ *
+ * @group Math
  */
 export class Vec2 {
 	/** @public X component */

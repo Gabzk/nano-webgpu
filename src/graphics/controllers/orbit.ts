@@ -9,6 +9,8 @@ import { BaseCameraController } from "./base";
  * - Scroll wheel: Smooth zoom (adjusts radial distance).
  * - Right or Middle-click drag: Pan focal center along the camera's local axes.
  * - Auto-rotation is supported and suspended during manual left-click dragging.
+ *
+ * @group Camera
  */
 export class OrbitCameraController extends BaseCameraController {
 	public override readonly mode: CameraMode = "orbit";

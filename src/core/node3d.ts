@@ -13,6 +13,8 @@ interface MeshLike {
  * Node3D represents a node in the 3D scene graph.
  * It contains spatial transformation properties (position, Euler rotation in radians, scale)
  * and optional collision structures for physical overlap detection.
+ *
+ * @group Core
  */
 export class Node3D extends Node {
 	/** @internal Inner storage for node position in 3D space. */

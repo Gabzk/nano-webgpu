@@ -30,7 +30,7 @@ scene.addLight({
 	rotationDegrees: [-45, 0, 0],
 	color: "#ffffffff",
 	intensity: 0.5,
-	shadowBias: 0.0001,
+	castShadow: true
 });
 
 scene.addLight({

@@ -1,11 +1,16 @@
+/**
+ * @module AABB
+ * Axis-Aligned Bounding Box used for broad-phase collision detection.
+ */
+
 import type { Mat4 } from "./mat4";
 import { Vec3 } from "./vec3";
 
 /**
- * @module AABB
- *
  * Axis-Aligned Bounding Box used for broad-phase collision detection.
  * This is a pure math struct with no dependencies on the GPU or scene graph.
+ *
+ * @group Math
  */
 export class AABB {
 	/** Minimum corner of the box (left, bottom, back) */

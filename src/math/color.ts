@@ -3,7 +3,11 @@
  
  * This module provides a Color representation for WebGPU (RGBA floats 0.0 - 1.0).
  */
-/** A type representing all standard W3C CSS color names for IDE autocomplete support. */
+/**
+ * A type representing all standard W3C CSS color names for IDE autocomplete support.
+ *
+ * @group Math
+ */
 export type ColorName =
 	| "aliceblue"
 	| "antiquewhite"
@@ -40,7 +44,7 @@ export type ColorName =
 	| "darkred"
 	| "darksalmon"
 	| "darkseagreen"
-	| "darkslateblue"
+	| "darkslate_blue"
 	| "darkslategray"
 	| "darkslategrey"
 	| "darkturquoise"
@@ -154,9 +158,20 @@ export type ColorName =
 	| "yellow"
 	| "yellowgreen";
 
-/** A custom type that merges Color, ColorName CSS color literals, and arbitrary hex strings (preserving IDE autocomplete suggestions). */
+/**
+ * A custom type that merges Color, ColorName CSS color literals, and arbitrary hex strings (preserving IDE autocomplete suggestions).
+ *
+ * @group Math
+ */
 export type ColorLike = Color | ColorName | (string & {});
 
+/**
+ * Color representation utilizing RGBA float values ranging from 0.0 to 1.0.
+ * Includes helpers to parse hex strings, CSS color names, interpolate colors,
+ * and convert to Linear space.
+ *
+ * @group Math
+ */
 export class Color {
 	private _r: number;
 	private _g: number;

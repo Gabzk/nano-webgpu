@@ -9,6 +9,8 @@ import {
 /**
  * PrimitivesFactory manages a per-context lazy-loaded cache of standard geometric shapes.
  * Promotes high-performance vertex/index buffer resource sharing and avoids redundant GPU allocations.
+ *
+ * @group Graphics
  */
 export class PrimitivesFactory {
 	/** @internal Cached cube geometry block. */

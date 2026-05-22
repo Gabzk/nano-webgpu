@@ -56,7 +56,7 @@ export abstract class BaseCameraController {
 	/** @internal Cached right horizontal vector. */
 	protected _right: Vec3 = new Vec3();
 
-	constructor(camera: Camera, options: any = {}) {
+	constructor(camera: Camera, options: BaseCameraControllerOptions = {}) {
 		this.camera = camera;
 		this.target = options.target ?? null;
 		if (options.center) {
@@ -101,4 +101,17 @@ export abstract class BaseCameraController {
 	 * Cleans up any registered event listeners on the canvas.
 	 */
 	public destroy(): void {}
+}
+
+export interface BaseCameraControllerOptions {
+	target?: Node3D | null;
+	center?: Vec3 | null;
+	distance?: number;
+	height?: number;
+	eyeHeight?: number;
+	sensitivity?: number;
+	minPitch?: number;
+	maxPitch?: number;
+	autoRotate?: boolean;
+	autoRotateSpeed?: number;
 }

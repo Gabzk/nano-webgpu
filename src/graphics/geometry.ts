@@ -3,6 +3,8 @@ import type { Context } from "../core/context";
 /**
  * Geometry encapsulates physical vertex and index GPUBuffers allocated in VRAM,
  * standardizing heterogeneous coordinate data into uniform 11-float vertex formats.
+ *
+ * @group Graphics
  */
 export class Geometry {
 	/** @internal Sequential static counter generating unique geometry identifiers. */

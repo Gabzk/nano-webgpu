@@ -1,28 +1,19 @@
 import type { Context } from "../core/context";
 import { Mat4 } from "../math/mat4";
 import { Vec3 } from "../math/vec3";
+import type { InstanceBatch } from "./batch-manager";
 import type { Camera } from "./camera";
 import type { Light, ShadowConfig } from "./light";
 import { isStandardMaterial } from "./materials/material";
 import type { Mesh } from "./mesh";
 
 /**
- * Internal batch record shared with BatchManager.
- */
-export interface InstanceBatch {
-	/** GPUBuffer containing model matrices array for instancing. */
-	buffer: GPUBuffer;
-	/** GPUBindGroup mapping the instanced storage buffer. */
-	bindGroup: GPUBindGroup;
-	/** Allocated matrix capacity of this batch. */
-	capacity: number;
-}
-
-/**
  * ShadowSystem coordinates standard orthographic shadow depth map passes for directional lights.
  * Handles shadow map resource allocations (depth textures, comparison samplers, uniform buffers),
  * computes orthographic camera matrices aligned with directional vectors, implements texel-snapping
  * to eliminate crawling shadow boundaries, and handles instanced batch drawing.
+ *
+ * @group Lighting
  */
 export class ShadowSystem {
 	/** Target context reference. */
@@ -214,46 +205,71 @@ export class ShadowSystem {
 
 		// Direction via getLightData (avoids instanceof)
 		const d = shadowCaster.getLightData();
-		const lightDir = new Vec3(d.x, d.y, d.z).normalize();
+		const isSpot = d.typeFlag > 3.5;
+		
+		const lightDir = isSpot
+			? new Vec3(d.dirX!, d.dirY!, d.dirZ!).normalize()
+			: new Vec3(d.x, d.y, d.z).normalize();
 
-		const center = camera.target.clone();
+		let viewMat: Mat4;
+		let projMat: Mat4;
 
-		let worldUp = new Vec3(0, 1, 0);
-		if (Math.abs(lightDir.dot(worldUp)) > 0.99) {
-			worldUp = new Vec3(0, 0, 1);
+		if (isSpot) {
+			const lightPos = new Vec3(d.x, d.y, d.z);
+			const target = lightPos.clone().add(lightDir);
+
+			let worldUp = new Vec3(0, 1, 0);
+			if (Math.abs(lightDir.dot(worldUp)) > 0.99) {
+				worldUp = new Vec3(0, 0, 1);
+			}
+
+			viewMat = new Mat4().lookAt(lightPos, target, worldUp);
+
+			// For SpotLight, shadowRadius carries outerAngle (cone half-angle in degrees)
+			// Total FOV of the spotlight projection frustum is outerAngle * 2
+			const fovY = (shadowRadius * 2.0 * Math.PI) / 180.0;
+			projMat = new Mat4().perspective(
+				fovY,
+				1.0,
+				config.shadowNear ?? 0.1,
+				shadowDepthRange,
+			);
+		} else {
+			const center = camera.target.clone();
+
+			let worldUp = new Vec3(0, 1, 0);
+			if (Math.abs(lightDir.dot(worldUp)) > 0.99) {
+				worldUp = new Vec3(0, 0, 1);
+			}
+			const lightRight = worldUp.clone().cross(lightDir).normalize();
+			const lightUp = lightDir.clone().cross(lightRight).normalize();
+
+			// Texel-snapping to eliminate shadow-edge crawl
+			const texelWorldSize = (shadowRadius * 2.0) / this.textureSize;
+			const rawX = center.dot(lightRight);
+			const rawY = center.dot(lightUp);
+			const snappedX = Math.round(rawX / texelWorldSize) * texelWorldSize;
+			const snappedY = Math.round(rawY / texelWorldSize) * texelWorldSize;
+
+			const snappedCenter = center
+				.clone()
+				.add(lightRight.clone().scale(snappedX - rawX))
+				.add(lightUp.clone().scale(snappedY - rawY));
+
+			const shadowEye = snappedCenter
+				.clone()
+				.add(lightDir.clone().scale(-shadowDepthRange * 0.5));
+
+			viewMat = new Mat4().lookAt(shadowEye, snappedCenter, new Vec3(0, 1, 0));
+			projMat = new Mat4().ortho(
+				-shadowRadius,
+				shadowRadius,
+				-shadowRadius,
+				shadowRadius,
+				0.1,
+				shadowDepthRange,
+			);
 		}
-		const lightRight = worldUp.clone().cross(lightDir).normalize();
-		const lightUp = lightDir.clone().cross(lightRight).normalize();
-
-		// Texel-snapping to eliminate shadow-edge crawl
-		const texelWorldSize = (shadowRadius * 2.0) / this.textureSize;
-		const rawX = center.dot(lightRight);
-		const rawY = center.dot(lightUp);
-		const snappedX = Math.round(rawX / texelWorldSize) * texelWorldSize;
-		const snappedY = Math.round(rawY / texelWorldSize) * texelWorldSize;
-
-		const snappedCenter = center
-			.clone()
-			.add(lightRight.clone().scale(snappedX - rawX))
-			.add(lightUp.clone().scale(snappedY - rawY));
-
-		const shadowEye = snappedCenter
-			.clone()
-			.add(lightDir.clone().scale(-shadowDepthRange * 0.5));
-
-		const viewMat = new Mat4().lookAt(
-			shadowEye,
-			snappedCenter,
-			new Vec3(0, 1, 0),
-		);
-		const projMat = new Mat4().ortho(
-			-shadowRadius,
-			shadowRadius,
-			-shadowRadius,
-			shadowRadius,
-			0.1,
-			shadowDepthRange,
-		);
 
 		this.matrix = projMat.multiply(viewMat);
 		this.ctx.device.queue.writeBuffer(

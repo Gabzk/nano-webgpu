@@ -1,1 +1,6 @@
-export const VERSION = "0.6.5";
+/**
+ * The current version of the nano-webgpu library.
+ *
+ * @group Core
+ */
+export const VERSION = "0.7.0";

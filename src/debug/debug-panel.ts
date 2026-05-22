@@ -3,6 +3,8 @@ import { VRAMTracker } from "./vram-tracker";
 
 /**
  * Options defining style and visibility behaviors for DebugPanel.
+ *
+ * @group Debugging
  */
 export interface DebugPanelOptions {
 	/** Screen position quadrant anchor. Defaults to `"top-left"`. */
@@ -24,6 +26,8 @@ type TabName = "monitors" | "vram" | "scene";
  * DebugPanel coordinates an HTML/CSS screen overlay debug dashboard.
  * Generates tabbed views, captures rendering performance metrics, outlines active VRAM allocation sizes,
  * registers key listeners (`F3` by default) to toggle overlay visibility, and draws historical FPS bars on a Canvas element.
+ *
+ * @group Debugging
  */
 export class DebugPanel {
 	/** @internal Root container element appended to the canvas DOM parent. */

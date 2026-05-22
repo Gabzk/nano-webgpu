@@ -13,6 +13,8 @@ import { ShadowSystem } from "./shadow-system";
  * light properties to storage buffers, compiles global viewport/ambient uniform bind groups, drives instanced
  * drawing via `BatchManager`, runs directional shadow map passes via `ShadowSystem`, supports multi-pass overlays
  * (using the `.nextPass` material feature), and applies fullscreen post-processing FXAA filters.
+ *
+ * @group Graphics
  */
 export class Renderer {
 	/** Parent context reference. */
@@ -163,7 +165,7 @@ export class Renderer {
 	 */
 	private ensureLightsBufferSize(lightCount: number) {
 		const currentLimit = this.lightsDataFloat
-			? (this.lightsDataFloat.length - 4) / 8
+			? (this.lightsDataFloat.length - 4) / 16
 			: 0;
 
 		if (lightCount <= currentLimit && this.lightsBuffer) {
@@ -171,7 +173,7 @@ export class Renderer {
 		}
 
 		const newLimit = Math.max(16, Math.ceil(lightCount / 16) * 16);
-		const newLength = 4 + newLimit * 8;
+		const newLength = 4 + newLimit * 16;
 
 		const newFloatArray = new Float32Array(newLength);
 		const newUintArray = new Uint32Array(newFloatArray.buffer);
@@ -219,15 +221,27 @@ export class Renderer {
 
 		for (let i = 0; i < limit; i++) {
 			const data = lights[i].getLightData();
-			const offset = 4 + i * 8;
+			const offset = 4 + i * 16;
+			// vec4 0: position.xyz + typeFlag
 			this.lightsDataFloat[offset + 0] = data.x;
 			this.lightsDataFloat[offset + 1] = data.y;
 			this.lightsDataFloat[offset + 2] = data.z;
 			this.lightsDataFloat[offset + 3] = data.typeFlag;
+			// vec4 1: color.rgb + intensity
 			this.lightsDataFloat[offset + 4] = data.r;
 			this.lightsDataFloat[offset + 5] = data.g;
 			this.lightsDataFloat[offset + 6] = data.b;
 			this.lightsDataFloat[offset + 7] = data.intensity;
+			// vec4 2: direction.xyz + range
+			this.lightsDataFloat[offset + 8] = data.dirX ?? 0.0;
+			this.lightsDataFloat[offset + 9] = data.dirY ?? 0.0;
+			this.lightsDataFloat[offset + 10] = data.dirZ ?? 0.0;
+			this.lightsDataFloat[offset + 11] = data.range ?? 0.0;
+			// vec4 3: innerAngleCos + outerAngleCos + padding (zw)
+			this.lightsDataFloat[offset + 12] = data.innerAngleCos ?? 0.0;
+			this.lightsDataFloat[offset + 13] = data.outerAngleCos ?? 0.0;
+			this.lightsDataFloat[offset + 14] = 0.0;
+			this.lightsDataFloat[offset + 15] = 0.0;
 		}
 
 		this.ctx.device.queue.writeBuffer(
@@ -235,7 +249,7 @@ export class Renderer {
 			0,
 			this.lightsDataFloat.buffer,
 			0,
-			16 + 32 * limit,
+			16 + 64 * limit,
 		);
 	}
 

@@ -434,6 +434,8 @@ class OBJParser implements ModelParser {
 /**
  * Loader class fetches, decodes, and manages 3D assets, textures, and shader modules.
  * Extensible through pluggable ModelParser registration.
+ *
+ * @group Core
  */
 export class Loader {
 	/**

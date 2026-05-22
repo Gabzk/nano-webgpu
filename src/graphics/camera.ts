@@ -12,6 +12,8 @@ import {
 
 /**
  * Configuration options utilized during standard Camera instantiation.
+ *
+ * @group Camera
  */
 export interface CameraOptions {
 	/** Field of View angle in radians. Defaults to `Math.PI / 4` (45 degrees). */
@@ -33,6 +35,8 @@ export interface CameraOptions {
  * It manages projection, view, and concatenated view-projection matrices,
  * and maintains dedicated WebGPU uniform buffers describing camera matrices
  * and spatial positions to fragment shaders.
+ *
+ * @group Camera
  */
 export class Camera extends Node3D {
 	/** @internal Parent render Context reference. */

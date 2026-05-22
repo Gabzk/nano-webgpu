@@ -1,7 +1,13 @@
 /**
  * @module Vec3
- 
  * This module provides a 3D vector representation.
+ */
+
+/**
+ * Represents a 3-dimensional vector containing x, y, and z components.
+ * Used for positional and spatial calculations.
+ *
+ * @group Math
  */
 export class Vec3 {
 	private _x: number;

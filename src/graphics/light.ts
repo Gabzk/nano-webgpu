@@ -4,6 +4,8 @@ import { Vec3 } from "../math/vec3";
 
 /**
  * Base configuration parameters utilized during Light node instantiation.
+ *
+ * @group Lighting
  */
 export interface LightOptions {
 	/** Color of emitted light. Can be a Color instance, hex string, or RGB array. Defaults to `#ffffff`. */
@@ -20,6 +22,8 @@ export interface LightOptions {
 
 /**
  * Configuration options specific to directional light sources.
+ *
+ * @group Lighting
  */
 export interface DirectionalLightOptions extends LightOptions {
 	/** If true, the light will cast shadows and generate an orthographic depth map. Defaults to `true`. */
@@ -38,6 +42,8 @@ export interface DirectionalLightOptions extends LightOptions {
 
 /**
  * Configuration options specific to point light sources.
+ *
+ * @group Lighting
  */
 export interface PointLightOptions extends LightOptions {
 	/** Initial spatial position of the point light source. */
@@ -51,6 +57,8 @@ export interface PointLightOptions extends LightOptions {
 /**
  * Represents the binary GPU-ready memory alignment structure for individual lights.
  * Conforms precisely with the WGSL standard layout struct declared within the default shader.
+ *
+ * @group Lighting
  */
 export interface LightGPUData {
 	/** Spatial translation coordinates (point light) or normalized direction vector (directional light). */
@@ -65,6 +73,8 @@ export interface LightGPUData {
 	 * - `1.0`: Directional light, shadow-casting.
 	 * - `2.0`: Point light, no shadows.
 	 * - `3.0`: Point light, shadow-casting.
+	 * - `4.0`: Spotlight, no shadows.
+	 * - `5.0`: Spotlight, shadow-casting.
 	 */
 	typeFlag: number;
 	/** Red color component in sRGB/Linear space. */
@@ -75,10 +85,24 @@ export interface LightGPUData {
 	b: number;
 	/** Physical scale factor describing light brilliance. */
 	intensity: number;
+	/** Direction X-axis component for spotlights. */
+	dirX?: number;
+	/** Direction Y-axis component for spotlights. */
+	dirY?: number;
+	/** Direction Z-axis component for spotlights. */
+	dirZ?: number;
+	/** Linear distance range limit of spotlight illumination. */
+	range?: number;
+	/** Cosine of the inner cone threshold angle. */
+	innerAngleCos?: number;
+	/** Cosine of the outer cone threshold angle. */
+	outerAngleCos?: number;
 }
 
 /**
  * Aggregates configuration details used when allocating depth maps and configuring PCF samplers.
+ *
+ * @group Lighting
  */
 export interface ShadowConfig {
 	/** Width/height resolution of the depth attachment texture. */
@@ -91,12 +115,16 @@ export interface ShadowConfig {
 	shadowDepthRange: number;
 	/** Shadow depth bias. */
 	shadowBias: number;
+	/** Near clipping plane for perspective projection (spotlights). */
+	shadowNear?: number;
 }
 
 /**
  * Base class representing a light source in the 3D scene.
  * Manages diffuse/specular colors, intensity, and provides standard polymorphic hooks
  * to stream packed GPU data to WebGPU buffers.
+ *
+ * @group Lighting
  */
 export class Light extends Node3D {
 	/** @internal Diffuse/specular color of the light source. */
@@ -174,6 +202,8 @@ export class Light extends Node3D {
  * DirectionalLight represents an infinitely far light source emitting parallel light rays
  * along a uniform coordinate direction (e.g. sunlight).
  * Can be configured to generate standard orthographic shadow depth maps.
+ *
+ * @group Lighting
  */
 export class DirectionalLight extends Light {
 	/** If true, enables rendering of a depth texture from this light's perspective. */
@@ -187,7 +217,7 @@ export class DirectionalLight extends Light {
 	/** Near/Far depth boundary limits of the shadow projection volume. */
 	public shadowDepthRange: number = 200.0;
 	/** Custom depth bias to avoid shadow acne or peter panning. Defaults to `0.0001`. */
-	public shadowBias: number = 0.0001;
+	public shadowBias: number = 0.00001;
 
 	/**
 	 * Instantiates a new DirectionalLight node.
@@ -248,6 +278,8 @@ export class DirectionalLight extends Light {
  * PointLight represents an omnidirectional light source emitting light rays uniformly
  * outward from a single point in space (e.g. light bulbs).
  * Attenuates based on distance and defined radius limits.
+ *
+ * @group Lighting
  */
 export class PointLight extends Light {
 	/** Linear distance limit at which point light attenuation falls to zero. */
@@ -282,6 +314,127 @@ export class PointLight extends Light {
 			g: this.color.g,
 			b: this.color.b,
 			intensity: this.intensity,
+		};
+	}
+}
+
+/**
+ * Configuration options specific to spotlight sources.
+ *
+ * @group Lighting
+ */
+export interface SpotLightOptions extends LightOptions {
+	/** If true, the spotlight will cast shadows and generate a perspective depth map. Defaults to `true`. */
+	castShadow?: boolean;
+	/** Resolution width/height of the shadow map texture. Defaults to `2048`. */
+	shadowMapSize?: number;
+	/** Toggle Percentage-Closer Filtering (PCF) to smooth out shadow edges. Defaults to `true`. */
+	usePCF?: boolean;
+	/** Custom depth bias to avoid shadow acne or peter panning. Defaults to `0.00001`. */
+	shadowBias?: number;
+	/** Spotlight inner cone angle in degrees. Defaults to `30.0`. */
+	innerAngle?: number;
+	/** Spotlight outer cone angle in degrees. Defaults to `45.0`. */
+	outerAngle?: number;
+	/** Physical limit at which spotlight attenuation falls to zero. Defaults to `20.0`. */
+	range?: number;
+	/** Near clipping plane for perspective shadow projection. Defaults to `0.1`. */
+	shadowNear?: number;
+}
+
+/**
+ * SpotLight represents a conical light source emitting light rays outward from a single point
+ * along a specific coordinate direction (e.g. flashlights, spotlights).
+ * Attenuates over distance and across inner/outer angular thresholds.
+ * Can be configured to generate perspective shadow depth maps.
+ *
+ * @group Lighting
+ */
+export class SpotLight extends Light {
+	/** If true, enables rendering of a depth texture from this light's perspective. */
+	public castShadow: boolean = true;
+	/** Resolution of the generated shadow map texture. */
+	public shadowMapSize: number = 2048;
+	/** Enables hardware Percentage-Closer Filtering (PCF) to smooth shadow boundary edges. */
+	public usePCF: boolean = true;
+	/** Custom depth bias to avoid shadow acne or peter panning. Defaults to `0.00001`. */
+	public shadowBias: number = 0.00001;
+	/** Spotlight inner cone angle in degrees. */
+	public innerAngle: number = 30.0;
+	/** Spotlight outer cone angle in degrees. */
+	public outerAngle: number = 45.0;
+	/** Physical distance limit where light attenuation falls to zero. */
+	public range: number = 20.0;
+	/** Near clipping plane for perspective shadow projection. */
+	public shadowNear: number = 0.1;
+
+	/**
+	 * Instantiates a new SpotLight node.
+	 *
+	 * @param options - Custom SpotLight parameters.
+	 */
+	constructor(options: SpotLightOptions = {}) {
+		super(options);
+		this.position = Vec3.from(options.position ?? [0, 0, 0]);
+		if (options.castShadow !== undefined) this.castShadow = options.castShadow;
+		if (options.shadowMapSize !== undefined)
+			this.shadowMapSize = options.shadowMapSize;
+		if (options.usePCF !== undefined) this.usePCF = options.usePCF;
+		if (options.shadowBias !== undefined) this.shadowBias = options.shadowBias;
+		if (options.innerAngle !== undefined) this.innerAngle = options.innerAngle;
+		if (options.outerAngle !== undefined) this.outerAngle = options.outerAngle;
+		if (options.range !== undefined) this.range = options.range;
+		if (options.shadowNear !== undefined) this.shadowNear = options.shadowNear;
+	}
+
+	/**
+	 * Overrides polymorphic routines to pack spotlight translation, direction, cone cosines, and range.
+	 *
+	 * @returns Aligned spotlight LightGPUData.
+	 */
+	public override getLightData(): LightGPUData {
+		const pos = new Vec3(
+			this.worldMatrix.values[12],
+			this.worldMatrix.values[13],
+			this.worldMatrix.values[14],
+		);
+		const dir = this.worldMatrix.transformDirection(new Vec3(0, 0, -1));
+
+		const innerRad = (this.innerAngle * Math.PI) / 180.0;
+		const outerRad = (this.outerAngle * Math.PI) / 180.0;
+
+		return {
+			x: pos.x,
+			y: pos.y,
+			z: pos.z,
+			typeFlag: this.castShadow ? 5.0 : 4.0,
+			r: this.color.r,
+			g: this.color.g,
+			b: this.color.b,
+			intensity: this.intensity,
+			dirX: dir.x,
+			dirY: dir.y,
+			dirZ: dir.z,
+			range: this.range,
+			innerAngleCos: Math.cos(innerRad),
+			outerAngleCos: Math.cos(outerRad),
+		};
+	}
+
+	/**
+	 * Compiles and returns active shadow map configurations.
+	 *
+	 * @returns ShadowConfig descriptors, or null if shadow casting is disabled.
+	 */
+	public override getShadowConfig(): ShadowConfig | null {
+		if (!this.castShadow) return null;
+		return {
+			shadowMapSize: this.shadowMapSize,
+			usePCF: this.usePCF,
+			shadowRadius: this.outerAngle, // Reuse shadowRadius to carry spotlight outerAngle (FOV)
+			shadowDepthRange: this.range, // Reuse shadowDepthRange to carry spotlight range (far plane)
+			shadowBias: this.shadowBias,
+			shadowNear: this.shadowNear,
 		};
 	}
 }

@@ -6,6 +6,8 @@ import { BaseCameraController } from "./base";
 /**
  * FirstPersonCameraController implements a classic first-person look scheme,
  * where the camera sits inside a target Node3D node and is controlled via mouse movement.
+ *
+ * @group Camera
  */
 export class FirstPersonCameraController extends BaseCameraController {
 	public override readonly mode: CameraMode = "first-person";

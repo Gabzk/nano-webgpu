@@ -6,6 +6,8 @@ import { postProcessShader } from "./shaders/post-process";
  * PipelineManager acts as a centralized caching compiling system for GPURenderPipelines.
  * Allocates reusable bind group layouts, caches compiled standard/custom/shadow/post-processing
  * pipelines to avoid redundant shader compilation overhead, and manages standard pipeline layouts.
+ *
+ * @group Graphics
  */
 export class PipelineManager {
 	/** @internal Target context reference. */

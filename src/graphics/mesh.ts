@@ -14,6 +14,8 @@ import { Texture } from "./texture";
 
 /**
  * Configuration options utilized during direct Mesh node instantiation.
+ *
+ * @group Graphics
  */
 export interface MeshOptions {
 	/** Underlying GPU vertex/index buffer geometry interface. */
@@ -34,6 +36,8 @@ export interface MeshOptions {
 
 /**
  * Configuration options utilized during programmatic mesh construction via `Mesh.build()`.
+ *
+ * @group Graphics
  */
 export interface BuildMeshOptions {
 	/** Ordering layout identifying attributes (e.g. `['position', 'normal', 'uv']`). */
@@ -64,6 +68,8 @@ export interface BuildMeshOptions {
  * Mesh represents a physical, renderable 3D entity within the scene graph.
  * It couples geometric vertex/index buffers (Geometry) with shading parameter bindings (Material)
  * and maintains spatial Node3D transforms.
+ *
+ * @group Graphics
  */
 export class Mesh extends Node3D {
 	/** Type identifier used for fast polymorphic runtime checks. */

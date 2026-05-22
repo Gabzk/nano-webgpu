@@ -1,13 +1,15 @@
 import { VRAMTracker } from "../debug/vram-tracker";
 import { PipelineManager } from "../graphics/pipeline";
 import { PrimitivesFactory } from "../graphics/primitives-factory";
-import { Input, InputManager, setActiveInput } from "./input";
+import { InputManager, setActiveInput } from "./input";
 import { Loader } from "./loader";
 
 /**
  * Context acts as the primary orchestrator for a WebGPU instance on a target HTMLCanvasElement.
  * It encapsulates the GPUDevice connection, the GPUCanvasContext configuration, and aggregates
  * key framework singletons such as the PipelineManager, asset Loader, VRAMTracker, and PrimitivesFactory.
+ *
+ * @group Core
  */
 export class Context {
 	/**

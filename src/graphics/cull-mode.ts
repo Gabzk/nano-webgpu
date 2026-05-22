@@ -1,6 +1,8 @@
 /**
  * Defines the culling behaviors supported by the renderer.
  * Extends the native WebGPU `GPUCullMode` (`"none" | "front" | "back"`) with an additional `"disabled"` keyword.
+ *
+ * @group Graphics
  */
 export type CullMode = GPUCullMode | "disabled";
 

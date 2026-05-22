@@ -6,6 +6,8 @@ import { BaseCameraController } from "./base";
 /**
  * ThirdPersonCameraController implements a classic third-person follow-look camera,
  * tracking a target Node3D node from a distance.
+ *
+ * @group Camera
  */
 export class ThirdPersonCameraController extends BaseCameraController {
 	public override readonly mode: CameraMode = "third-person";

@@ -1,6 +1,7 @@
 /**
  * @module NanoWebGPU
- * @description The main entry point for the nano-webgpu engine, exporting all core modules,
+ *
+ * The main entry point for the nano-webgpu engine, exporting all core modules,
  * graphics nodes, materials, mathematical helpers, and debugging utilities.
  */
 
@@ -14,7 +15,7 @@ export { Node3D } from "./core/node3d";
 export { DebugPanel, type DebugPanelOptions } from "./debug/debug-panel";
 export { PerformanceTracker } from "./debug/performance-tracker";
 export { type VRAMEntry, VRAMTracker } from "./debug/vram-tracker";
-export { BatchManager } from "./graphics/batch-manager";
+export { BatchManager, type InstanceBatch } from "./graphics/batch-manager";
 export { Camera, type CameraOptions } from "./graphics/camera";
 export {
 	CameraController,
@@ -37,11 +38,14 @@ export {
 	PointLight,
 	type PointLightOptions,
 	type ShadowConfig,
+	SpotLight,
+	type SpotLightOptions,
 } from "./graphics/light";
 export {
 	isShaderMaterial,
 	isStandardMaterial,
 	Material,
+	type MaterialOptions,
 } from "./graphics/materials/material";
 export {
 	ShaderMaterial,
@@ -53,8 +57,9 @@ export {
 	StandardMaterial,
 	type StandardMaterialOptions,
 } from "./graphics/materials/standard-material";
-export { Mesh, type MeshOptions } from "./graphics/mesh";
+export { type BuildMeshOptions, Mesh, type MeshOptions } from "./graphics/mesh";
 export { PipelineManager } from "./graphics/pipeline";
+export { PrimitivesFactory } from "./graphics/primitives-factory";
 export { Renderer } from "./graphics/renderer";
 export {
 	type RenderInfo,
