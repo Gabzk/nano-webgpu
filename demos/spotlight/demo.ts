@@ -22,7 +22,7 @@ scene.addPlane({
 });
 
 // Load the high-quality Shiba GLB mesh in the center of the spotlight
-const shiba = await scene.loadMesh("../render/assets/shiba.glb", {
+const shiba = await scene.loadMesh("../addInstance/shiba.glb", {
 	position: [0, -1, 0],
 	scale: 1.6,
 	rotation: [-Math.PI / 2, 0, 0],

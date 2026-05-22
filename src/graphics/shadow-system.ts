@@ -206,7 +206,6 @@ export class ShadowSystem {
 		// Direction via getLightData (avoids instanceof)
 		const d = shadowCaster.getLightData();
 		const isSpot = d.typeFlag > 3.5;
-		
 		const lightDir = isSpot
 			? new Vec3(d.dirX!, d.dirY!, d.dirZ!).normalize()
 			: new Vec3(d.x, d.y, d.z).normalize();
