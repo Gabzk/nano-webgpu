@@ -287,17 +287,22 @@ export class Mesh extends Node3D {
 	}
 
 	/**
-	 * Detaches the Mesh from its hierarchy parent and optionally destroys associated GPUBuffers.
+	 * Detaches the Mesh from its hierarchy parent and optionally destroys associated GPUBuffers and Materials.
 	 *
 	 * @param destroyGeometry - If true, releases GPU vertex/index buffer allocations immediately.
 	 *   Defaults to false to allow shared geometric allocations across instanced Mesh clones.
+	 * @param destroyMaterial - If true, releases GPU uniform buffer allocations of the associated material immediately.
+	 *   Defaults to false to allow shared material allocations.
 	 */
-	public destroy(destroyGeometry: boolean = false): void {
+	public destroy(destroyGeometry: boolean = false, destroyMaterial: boolean = false): void {
 		if (this.parent) {
 			this.parent.remove(this);
 		}
 		if (destroyGeometry && this.geometry) {
 			this.geometry.destroy(this.ctx);
+		}
+		if (destroyMaterial && this.material) {
+			this.material.destroy(this.ctx);
 		}
 	}
 

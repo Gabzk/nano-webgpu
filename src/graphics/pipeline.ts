@@ -415,6 +415,14 @@ export class PipelineManager {
 			),
 		);
 
+		// Prevent infinite cache memory leak on GPUs (FIFO eviction logic)
+		if (this.customParamsPipelines.size >= 100) {
+			const oldestKey = this.customParamsPipelines.keys().next().value;
+			if (oldestKey) {
+				this.customParamsPipelines.delete(oldestKey);
+			}
+		}
+
 		this.customParamsPipelines.set(cacheKey, pipeline);
 		return pipeline;
 	}
@@ -460,6 +468,14 @@ export class PipelineManager {
 				depthCompare,
 			),
 		);
+
+		// Prevent infinite cache memory leak on GPUs (FIFO eviction logic)
+		if (this.customPipelines.size >= 100) {
+			const oldestKey = this.customPipelines.keys().next().value;
+			if (oldestKey) {
+				this.customPipelines.delete(oldestKey);
+			}
+		}
 
 		this.customPipelines.set(cacheKey, pipeline);
 		return pipeline;

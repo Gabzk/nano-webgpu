@@ -51,6 +51,24 @@ export interface StandardMaterialOptions extends MaterialOptions {
  * handles shadow filtering variant compilation keys, and supports double-sided material rendering.
  */
 export class StandardMaterial extends Material {
+	/** Mappings of PBR parameters to Float32Array offsets matching the WGSL MaterialUniform struct layout. */
+	public static readonly UNIFORM_OFFSETS = {
+		ALBEDO_R: 0,
+		ALBEDO_G: 1,
+		ALBEDO_B: 2,
+		ALBEDO_A: 3,
+		ROUGHNESS: 4,
+		METALLIC: 5,
+		NORMAL_SCALE: 6,
+		AO_INTENSITY: 7,
+		HAS_NORMAL_MAP: 8,
+		HAS_ROUGHNESS_MAP: 9,
+		HAS_METALLIC_MAP: 10,
+		HAS_AO_MAP: 11,
+		HAS_ORM_MAP: 12,
+		CULL_MODE: 13,
+	} as const;
+
 	/** @internal Solid base color coefficients. */
 	private _albedoColor: Color = new Color();
 	/** Map containing surface color data. */
@@ -250,28 +268,29 @@ export class StandardMaterial extends Material {
 	 * @internal Packages PBR coefficient scalars and map activation statuses sequentially into uniform float arrays.
 	 */
 	private updateBufferData() {
-		this.bufferData[0] = this.albedoColor.r;
-		this.bufferData[1] = this.albedoColor.g;
-		this.bufferData[2] = this.albedoColor.b;
-		this.bufferData[3] = this.albedoColor.a ?? 1.0;
+		const offsets = StandardMaterial.UNIFORM_OFFSETS;
+		this.bufferData[offsets.ALBEDO_R] = this.albedoColor.r;
+		this.bufferData[offsets.ALBEDO_G] = this.albedoColor.g;
+		this.bufferData[offsets.ALBEDO_B] = this.albedoColor.b;
+		this.bufferData[offsets.ALBEDO_A] = this.albedoColor.a ?? 1.0;
 
-		this.bufferData[4] = this.roughness;
-		this.bufferData[5] = this.metallic;
-		this.bufferData[6] = this.normalScale;
-		this.bufferData[7] = this.aoIntensity;
+		this.bufferData[offsets.ROUGHNESS] = this.roughness;
+		this.bufferData[offsets.METALLIC] = this.metallic;
+		this.bufferData[offsets.NORMAL_SCALE] = this.normalScale;
+		this.bufferData[offsets.AO_INTENSITY] = this.aoIntensity;
 
-		this.bufferData[8] = this.normalTexture ? 1.0 : 0.0;
-		this.bufferData[9] = this.roughnessTexture ? 1.0 : 0.0;
-		this.bufferData[10] = this.metallicTexture ? 1.0 : 0.0;
-		this.bufferData[11] = this.aoTexture ? 1.0 : 0.0;
+		this.bufferData[offsets.HAS_NORMAL_MAP] = this.normalTexture ? 1.0 : 0.0;
+		this.bufferData[offsets.HAS_ROUGHNESS_MAP] = this.roughnessTexture ? 1.0 : 0.0;
+		this.bufferData[offsets.HAS_METALLIC_MAP] = this.metallicTexture ? 1.0 : 0.0;
+		this.bufferData[offsets.HAS_AO_MAP] = this.aoTexture ? 1.0 : 0.0;
 
 		const lightingCull =
 			this._lightingCullMode ?? normalizeCullMode(this._cullMode);
 		const cullModeFlag =
 			lightingCull === "front" ? 1.0 : lightingCull === "none" ? 2.0 : 0.0;
 
-		this.bufferData[12] = this.ormTexture ? 1.0 : 0.0;
-		this.bufferData[13] = cullModeFlag;
+		this.bufferData[offsets.HAS_ORM_MAP] = this.ormTexture ? 1.0 : 0.0;
+		this.bufferData[offsets.CULL_MODE] = cullModeFlag;
 		this.bufferData[14] = 0.0;
 		this.bufferData[15] = 0.0;
 	}
@@ -441,12 +460,27 @@ export class StandardMaterial extends Material {
 				tex.onUpdate(() => {
 					this.bindGroup = null;
 					this._bindGroupPCFVariant = null;
-					tryBuild();
 				});
 			}
 		}
 
 		// biome-ignore lint/style/noNonNullAssertion: tryBuild() above always assigns this.bindGroup
 		return this.bindGroup!;
+	}
+
+	/**
+	 * Releases standard material resources (GPUBuffers) and unregisters entries from the VRAM tracker.
+	 *
+	 * @param ctx - Active context.
+	 */
+	public destroy(ctx: Context): void {
+		if (this.uniformBuffer) {
+			ctx.vramTracker.unregister(this.uniformBuffer);
+			this.uniformBuffer.destroy();
+			// @ts-expect-error - allow cleanup reference assignment
+			this.uniformBuffer = null;
+		}
+		this.bindGroup = null;
+		this.sampler = null;
 	}
 }

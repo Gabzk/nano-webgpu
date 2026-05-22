@@ -55,6 +55,9 @@ export class ShaderMaterial extends Material {
 	/** @internal Custom parameter bind group 3 container. */
 	private _paramsBindGroup: GPUBindGroup | null = null;
 
+	/** @internal Cached context reference for dynamic parameter updates and VRAM tracking. */
+	private _ctx: Context | null = null;
+
 	/**
 	 * Instantiates a new ShaderMaterial.
 	 *
@@ -106,6 +109,9 @@ export class ShaderMaterial extends Material {
 				this.isDirty = true;
 			} else {
 				// Buffer too small — destroy and recreate
+				if (this._ctx) {
+					this._ctx.vramTracker.unregister(this._paramsBuffer);
+				}
 				this._paramsBuffer.destroy();
 				this._paramsBuffer = null;
 				this._paramsBindGroup = null;
@@ -176,12 +182,20 @@ export class ShaderMaterial extends Material {
 		if (this.customBindGroup) return this.customBindGroup;
 		if (this._defaultBindGroup) return this._defaultBindGroup;
 
+		this._ctx = ctx;
 		if (!this._defaultUniformBuffer) {
 			this._defaultUniformBuffer = ctx.device.createBuffer({
 				label: `ShaderMaterial_${this.id}_UniformBuffer`,
 				size: 64, // 16 floats × 4 bytes
 				usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
 			});
+			ctx.vramTracker.register(
+				this._defaultUniformBuffer,
+				"buffer",
+				`ShaderMaterial_${this.id}_UniformBuffer`,
+				64,
+				"ShaderMaterial",
+			);
 		}
 
 		if (!this._defaultSampler) {
@@ -248,6 +262,7 @@ export class ShaderMaterial extends Material {
 
 		if (this._paramsBindGroup) return this._paramsBindGroup;
 
+		this._ctx = ctx;
 		// Create the parameters buffer
 		const byteLength = this._paramsData.byteLength;
 		this._paramsBuffer = ctx.device.createBuffer({
@@ -255,6 +270,13 @@ export class ShaderMaterial extends Material {
 			size: byteLength,
 			usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
 		});
+		ctx.vramTracker.register(
+			this._paramsBuffer,
+			"buffer",
+			`ShaderMaterial_${this.id}_ParamsBuffer`,
+			byteLength,
+			"ShaderMaterial",
+		);
 		ctx.device.queue.writeBuffer(
 			this._paramsBuffer,
 			0,
@@ -274,5 +296,27 @@ export class ShaderMaterial extends Material {
 		});
 
 		return this._paramsBindGroup;
+	}
+
+	/**
+	 * Releases custom shader material resources (GPUBuffers) and unregisters entries from the VRAM tracker.
+	 *
+	 * @param ctx - Active context.
+	 */
+	public destroy(ctx: Context): void {
+		this._ctx = ctx;
+		if (this._defaultUniformBuffer) {
+			ctx.vramTracker.unregister(this._defaultUniformBuffer);
+			this._defaultUniformBuffer.destroy();
+			this._defaultUniformBuffer = null;
+		}
+		if (this._paramsBuffer) {
+			ctx.vramTracker.unregister(this._paramsBuffer);
+			this._paramsBuffer.destroy();
+			this._paramsBuffer = null;
+		}
+		this._defaultBindGroup = null;
+		this._defaultSampler = null;
+		this._paramsBindGroup = null;
 	}
 }

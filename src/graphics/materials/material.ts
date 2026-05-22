@@ -109,6 +109,13 @@ export abstract class Material {
 	public getParamsBindGroup(_ctx: Context): GPUBindGroup | null {
 		return null;
 	}
+
+	/**
+	 * Abstract method performing resource cleanup (releasing GPU buffers and removing allocations tracker entries).
+	 *
+	 * @param ctx - Target framework context.
+	 */
+	public abstract destroy(ctx: Context): void;
 }
 
 /**
