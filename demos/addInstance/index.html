@@ -4,22 +4,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nano WebGPU Demo</title>
+    <title>Nano WebGPU — Light & CSM Shadows Demo</title>
     <style>
-        body {
-            margin: 32px;
-            font-family: sans-serif;
-            background: #1a1a1a;
-            color: #fff;
-        }
+        @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;800&display=swap');
 
-        html,
-        body {
+        html, body {
             height: 100%;
             margin: 0;
             padding: 0;
             overflow: hidden;
-            background: #000;
+            background: #0a0a12;
+            font-family: 'Outfit', sans-serif;
+            color: #f3f4f6;
         }
 
         canvas {
@@ -28,25 +24,147 @@
             height: 100vh;
         }
 
-        .status {
-            padding: 10px;
-            border-radius: 4px;
-            display: inline-block;
+        /* Glassmorphic Control Panel */
+        .control-panel {
+            position: absolute;
+            top: 24px;
+            right: 24px;
+            width: 320px;
+            background: rgba(13, 13, 26, 0.7);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            padding: 24px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+            z-index: 10;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
-        .success {
-            background: #2e7d32;
+        .control-panel h2 {
+            margin: 0 0 16px 0;
+            font-size: 1.25rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, #00e5ff, #8a2be2);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            letter-spacing: 0.5px;
         }
 
-        .error {
-            background: #c62828;
+        .control-group {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 20px;
+            font-size: 0.9rem;
+        }
+
+        .label {
+            color: #9ca3af;
+        }
+
+        .value {
+            font-weight: 600;
+        }
+
+        .badge {
+            padding: 4px 10px;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-weight: 800;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+        }
+
+        .csm-badge {
+            background: rgba(0, 229, 255, 0.15);
+            color: #00e5ff;
+            border: 1px solid rgba(0, 229, 255, 0.3);
+        }
+
+        .std-badge {
+            background: rgba(138, 43, 226, 0.15);
+            color: #a855f7;
+            border: 1px solid rgba(138, 43, 226, 0.3);
+        }
+
+        button {
+            width: 100%;
+            background: linear-gradient(135deg, #00e5ff, #0088ff);
+            color: #07070d;
+            border: none;
+            border-radius: 8px;
+            padding: 12px;
+            font-family: 'Outfit', sans-serif;
+            font-weight: 700;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            box-shadow: 0 4px 15px rgba(0, 229, 255, 0.3);
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 229, 255, 0.5);
+            filter: brightness(1.1);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        .info-text {
+            margin-top: 16px;
+            font-size: 0.8rem;
+            color: #9ca3af;
+            line-height: 1.4;
+            border-top: 1px solid rgba(255, 255, 255, 0.08);
+            padding-top: 16px;
+        }
+
+        /* Back button */
+        .back-btn {
+            position: absolute;
+            top: 24px;
+            left: 24px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: #fff;
+            padding: 8px 16px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-size: 0.9rem;
+            font-weight: 600;
+            backdrop-filter: blur(8px);
+            z-index: 10;
+            transition: all 0.2s ease;
+        }
+
+        .back-btn:hover {
+            background: rgba(255, 255, 255, 0.15);
+            border-color: rgba(255, 255, 255, 0.3);
         }
     </style>
 </head>
 
 <body>
+    <a href="../index.html" class="back-btn">← Back to Hub</a>
+    
+    <div class="control-panel">
+        <h2>Lighting Controls</h2>
+        <div class="control-group">
+            <span class="label">Shadow Technique:</span>
+            <span id="active-technique" class="value badge csm-badge">Cascaded Shadow Map (CSM)</span>
+        </div>
+        <button id="toggle-light-btn">Switch to Standard Shadows</button>
+        <div class="info-text">
+            CSM splits the camera frustum into 4 depth cascades, maintaining shadow sharpness at close and far distances.
+        </div>
+    </div>
+
     <canvas id="canvas"></canvas>
     <script type="module" src="./demo.ts"></script>
 </body>
-
 </html>

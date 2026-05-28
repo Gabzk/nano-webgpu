@@ -331,13 +331,22 @@ export class Renderer {
 
 		// 4. (Re)build globals bind group if dirty
 		if (this.globalsBindGroupDirty && camera.uniformBuffer) {
+			const useCSM = this.shadow.useCSM;
+			const shadowView = useCSM
+				? this.shadow.texture.createView({
+						dimension: "2d-array",
+						baseArrayLayer: 0,
+						arrayLayerCount: this.shadow.cascadeCount,
+					})
+				: this.shadow.texture.createView();
+
 			this.globalsBindGroup = this.ctx.device.createBindGroup({
 				label: "Scene_Globals_BindGroup",
-				layout: this.ctx.pipelineManager.getGlobalsBindGroupLayout(),
+				layout: this.ctx.pipelineManager.getGlobalsBindGroupLayout(useCSM),
 				entries: [
 					{ binding: 0, resource: { buffer: camera.uniformBuffer } },
 					{ binding: 1, resource: { buffer: this.lightsBuffer } },
-					{ binding: 2, resource: this.shadow.texture.createView() },
+					{ binding: 2, resource: shadowView },
 					{ binding: 3, resource: this.shadow.sampler },
 					{ binding: 4, resource: { buffer: this.shadow.uniformBuffer } },
 					{ binding: 5, resource: { buffer: this.renderSettingsBuffer } },
@@ -371,6 +380,7 @@ export class Renderer {
 				topology,
 				indexFormat,
 				cullMode,
+				this.shadow.useCSM,
 			);
 			if (pipeline !== lastPipeline) {
 				passEncoder.setPipeline(pipeline);
@@ -438,6 +448,7 @@ export class Renderer {
 				topology,
 				indexFormat,
 				cullMode,
+				this.shadow.useCSM,
 			);
 
 			// Restore original material depth properties

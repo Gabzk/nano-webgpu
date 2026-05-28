@@ -1,48 +1,5 @@
 export const waterShader = /* wgsl */`
 
-// ── Group 0: Globals ──────────────────────────────────────────────────────────
-struct CameraUniform {
-    viewProj: mat4x4<f32>,
-    cameraPos: vec4<f32>,
-}
-@group(0) @binding(0) var<uniform> camera: CameraUniform;
-
-struct RenderSettings {
-    fxaa_enabled: u32,
-    time_bits: u32,
-    _pad2: u32,
-    _pad3: u32,
-}
-@group(0) @binding(5) var<uniform> settings: RenderSettings;
-
-// ── Group 1: Model matrices ────────────────────────────────────────────────────
-@group(1) @binding(0) var<storage, read> models: array<mat4x4<f32>>;
-
-// ── Group 2: Material (not used — declared to satisfy the fixed pipeline layout) ─
-struct MaterialUniform {
-    color: vec4<f32>,
-    roughness: f32,
-    metallic: f32,
-    normalScale: f32,
-    aoIntensity: f32,
-    useNormalMap: f32,
-    useRoughnessMap: f32,
-    useMetallicMap: f32,
-    useAOMap: f32,
-    useORMMap: f32,
-    cullMode: f32,
-    _pad2: f32,
-    _pad3: f32,
-}
-@group(2) @binding(0) var<uniform> material: MaterialUniform;
-@group(2) @binding(1) var mySampler: sampler;
-@group(2) @binding(2) var albedoTex:    texture_2d<f32>;
-@group(2) @binding(3) var normalTex:    texture_2d<f32>;
-@group(2) @binding(4) var roughnessTex: texture_2d<f32>;
-@group(2) @binding(5) var metallicTex:  texture_2d<f32>;
-@group(2) @binding(6) var aoTex:        texture_2d<f32>;
-@group(2) @binding(7) var ormTex:       texture_2d<f32>;
-
 // ── Group 3: Configurable shader parameters ────────────────────────────────────
 struct WaterParams {
     water_color: vec4<f32>,
@@ -56,22 +13,6 @@ struct WaterParams {
     _pad: f32,
 }
 @group(3) @binding(0) var<uniform> params: WaterParams;
-
-// ── Vertex I/O ────────────────────────────────────────────────────────────────
-struct VertexInput {
-    @location(0) position: vec3<f32>,
-    @location(1) normal:   vec3<f32>,
-    @location(2) uv:       vec2<f32>,
-    @location(3) color:    vec3<f32>,
-}
-struct VertexOutput {
-    @builtin(position) clip_position: vec4<f32>,
-    @location(0) frag_pos:   vec3<f32>,
-    @location(1) normal:     vec3<f32>,
-    @location(2) uv:         vec2<f32>,
-    @location(3) shadow_pos: vec4<f32>,
-    @location(4) color:      vec3<f32>,
-}
 
 // ── Constants & Helpers ───────────────────────────────────────────────────────
 const M_2PI: f32 = 6.283185307;
@@ -266,7 +207,17 @@ fn vs_main(@builtin(instance_index) instanceIdx: u32, in: VertexInput) -> Vertex
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let time = bitcast<f32>(settings.time_bits);
-    let color = water(in.uv * params.tile, vec3<f32>(0.0, 1.0, 0.0), time * params.distortion_speed);
+    var color = water(in.uv * params.tile, vec3<f32>(0.0, 1.0, 0.0), time * params.distortion_speed);
+    
+    if (shadowCamera.hasShadow > 0.5) {
+        let shadowDir = normalize(vec3<f32>(shadowCamera.lightDirX, shadowCamera.lightDirY, shadowCamera.lightDirZ));
+        let shadowBias = max(shadowCamera.bias * (1.0 - dot(normalize(in.normal), shadowDir)), shadowCamera.bias * 0.1);
+        let depth = dot(in.frag_pos - camera.cameraPos.xyz, shadowCamera.cameraForward.xyz);
+        let shadowSample = getShadow(in.frag_pos, depth, shadowBias, shadowCamera.texelSize);
+        let shadowFactor = mix(0.4, 1.0, shadowSample); // 0.4 ambient shadow floor so it's not pitch black
+        color = color * shadowFactor;
+    }
+    
     return vec4<f32>(color, 1.0);
 }
 `

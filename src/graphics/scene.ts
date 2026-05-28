@@ -49,6 +49,20 @@ export interface SceneLightOptions extends LightOptions {
 	range?: number;
 	/** Near clipping plane for perspective shadow projection. */
 	shadowNear?: number;
+
+	// --- Directional & CSM Options ---
+	/** World-space boundary half-extent defining the orthographic shadow view box. Defaults to `20.0`. */
+	shadowRadius?: number;
+	/** Total depth range along the Z axis of the shadow projection frustum. Defaults to `200.0`. */
+	shadowDepthRange?: number;
+	/** If true, the directional light will use Cascaded Shadow Maps (CSM) to divide the frustum. Defaults to `false`. */
+	useCSM?: boolean;
+	/** Number of cascades for CSM (typically 3 or 4). Defaults to `4`. */
+	cascadeCount?: number;
+	/** Maximum distance along camera depth for shadow mapping projection. Defaults to `100.0`. */
+	csmMaxDistance?: number;
+	/** Factor weighting linear vs logarithmic cascade splits (value between 0 and 1). Defaults to `0.85`. */
+	cascadeSplitLambda?: number;
 }
 
 /**
@@ -83,6 +97,8 @@ export interface SceneGeometryOptions extends StandardMaterialOptions {
 export interface RenderInfo {
 	/** Delta time in seconds since the last frame. */
 	dt: number;
+	/** Total accumulated elapsed time in seconds since start. */
+	time: number;
 	/** Estimated frames per second. */
 	fps: number;
 	/** Total CPU frame calculation time in milliseconds. */
@@ -193,6 +209,7 @@ export class Scene extends Node {
 	/** @internal Frame profiling render statistics. */
 	private _renderInfo: RenderInfo = {
 		dt: 0,
+		time: 0,
 		fps: 0,
 		frameTimeMs: 0,
 		meshCount: 0,
@@ -315,6 +332,20 @@ export class Scene extends Node {
 		this._lights.push(light);
 		this.add(light);
 		return light;
+	}
+
+	/**
+	 * Detaches and removes an active Light node from the scene hierarchy and internal tracking.
+	 *
+	 * @param light - The Light instance to remove.
+	 */
+	public removeLight(light: Light): void {
+		const index = this._lights.indexOf(light);
+		if (index !== -1) {
+			this._lights.splice(index, 1);
+		}
+		this.remove(light);
+		this.renderer.globalsBindGroupDirty = true;
 	}
 
 	/**
@@ -576,6 +607,7 @@ export class Scene extends Node {
 			this._renderFrame(dt);
 			this._renderInfo = {
 				dt,
+				time: this.renderer.elapsedTime,
 				fps: this.perfTracker.fps,
 				frameTimeMs: this.perfTracker.frameTimeMs,
 				meshCount: this._meshes.length,

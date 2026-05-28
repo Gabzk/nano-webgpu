@@ -69,7 +69,9 @@ describe("Context", () => {
 
 		it("should initialize successfully if WebGPU is supported and Adapter is found", async () => {
 			// Create mocks for the device, context, and format
-			const mockDevice = {} as GPUDevice;
+			const mockDevice = {
+				addEventListener: vi.fn(),
+			} as unknown as GPUDevice;
 			const mockFormat = "bgra8unorm" as GPUTextureFormat;
 
 			const mockAdapter = {

@@ -198,6 +198,7 @@ export class ShaderMaterial extends Material {
 		topology: GPUPrimitiveTopology = "triangle-list",
 		indexFormat: GPUIndexFormat = "uint16",
 		cullMode?: GPUCullMode,
+		useCSM = false,
 	): GPURenderPipeline {
 		if (this._paramsData) {
 			return ctx.pipelineManager.getCustomPipelineWithParams(
@@ -207,6 +208,7 @@ export class ShaderMaterial extends Material {
 				cullMode,
 				this.depthWriteEnabled,
 				this.depthCompare,
+				useCSM,
 			);
 		}
 		return ctx.pipelineManager.getCustomPipeline(
@@ -216,6 +218,7 @@ export class ShaderMaterial extends Material {
 			cullMode,
 			this.depthWriteEnabled,
 			this.depthCompare,
+			useCSM,
 		);
 	}
 
@@ -230,8 +233,8 @@ export class ShaderMaterial extends Material {
 	 */
 	public override getBindGroup(
 		ctx: Context,
-		topology: GPUPrimitiveTopology = "triangle-list",
-		indexFormat: GPUIndexFormat = "uint16",
+		_topology: GPUPrimitiveTopology = "triangle-list",
+		_indexFormat: GPUIndexFormat = "uint16",
 	): GPUBindGroup {
 		if (this.customBindGroup) return this.customBindGroup;
 		if (this._defaultBindGroup) return this._defaultBindGroup;
@@ -262,19 +265,7 @@ export class ShaderMaterial extends Material {
 		const dummyWhite = Texture.getDummyWhite(ctx);
 		const dummyNormal = Texture.getDummyNormal(ctx);
 
-		const pipeline = this._paramsData
-			? ctx.pipelineManager.getCustomPipelineWithParams(
-					this.shaderCode,
-					topology,
-					indexFormat,
-				)
-			: ctx.pipelineManager.getCustomPipeline(
-					this.shaderCode,
-					topology,
-					indexFormat,
-				);
-
-		const layout = pipeline.getBindGroupLayout(2);
+		const layout = ctx.pipelineManager.getMaterialBindGroupLayout();
 
 		this._defaultBindGroup = ctx.device.createBindGroup({
 			label: `ShaderMaterial_${this.id}_DefaultBindGroup`,
@@ -338,10 +329,7 @@ export class ShaderMaterial extends Material {
 		);
 		this.isDirty = false;
 
-		const pipeline = ctx.pipelineManager.getCustomPipelineWithParams(
-			this.shaderCode,
-		);
-		const layout = pipeline.getBindGroupLayout(3);
+		const layout = ctx.pipelineManager.getCustomParamsBindGroupLayout();
 
 		this._paramsBindGroup = ctx.device.createBindGroup({
 			label: `ShaderMaterial_${this.id}_ParamsBindGroup`,

@@ -140,6 +140,7 @@ export abstract class Material {
 		topology?: GPUPrimitiveTopology,
 		indexFormat?: GPUIndexFormat,
 		cullMode?: GPUCullMode,
+		useCSM?: boolean,
 	): GPURenderPipeline;
 
 	/**

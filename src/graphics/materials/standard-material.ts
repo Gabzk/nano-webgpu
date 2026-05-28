@@ -467,6 +467,7 @@ export class StandardMaterial extends Material {
 		topology: GPUPrimitiveTopology = "triangle-list",
 		indexFormat: GPUIndexFormat = "uint16",
 		cullMode?: GPUCullMode,
+		useCSM = false,
 	): GPURenderPipeline {
 		const resolvedCullMode = resolveCullMode(cullMode, topology);
 		if (this._lightingCullMode !== resolvedCullMode) {
@@ -480,6 +481,7 @@ export class StandardMaterial extends Material {
 			cullMode,
 			this.depthWriteEnabled,
 			this.depthCompare,
+			useCSM,
 		);
 	}
 
@@ -588,9 +590,7 @@ export class StandardMaterial extends Material {
 			if (this.bindGroup) return;
 			this.bindGroup = ctx.device.createBindGroup({
 				label: `StandardMaterial_${this.id}_BindGroup`,
-				layout: ctx.pipelineManager
-					.getStandardPipeline(this._usePCF)
-					.getBindGroupLayout(2),
+				layout: ctx.pipelineManager.getMaterialBindGroupLayout(),
 				entries: [
 					{ binding: 0, resource: { buffer: this.uniformBuffer } },
 					{ binding: 1, resource: sampler },

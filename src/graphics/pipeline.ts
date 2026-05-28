@@ -1,4 +1,7 @@
 import type { Context } from "../core/context";
+import { getShadowChunk } from "./shaders/chunks/shadow.chunk";
+import { getStructsChunk } from "./shaders/chunks/structs.chunk";
+import { getVertexChunk } from "./shaders/chunks/vertex.chunk";
 import { buildDefaultShader } from "./shaders/default";
 import { postProcessShader } from "./shaders/post-process";
 
@@ -22,6 +25,8 @@ export class PipelineManager {
 	private customPipelines: Map<string, GPURenderPipeline> = new Map();
 	/** @internal Cached pipeline layout for custom materials. */
 	private customPipelineLayout: GPUPipelineLayout | null = null;
+	/** @internal Cached pipeline layout for custom materials with CSM. */
+	private customPipelineLayout_CSM: GPUPipelineLayout | null = null;
 
 	/** @internal Cached shadow map rendering pipeline. */
 	private shadowPipeline: GPURenderPipeline | null = null;
@@ -30,6 +35,10 @@ export class PipelineManager {
 
 	/** @internal Cached bind group layout 0 mapping global uniforms (camera matrices, lighting parameters). */
 	private bindGroupLayout0_Globals: GPUBindGroupLayout | null = null;
+	/** @internal Cached bind group layout 0 mapping global uniforms for CSM (depth texture array). */
+	private bindGroupLayout0_Globals_CSM: GPUBindGroupLayout | null = null;
+	/** @internal Cached pipeline layout for standard material bindings with CSM. */
+	private standardPipelineLayout_CSM: GPUPipelineLayout | null = null;
 	/** @internal Cached bind group layout 1 mapping model transformation arrays (instancing matrices). */
 	private bindGroupLayout1_Model: GPUBindGroupLayout | null = null;
 	/** @internal Cached bind group layout 2 mapping material parameter values and texture bindings. */
@@ -43,6 +52,8 @@ export class PipelineManager {
 	private customParamsPipelines: Map<string, GPURenderPipeline> = new Map();
 	/** @internal Cached pipeline layout for custom param-enabled shaders. */
 	private customParamsPipelineLayout: GPUPipelineLayout | null = null;
+	/** @internal Cached pipeline layout for custom param-enabled shaders with CSM. */
+	private customParamsPipelineLayout_CSM: GPUPipelineLayout | null = null;
 
 	/**
 	 * Instantiates a new PipelineManager.
@@ -60,7 +71,7 @@ export class PipelineManager {
 	private buildBindGroupLayouts() {
 		if (this.bindGroupLayout0_Globals) return;
 
-		// Group 0: Globals (Camera & Lights)
+		// Group 0: Globals (Camera & Lights) - Standard
 		this.bindGroupLayout0_Globals = this.ctx.device.createBindGroupLayout({
 			label: "Globals Bind Group Layout",
 			entries: [
@@ -77,7 +88,44 @@ export class PipelineManager {
 				{
 					binding: 2,
 					visibility: GPUShaderStage.FRAGMENT,
-					texture: { sampleType: "depth" }, // Shadow Map Depth Texture
+					texture: { sampleType: "depth", viewDimension: "2d" }, // Shadow Map Depth Texture
+				},
+				{
+					binding: 3,
+					visibility: GPUShaderStage.FRAGMENT,
+					sampler: { type: "comparison" }, // Shadow Map Comparison Sampler
+				},
+				{
+					binding: 4,
+					visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT,
+					buffer: { type: "uniform" }, // Shadow viewProj matrix
+				},
+				{
+					binding: 5,
+					visibility: GPUShaderStage.FRAGMENT | GPUShaderStage.VERTEX,
+					buffer: { type: "uniform" }, // Global render settings
+				},
+			],
+		});
+
+		// Group 0: Globals (Camera & Lights) - CSM (Texture Array viewDimension)
+		this.bindGroupLayout0_Globals_CSM = this.ctx.device.createBindGroupLayout({
+			label: "Globals Bind Group Layout CSM",
+			entries: [
+				{
+					binding: 0,
+					visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT,
+					buffer: { type: "uniform" }, // Camera
+				},
+				{
+					binding: 1,
+					visibility: GPUShaderStage.FRAGMENT,
+					buffer: { type: "read-only-storage" }, // Lights
+				},
+				{
+					binding: 2,
+					visibility: GPUShaderStage.FRAGMENT,
+					texture: { sampleType: "depth", viewDimension: "2d-array" }, // CSM Depth Texture Array
 				},
 				{
 					binding: 3,
@@ -261,7 +309,24 @@ export class PipelineManager {
 	 *
 	 * @returns The standard GPUPipelineLayout.
 	 */
-	public getStandardPipelineLayout(): GPUPipelineLayout {
+	public getStandardPipelineLayout(useCSM = false): GPUPipelineLayout {
+		if (useCSM) {
+			if (!this.standardPipelineLayout_CSM) {
+				this.buildBindGroupLayouts();
+				this.standardPipelineLayout_CSM = this.ctx.device.createPipelineLayout({
+					bindGroupLayouts: [
+						// biome-ignore lint/style/noNonNullAssertion: guaranteed by buildBindGroupLayouts
+						this.bindGroupLayout0_Globals_CSM!,
+						// biome-ignore lint/style/noNonNullAssertion: guaranteed by buildBindGroupLayouts
+						this.bindGroupLayout1_Model!,
+						// biome-ignore lint/style/noNonNullAssertion: guaranteed by buildBindGroupLayouts
+						this.bindGroupLayout2_Material!,
+					],
+				});
+			}
+			return this.standardPipelineLayout_CSM;
+		}
+
 		if (!this.standardPipelineLayout) {
 			this.buildBindGroupLayouts();
 			this.standardPipelineLayout = this.ctx.device.createPipelineLayout({
@@ -288,6 +353,7 @@ export class PipelineManager {
 	 * @param cullMode - Culling specification.
 	 * @param depthWriteEnabled - Toggle depth testing buffer updates. Defaults to `true`.
 	 * @param depthCompare - Depth comparative filter function. Defaults to `"less"`.
+	 * @param useCSM - If true, compiles CSM variant depth array sampling operations. Defaults to `false`.
 	 * @returns The resolved GPURenderPipeline.
 	 */
 	public getStandardPipeline(
@@ -297,22 +363,35 @@ export class PipelineManager {
 		cullMode?: GPUCullMode,
 		depthWriteEnabled = true,
 		depthCompare: GPUCompareFunction = "less",
+		useCSM = false,
 	): GPURenderPipeline {
 		const cullKey = cullMode ?? "default";
-		const variantKey = `${usePCF ? "pcf" : "hard"}:${topology}:${indexFormat}:${cullKey}:${depthWriteEnabled ? "dw" : "ndw"}:${depthCompare}`;
+		const variantKey = `${useCSM ? "csm" : "std"}:${usePCF ? "pcf" : "hard"}:${topology}:${indexFormat}:${cullKey}:${depthWriteEnabled ? "dw" : "ndw"}:${depthCompare}`;
 		const cached = this.standardPipelines.get(variantKey);
 		if (cached) return cached;
 
-		const shaderCode = buildDefaultShader({ usePCF });
+		const shaderCode = buildDefaultShader({ usePCF, useCSM });
 		const shaderModule = this.ctx.device.createShaderModule({
 			label: `Standard Pipeline Shader [${variantKey}]`,
 			code: shaderCode,
 		});
 
+		shaderModule.getCompilationInfo().then((info) => {
+			const errors = info.messages.filter((m) => m.type === "error");
+			if (errors.length > 0) {
+				console.error(
+					`WGSL Shader Compilation Failed for variant [${variantKey}]:`,
+				);
+				for (const msg of errors) {
+					console.error(`Line ${msg.lineNum}:${msg.linePos} - ${msg.message}`);
+				}
+			}
+		});
+
 		const pipeline = this.ctx.device.createRenderPipeline(
 			this.buildRenderPipelineDescriptor(
 				`Standard Render Pipeline [${variantKey}]`,
-				this.getStandardPipelineLayout(),
+				this.getStandardPipelineLayout(useCSM),
 				shaderModule,
 				topology,
 				indexFormat,
@@ -331,7 +410,26 @@ export class PipelineManager {
 	 *
 	 * @returns The custom GPUPipelineLayout.
 	 */
-	public getCustomPipelineLayout(): GPUPipelineLayout {
+	public getCustomPipelineLayout(useCSM = false): GPUPipelineLayout {
+		if (useCSM) {
+			if (!this.customPipelineLayout_CSM) {
+				this.buildBindGroupLayouts();
+				this.customPipelineLayout_CSM = this.ctx.device.createPipelineLayout({
+					bindGroupLayouts: [
+						// biome-ignore lint/style/noNonNullAssertion: guaranteed by buildBindGroupLayouts
+						this.bindGroupLayout0_Globals_CSM!,
+						// biome-ignore lint/style/noNonNullAssertion: guaranteed by buildBindGroupLayouts
+						this.bindGroupLayout1_Model!,
+						// biome-ignore lint/style/noNonNullAssertion: guaranteed by buildBindGroupLayouts
+						this.bindGroupLayout2_Material!,
+						// biome-ignore lint/style/noNonNullAssertion: guaranteed by buildBindGroupLayouts
+						this.bindGroupLayout3_Custom!,
+					],
+				});
+			}
+			return this.customPipelineLayout_CSM;
+		}
+
 		if (!this.customPipelineLayout) {
 			this.buildBindGroupLayouts();
 			this.customPipelineLayout = this.ctx.device.createPipelineLayout({
@@ -355,7 +453,27 @@ export class PipelineManager {
 	 *
 	 * @returns The custom params GPUPipelineLayout.
 	 */
-	public getCustomParamsPipelineLayout(): GPUPipelineLayout {
+	public getCustomParamsPipelineLayout(useCSM = false): GPUPipelineLayout {
+		if (useCSM) {
+			if (!this.customParamsPipelineLayout_CSM) {
+				this.buildBindGroupLayouts();
+				this.customParamsPipelineLayout_CSM =
+					this.ctx.device.createPipelineLayout({
+						bindGroupLayouts: [
+							// biome-ignore lint/style/noNonNullAssertion: guaranteed by buildBindGroupLayouts
+							this.bindGroupLayout0_Globals_CSM!,
+							// biome-ignore lint/style/noNonNullAssertion: guaranteed by buildBindGroupLayouts
+							this.bindGroupLayout1_Model!,
+							// biome-ignore lint/style/noNonNullAssertion: guaranteed by buildBindGroupLayouts
+							this.bindGroupLayout2_Material!,
+							// biome-ignore lint/style/noNonNullAssertion: guaranteed by buildBindGroupLayouts
+							this.bindGroupLayout3_CustomParams!,
+						],
+					});
+			}
+			return this.customParamsPipelineLayout_CSM;
+		}
+
 		if (!this.customParamsPipelineLayout) {
 			this.buildBindGroupLayouts();
 			this.customParamsPipelineLayout = this.ctx.device.createPipelineLayout({
@@ -384,6 +502,7 @@ export class PipelineManager {
 	 * @param cullMode - Face culling specification.
 	 * @param depthWriteEnabled - Toggle depth testing buffer updates. Defaults to `true`.
 	 * @param depthCompare - Depth comparative filter function. Defaults to `"less"`.
+	 * @param useCSM - If true, compiles CSM variant depth array sampling operations. Defaults to `false`.
 	 * @returns The resolved custom GPURenderPipeline.
 	 */
 	public getCustomPipelineWithParams(
@@ -393,21 +512,23 @@ export class PipelineManager {
 		cullMode?: GPUCullMode,
 		depthWriteEnabled = true,
 		depthCompare: GPUCompareFunction = "less",
+		useCSM = false,
 	): GPURenderPipeline {
 		const cullKey = cullMode ?? "default";
-		const cacheKey = `${shaderCode}::${topology}::${indexFormat}::${cullKey}:${depthWriteEnabled ? "dw" : "ndw"}:${depthCompare}`;
+		const cacheKey = `${shaderCode}::${topology}::${indexFormat}::${cullKey}:${depthWriteEnabled ? "dw" : "ndw"}:${depthCompare}::${useCSM ? "csm" : "std"}`;
 		const cached = this.customParamsPipelines.get(cacheKey);
 		if (cached) return cached;
 
+		const processedCode = preprocessShader(shaderCode, useCSM);
 		const shaderModule = this.ctx.device.createShaderModule({
 			label: "Custom Params Pipeline Shader",
-			code: shaderCode,
+			code: processedCode,
 		});
 
 		const pipeline = this.ctx.device.createRenderPipeline(
 			this.buildRenderPipelineDescriptor(
 				"Custom Params Render Pipeline",
-				this.getCustomParamsPipelineLayout(),
+				this.getCustomParamsPipelineLayout(useCSM),
 				shaderModule,
 				topology,
 				indexFormat,
@@ -438,6 +559,7 @@ export class PipelineManager {
 	 * @param cullMode - Face culling specification.
 	 * @param depthWriteEnabled - Toggle depth testing buffer updates. Defaults to `true`.
 	 * @param depthCompare - Depth comparative filter function. Defaults to `"less"`.
+	 * @param useCSM - If true, compiles CSM variant depth array sampling operations. Defaults to `false`.
 	 * @returns The resolved custom GPURenderPipeline.
 	 */
 	public getCustomPipeline(
@@ -447,21 +569,23 @@ export class PipelineManager {
 		cullMode?: GPUCullMode,
 		depthWriteEnabled = true,
 		depthCompare: GPUCompareFunction = "less",
+		useCSM = false,
 	): GPURenderPipeline {
 		const cullKey = cullMode ?? "default";
-		const cacheKey = `${shaderCode}::${topology}::${indexFormat}::${cullKey}:${depthWriteEnabled ? "dw" : "ndw"}:${depthCompare}`;
+		const cacheKey = `${shaderCode}::${topology}::${indexFormat}::${cullKey}:${depthWriteEnabled ? "dw" : "ndw"}:${depthCompare}::${useCSM ? "csm" : "std"}`;
 		const cached = this.customPipelines.get(cacheKey);
 		if (cached) return cached;
 
+		const processedCode = preprocessShader(shaderCode, useCSM);
 		const shaderModule = this.ctx.device.createShaderModule({
 			label: "Custom Pipeline Shader",
-			code: shaderCode,
+			code: processedCode,
 		});
 
 		const pipeline = this.ctx.device.createRenderPipeline(
 			this.buildRenderPipelineDescriptor(
 				"Custom Render Pipeline",
-				this.getCustomPipelineLayout(),
+				this.getCustomPipelineLayout(useCSM),
 				shaderModule,
 				topology,
 				indexFormat,
@@ -572,8 +696,12 @@ export class PipelineManager {
 	 *
 	 * @returns Global bind group layout interface.
 	 */
-	public getGlobalsBindGroupLayout(): GPUBindGroupLayout {
+	public getGlobalsBindGroupLayout(useCSM = false): GPUBindGroupLayout {
 		this.buildBindGroupLayouts();
+		if (useCSM) {
+			// biome-ignore lint/style/noNonNullAssertion: guaranteed by buildBindGroupLayouts
+			return this.bindGroupLayout0_Globals_CSM!;
+		}
 		// biome-ignore lint/style/noNonNullAssertion: guaranteed by buildBindGroupLayouts
 		return this.bindGroupLayout0_Globals!;
 	}
@@ -587,6 +715,39 @@ export class PipelineManager {
 		this.buildBindGroupLayouts();
 		// biome-ignore lint/style/noNonNullAssertion: guaranteed by buildBindGroupLayouts
 		return this.bindGroupLayout1_Model!;
+	}
+
+	/**
+	 * Resolves GPUBindGroupLayout representing standard PBR materials.
+	 *
+	 * @returns Material bind group layout interface.
+	 */
+	public getMaterialBindGroupLayout(): GPUBindGroupLayout {
+		this.buildBindGroupLayouts();
+		// biome-ignore lint/style/noNonNullAssertion: guaranteed by buildBindGroupLayouts
+		return this.bindGroupLayout2_Material!;
+	}
+
+	/**
+	 * Resolves GPUBindGroupLayout representing custom parameter-less materials.
+	 *
+	 * @returns Custom bind group layout interface.
+	 */
+	public getCustomBindGroupLayout(): GPUBindGroupLayout {
+		this.buildBindGroupLayouts();
+		// biome-ignore lint/style/noNonNullAssertion: guaranteed by buildBindGroupLayouts
+		return this.bindGroupLayout3_Custom!;
+	}
+
+	/**
+	 * Resolves GPUBindGroupLayout representing custom parameter-enabled materials.
+	 *
+	 * @returns Custom params bind group layout interface.
+	 */
+	public getCustomParamsBindGroupLayout(): GPUBindGroupLayout {
+		this.buildBindGroupLayouts();
+		// biome-ignore lint/style/noNonNullAssertion: guaranteed by buildBindGroupLayouts
+		return this.bindGroupLayout3_CustomParams!;
 	}
 
 	// --- Post Processing ---
@@ -662,4 +823,32 @@ export class PipelineManager {
 
 		return this.postProcessPipeline;
 	}
+}
+
+/**
+ * @internal Preprocesses custom shader code to auto-inject system structures,
+ * default vertex shaders, and shadow sampling helpers if they are not explicitly declared.
+ */
+function preprocessShader(shaderCode: string, useCSM: boolean): string {
+	let processed = shaderCode.trim();
+
+	// 1. Auto-inject system structs and bindings if group 0, 1, or 2 are not defined
+	if (
+		!processed.includes("@group(0)") &&
+		!processed.includes("CameraUniform")
+	) {
+		processed = getStructsChunk(useCSM) + "\n\n" + processed;
+	}
+
+	// 2. Auto-inject shadow mapping helper if getShadow is used but not defined in the code
+	if (processed.includes("getShadow") && !processed.includes("fn getShadow")) {
+		processed = getShadowChunk(true, useCSM) + "\n\n" + processed;
+	}
+
+	// 3. Auto-inject vertex shader if no @vertex or vs_main is defined in the shader
+	if (!processed.includes("@vertex") && !processed.includes("vs_main")) {
+		processed = processed + "\n\n" + getVertexChunk(useCSM);
+	}
+
+	return processed;
 }

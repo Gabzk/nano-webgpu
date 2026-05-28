@@ -1,8 +1,8 @@
-import { lightingChunk } from "./chunks/lighting.chunk";
+import { getLightingChunk } from "./chunks/lighting.chunk";
 import { normalMapChunk } from "./chunks/normal-map.chunk";
 import { getShadowChunk } from "./chunks/shadow.chunk";
-import { structsChunk } from "./chunks/structs.chunk";
-import { vertexChunk } from "./chunks/vertex.chunk";
+import { getStructsChunk } from "./chunks/structs.chunk";
+import { getVertexChunk } from "./chunks/vertex.chunk";
 
 /**
  * Options defining standard shading compilations.
@@ -10,6 +10,8 @@ import { vertexChunk } from "./chunks/vertex.chunk";
 export interface DefaultShaderOptions {
 	/** If true, compiles PCF soft shadow sampling operations (using 9 tap comparisons). Otherwise uses 1 tap comparison. */
 	usePCF: boolean;
+	/** If true, compiles Cascaded Shadow Maps (CSM) sampling operations. */
+	useCSM?: boolean;
 }
 
 /**
@@ -21,11 +23,12 @@ export interface DefaultShaderOptions {
  * @returns The fully assembled WGSL shader source code.
  */
 export function buildDefaultShader(opts: DefaultShaderOptions): string {
+	const useCSM = opts.useCSM ?? false;
 	return [
-		structsChunk,
-		vertexChunk,
+		getStructsChunk(useCSM),
+		getVertexChunk(useCSM),
 		normalMapChunk,
-		getShadowChunk(opts.usePCF),
-		lightingChunk,
+		getShadowChunk(opts.usePCF, useCSM),
+		getLightingChunk(useCSM),
 	].join("\n");
 }

@@ -38,6 +38,14 @@ export interface DirectionalLightOptions extends LightOptions {
 	shadowDepthRange?: number;
 	/** Custom depth bias to avoid shadow acne or peter panning. Defaults to `0.0001`. */
 	shadowBias?: number;
+	/** If true, the directional light will use Cascaded Shadow Maps (CSM) to divide the frustum. Defaults to `false`. */
+	useCSM?: boolean;
+	/** Number of cascades for CSM (typically 3 or 4). Defaults to `4`. */
+	cascadeCount?: number;
+	/** Maximum distance along camera depth for shadow mapping projection. Defaults to `100.0`. */
+	csmMaxDistance?: number;
+	/** Factor weighting linear vs logarithmic cascade splits (value between 0 and 1). Defaults to `0.85`. */
+	cascadeSplitLambda?: number;
 }
 
 /**
@@ -117,6 +125,14 @@ export interface ShadowConfig {
 	shadowBias: number;
 	/** Near clipping plane for perspective projection (spotlights). */
 	shadowNear?: number;
+	/** If true, the directional light uses CSM. */
+	useCSM?: boolean;
+	/** Number of CSM cascades. */
+	cascadeCount?: number;
+	/** Maximum CSM depth range. */
+	csmMaxDistance?: number;
+	/** Linear vs logarithmic blend factor. */
+	cascadeSplitLambda?: number;
 }
 
 /**
@@ -167,6 +183,16 @@ export class Light extends Node3D {
 			this.isDirty = true;
 		};
 		this._intensity = options.intensity ?? 1.0;
+
+		if (options.position) {
+			this.position = Vec3.from(options.position as any);
+		}
+		if (options.rotation) {
+			this.rotation = Vec3.from(options.rotation as any);
+		}
+		if (options.rotationDegrees) {
+			this.rotationDegrees = options.rotationDegrees as any;
+		}
 	}
 
 	/**
@@ -219,6 +245,15 @@ export class DirectionalLight extends Light {
 	/** Custom depth bias to avoid shadow acne or peter panning. Defaults to `0.0001`. */
 	public shadowBias: number = 0.00001;
 
+	/** If true, uses Cascaded Shadow Maps (CSM) to divide the frustum into depth layers. */
+	public useCSM: boolean = false;
+	/** Number of cascades for CSM (min 1, max 4). Defaults to `4`. */
+	public cascadeCount: number = 4;
+	/** Maximum distance along camera depth for shadow mapping projection. Defaults to `100.0`. */
+	public csmMaxDistance: number = 100.0;
+	/** Factor weighting linear vs logarithmic cascade splits (between 0.0 and 1.0). Defaults to `0.85`. */
+	public cascadeSplitLambda: number = 0.85;
+
 	/**
 	 * Instantiates a new DirectionalLight node.
 	 *
@@ -235,6 +270,13 @@ export class DirectionalLight extends Light {
 		if (options.shadowDepthRange !== undefined)
 			this.shadowDepthRange = options.shadowDepthRange;
 		if (options.shadowBias !== undefined) this.shadowBias = options.shadowBias;
+		if (options.useCSM !== undefined) this.useCSM = options.useCSM;
+		if (options.cascadeCount !== undefined)
+			this.cascadeCount = Math.max(1, Math.min(4, options.cascadeCount));
+		if (options.csmMaxDistance !== undefined)
+			this.csmMaxDistance = options.csmMaxDistance;
+		if (options.cascadeSplitLambda !== undefined)
+			this.cascadeSplitLambda = options.cascadeSplitLambda;
 	}
 
 	/**
@@ -270,6 +312,10 @@ export class DirectionalLight extends Light {
 			shadowRadius: this.shadowRadius,
 			shadowDepthRange: this.shadowDepthRange,
 			shadowBias: this.shadowBias,
+			useCSM: this.useCSM,
+			cascadeCount: this.cascadeCount,
+			csmMaxDistance: this.csmMaxDistance,
+			cascadeSplitLambda: this.cascadeSplitLambda,
 		};
 	}
 }

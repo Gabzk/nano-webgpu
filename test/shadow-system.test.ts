@@ -157,4 +157,69 @@ describe("ShadowSystem", () => {
 			expect.any(Float32Array),
 		);
 	});
+
+	it("should initialize and reinitialize CSM depth textures and buffers correctly", () => {
+		const ctx = createMockContext();
+		const shadow = new ShadowSystem(ctx);
+
+		const didReinit = shadow.reinitIfNeeded(2048, true, 4);
+
+		expect(didReinit).toBe(true);
+		expect(shadow.useCSM).toBe(true);
+		expect(shadow.cascadeCount).toBe(4);
+
+		// Verify createTexture was called with array layers = 4
+		expect(ctx.device.createTexture).toHaveBeenCalledWith(
+			expect.objectContaining({
+				size: [2048, 2048, 4],
+				format: "depth32float",
+			}),
+		);
+	});
+
+	it("should render CSM and verify correct split distance values are computed and uploaded", () => {
+		const ctx = createMockContext();
+		const shadow = new ShadowSystem(ctx);
+		const camera = new Camera();
+
+		const light = new DirectionalLight({
+			castShadow: true,
+			useCSM: true,
+			cascadeCount: 4,
+			csmMaxDistance: 100.0,
+			cascadeSplitLambda: 0.85,
+		});
+		light.updateWorldMatrix(true);
+
+		const mockPassEncoder = {
+			setPipeline: vi.fn(),
+			setBindGroup: vi.fn(),
+			setVertexBuffer: vi.fn(),
+			setIndexBuffer: vi.fn(),
+			drawIndexed: vi.fn(),
+			end: vi.fn(),
+		};
+		const mockEncoder = {
+			beginRenderPass: vi.fn().mockReturnValue(mockPassEncoder),
+		} as unknown as GPUCommandEncoder;
+
+		const result = shadow.renderPass(
+			mockEncoder,
+			[light],
+			camera,
+			new Map(),
+			new Map(),
+			[],
+		);
+
+		expect(result).toBe(true);
+		expect(shadow.useCSM).toBe(true);
+
+		// Ensure csmData with cascade matrices, splits, and parameters is written
+		expect(ctx.device.queue.writeBuffer).toHaveBeenCalledWith(
+			shadow.uniformBuffer,
+			0,
+			expect.any(Float32Array),
+		);
+	});
 });

@@ -153,4 +153,25 @@ describe("Scene", () => {
 		// Controller canvas listeners should be detached
 		expect((controller.impl as any)._canvasListenersAttached).toBe(false);
 	});
+
+	it("should support adding and removing lights dynamically", () => {
+		const mockContext = createMockContext();
+		const scene = new Scene(mockContext);
+
+		expect(scene.lights.length).toBe(0);
+
+		const light = scene.addLight({
+			type: "directional",
+			rotationDegrees: [45, 45, 0],
+			color: "#ff0000",
+		});
+
+		expect(scene.lights.length).toBe(1);
+		expect(scene.lights[0]).toBe(light);
+		expect(scene.children.includes(light)).toBe(true);
+
+		scene.removeLight(light);
+		expect(scene.lights.length).toBe(0);
+		expect(scene.children.includes(light)).toBe(false);
+	});
 });

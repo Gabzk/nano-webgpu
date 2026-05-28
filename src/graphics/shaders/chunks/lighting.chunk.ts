@@ -12,10 +12,10 @@
  *
  * Specular: GGX + Smith V (Hammon) + Schlick Fresnel approximation.
  *
- * Ambient:  Hemisphere sky/ground gradient, so surfaces NEVER go fully black even
  *           when the direct light faces away. Provides a robust fill light.
  */
-export const lightingChunk = /* wgsl */ `
+export function getLightingChunk(useCSM: boolean): string {
+	return /* wgsl */ `
 
 // Schlick Fresnel power: (1 - u)^5
 fn schlick5(u: f32) -> f32 {
@@ -40,7 +40,7 @@ fn fs_main(in: VertexOutput, @builtin(front_facing) isFrontFace: bool) -> @locat
     if (material.useNormalMap > 0.5) {
         let nSample = textureSample(normalTex, mySampler, in.uv).rgb;
         N = getPerturbedNormal(N, in.frag_pos, in.uv, nSample, material.normalScale,
-                               dp1, dp2, duv1, duv2);
+                                dp1, dp2, duv1, duv2);
     }
     if (material.cullMode > 0.5 && !isFrontFace) {
         N = -N;
@@ -99,7 +99,13 @@ fn fs_main(in: VertexOutput, @builtin(front_facing) isFrontFace: bool) -> @locat
         shadowDir = normalize(vec3<f32>(shadowCamera.lightDirX, shadowCamera.lightDirY, shadowCamera.lightDirZ));
     }
     let shadowBias        = max(shadowCamera.bias * (1.0 - dot(N, shadowDir)), shadowCamera.bias * 0.1);
-    let shadowSample      = getShadow(in.shadow_pos, shadowBias, shadowCamera.texelSize);
+    
+    ${
+			useCSM
+				? `let depth = dot(in.frag_pos - camera.cameraPos.xyz, shadowCamera.cameraForward.xyz);
+    let shadowSample      = getShadow(in.frag_pos, depth, shadowBias, shadowCamera.texelSize);`
+				: `let shadowSample      = getShadow(in.shadow_pos, shadowBias, shadowCamera.texelSize);`
+		}
     let shadowFactor      = select(1.0, shadowSample, shadowCamera.hasShadow > 0.5);
 
     // ------------------------------------------------------------------
@@ -175,3 +181,6 @@ fn fs_main(in: VertexOutput, @builtin(front_facing) isFrontFace: bool) -> @locat
     return vec4<f32>(finalColor, alpha);
 }
 `;
+}
+
+export const lightingChunk = getLightingChunk(false);

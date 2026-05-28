@@ -22,6 +22,7 @@ const sun = scene.addLight({
 	rotationDegrees: [0, 0, 0],
 	color: "#ffffff",
 	intensity: 1,
+	shadowBias: 0.001
 });
 
 const canvas = scene.getCanvas();

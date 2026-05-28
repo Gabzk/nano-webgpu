@@ -1,9 +1,5 @@
-/**
- * Chunk: global bindings (group 0, 1, 2) struct declarations.
- * ShadowCameraUniform no longer carries usePCF — it is baked into the shader
- * variant at pipeline-creation time, saving a runtime uniform read.
- */
-export const structsChunk = /* wgsl */ `
+export function getStructsChunk(useCSM: boolean): string {
+	return /* wgsl */ `
 // --- GLOBALS (@group(0)) ---
 struct CameraUniform {
     viewProj: mat4x4<f32>,
@@ -36,13 +32,24 @@ struct SceneLights {
     lights: array<Light>,
 }
 @group(0) @binding(1) var<storage, read> scene: SceneLights;
-@group(0) @binding(2) var shadowMap: texture_depth_2d;
+@group(0) @binding(2) var shadowMap: ${useCSM ? "texture_depth_2d_array" : "texture_depth_2d"};
 @group(0) @binding(3) var shadowSampler: sampler_comparison;
 
-// usePCF is no longer a runtime uniform field — it is selected at compile time
-// via shader variants. The two padding slots now go back to being explicit pads.
 struct ShadowCameraUniform {
-    viewProj: mat4x4<f32>,
+    ${
+			useCSM
+				? `viewProjs: array<mat4x4<f32>, 4>,
+    splits: vec4<f32>,
+    cameraForward: vec4<f32>,
+    texelSize: f32,
+    hasShadow: f32,
+    lightDirX: f32,
+    lightDirY: f32,
+    lightDirZ: f32,
+    bias: f32,
+    cascadeCount: f32,
+    _pad2: f32,`
+				: `viewProj: mat4x4<f32>,
     texelSize: f32,
     hasShadow: f32,
     lightDirX: f32,
@@ -50,7 +57,8 @@ struct ShadowCameraUniform {
     lightDirZ: f32,
     bias: f32,
     _pad2: f32,
-    _pad3: f32,
+    _pad3: f32,`
+		}
 }
 @group(0) @binding(4) var<uniform> shadowCamera: ShadowCameraUniform;
 
@@ -102,5 +110,7 @@ struct VertexOutput {
     @location(3) shadow_pos: vec4<f32>,
     @location(4) color: vec3<f32>,
 }
-
 `;
+}
+
+export const structsChunk = getStructsChunk(false);

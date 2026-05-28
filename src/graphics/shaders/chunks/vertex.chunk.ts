@@ -1,7 +1,5 @@
-/**
- * Chunk: vertex shader entry point.
- */
-export const vertexChunk = /* wgsl */ `
+export function getVertexChunk(useCSM: boolean): string {
+	return /* wgsl */ `
 @vertex
 fn vs_main(@builtin(instance_index) instanceIdx: u32, in: VertexInput) -> VertexOutput {
     var out: VertexOutput;
@@ -16,8 +14,14 @@ fn vs_main(@builtin(instance_index) instanceIdx: u32, in: VertexInput) -> Vertex
 
     out.clip_position = camera.viewProj * world_pos;
 
-    // Transform world position into shadow clip space
-    out.shadow_pos = shadowCamera.viewProj * world_pos;
+    ${
+			useCSM
+				? "out.shadow_pos = vec4<f32>(0.0);"
+				: "out.shadow_pos = shadowCamera.viewProj * world_pos;"
+		}
     return out;
 }
 `;
+}
+
+export const vertexChunk = getVertexChunk(false);

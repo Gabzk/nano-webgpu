@@ -121,6 +121,10 @@ export class Context {
 
 		this.device = await adapter.requestDevice();
 
+		this.device.addEventListener("uncapturederror", (event) => {
+			console.error("WebGPU Device Validation Error:", event.error.message);
+		});
+
 		this.context = canvas.getContext("webgpu") as GPUCanvasContext;
 		this.format = navigator.gpu.getPreferredCanvasFormat();
 
