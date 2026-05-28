@@ -182,32 +182,62 @@ export class AABB {
 		const maxY = this.max.y;
 		const maxZ = this.max.z;
 
-		// Reset result bounds
-		result.min.x = Infinity;
-		result.min.y = Infinity;
-		result.min.z = Infinity;
-		result.max.x = -Infinity;
-		result.max.y = -Infinity;
-		result.max.z = -Infinity;
+		// Start with the translation components of the matrix (w = 1 translation)
+		let min_x = v[12];
+		let max_x = v[12];
+		let min_y = v[13];
+		let max_y = v[13];
+		let min_z = v[14];
+		let max_z = v[14];
 
-		// Transform the 8 corners without allocating Vec3 objects
-		for (let i = 0; i < 8; i++) {
-			const cx = (i & 1) === 0 ? minX : maxX;
-			const cy = (i & 2) === 0 ? minY : maxY;
-			const cz = (i & 4) === 0 ? minZ : maxZ;
+		// For each matrix column, multiply min/max components according to the sign of the matrix elements.
+		// This is Jim Arvo's O(1) algorithm for transforming Axis-Aligned Bounding Boxes.
+		
+		// X Component of Output
+		let a = v[0] * minX;
+		let b = v[0] * maxX;
+		if (a < b) { min_x += a; max_x += b; } else { min_x += b; max_x += a; }
 
-			// Full 4x4 point transform (w = 1)
-			const x = cx * v[0] + cy * v[4] + cz * v[8] + v[12];
-			const y = cx * v[1] + cy * v[5] + cz * v[9] + v[13];
-			const z = cx * v[2] + cy * v[6] + cz * v[10] + v[14];
+		a = v[4] * minY;
+		b = v[4] * maxY;
+		if (a < b) { min_x += a; max_x += b; } else { min_x += b; max_x += a; }
 
-			if (x < result.min.x) result.min.x = x;
-			if (y < result.min.y) result.min.y = y;
-			if (z < result.min.z) result.min.z = z;
-			if (x > result.max.x) result.max.x = x;
-			if (y > result.max.y) result.max.y = y;
-			if (z > result.max.z) result.max.z = z;
-		}
+		a = v[8] * minZ;
+		b = v[8] * maxZ;
+		if (a < b) { min_x += a; max_x += b; } else { min_x += b; max_x += a; }
+
+		// Y Component of Output
+		a = v[1] * minX;
+		b = v[1] * maxX;
+		if (a < b) { min_y += a; max_y += b; } else { min_y += b; max_y += a; }
+
+		a = v[5] * minY;
+		b = v[5] * maxY;
+		if (a < b) { min_y += a; max_y += b; } else { min_y += b; max_y += a; }
+
+		a = v[9] * minZ;
+		b = v[9] * maxZ;
+		if (a < b) { min_y += a; max_y += b; } else { min_y += b; max_y += a; }
+
+		// Z Component of Output
+		a = v[2] * minX;
+		b = v[2] * maxX;
+		if (a < b) { min_z += a; max_z += b; } else { min_z += b; max_z += a; }
+
+		a = v[6] * minY;
+		b = v[6] * maxY;
+		if (a < b) { min_z += a; max_z += b; } else { min_z += b; max_z += a; }
+
+		a = v[10] * minZ;
+		b = v[10] * maxZ;
+		if (a < b) { min_z += a; max_z += b; } else { min_z += b; max_z += a; }
+
+		result.min.x = min_x;
+		result.min.y = min_y;
+		result.min.z = min_z;
+		result.max.x = max_x;
+		result.max.y = max_y;
+		result.max.z = max_z;
 
 		return result;
 	}

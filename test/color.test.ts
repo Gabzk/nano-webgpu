@@ -42,11 +42,19 @@ describe("Color", () => {
 		expect(color.a).toBe(0.5);
 	});
 
-	it("should throw an error if the floats are invalid", () => {
+	it("should throw an error if the floats are invalid or negative", () => {
 		expect(() => new Color(-1.0, 0.0, 0.0)).toThrow("Invalid floats");
-		expect(() => new Color(0.0, 2.0, 0.0)).toThrow("Invalid floats");
-		expect(() => new Color(0.0, 0.0, 2.0)).toThrow("Invalid floats");
+		expect(() => new Color(0.0, -0.5, 0.0)).toThrow("Invalid floats");
+		expect(() => new Color(0.0, 0.0, -2.0)).toThrow("Invalid floats");
+		expect(() => new Color(0.0, 0.0, 0.0, -0.1)).toThrow("Invalid floats");
 		expect(() => new Color(0.0, 0.0, 0.0, 2.0)).toThrow("Invalid floats");
+	});
+
+	it("should allow HDR values (RGB > 1.0)", () => {
+		const color = new Color(2.5, 10.0, 1.2, 1.0);
+		expect(color.r).toBe(2.5);
+		expect(color.g).toBe(10.0);
+		expect(color.b).toBe(1.2);
 	});
 
 	it("should create a color from hex", () => {

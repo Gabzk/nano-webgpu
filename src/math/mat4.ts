@@ -4,6 +4,7 @@
  * 3D transformations, camera rotations, and projections.
  */
 
+import { Quaternion } from "./quaternion";
 import { Vec3 } from "./vec3";
 
 /**
@@ -117,8 +118,8 @@ export class Mat4 {
 			sz = x.z;
 		} else {
 			sx = x;
-			sy = y || 0;
-			sz = z || 0;
+			sy = y !== undefined ? y : sx;
+			sz = z !== undefined ? z : sx;
 		}
 
 		const v = this.values;
@@ -369,6 +370,7 @@ export class Mat4 {
 		aspect: number,
 		near: number,
 		far: number,
+		reversedZ: boolean = false,
 	): this {
 		const f = 1.0 / Math.tan(fovy / 2);
 		const nf = 1 / (near - far);
@@ -385,11 +387,11 @@ export class Mat4 {
 		v[7] = 0;
 		v[8] = 0;
 		v[9] = 0;
-		v[10] = far * nf;
+		v[10] = reversedZ ? -near * nf : far * nf;
 		v[11] = -1;
 		v[12] = 0;
 		v[13] = 0;
-		v[14] = far * near * nf;
+		v[14] = reversedZ ? -far * near * nf : far * near * nf;
 		v[15] = 0;
 
 		return this;
@@ -530,5 +532,15 @@ export class Mat4 {
 		out.z = x * v[2] + y * v[6] + z * v[10];
 
 		return out.normalize();
+	}
+
+	/**
+	 * Creates a Mat4 from a Quaternion rotation
+	 * @param {Quaternion} q - The quaternion representing the rotation
+	 * @param {Mat4} [out] - Optional pre-allocated matrix to store the result
+	 * @returns {Mat4} The rotation matrix
+	 */
+	public static fromQuaternion(q: Quaternion, out: Mat4 = new Mat4()): Mat4 {
+		return q.toMat4(out);
 	}
 }

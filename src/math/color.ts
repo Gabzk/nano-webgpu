@@ -234,7 +234,7 @@ export class Color {
 		b: number = 0.0,
 		a: number = 1.0,
 	) {
-		if (r < 0 || r > 1 || g < 0 || g > 1 || b < 0 || b > 1 || a < 0 || a > 1) {
+		if (r < 0 || g < 0 || b < 0 || a < 0 || a > 1) {
 			throw new Error("Invalid floats");
 		}
 		this._r = r;
@@ -365,6 +365,53 @@ export class Color {
 			srgbToLinear(this._b),
 			this._a,
 		);
+	}
+
+	/**
+	 * Returns a new Color converted from Linear space to sRGB space.
+	 */
+	public toSRGB(): Color {
+		const linearToSRGB = (c: number) => {
+			return c <= 0.0031308 ? c * 12.92 : 1.055 * (c ** (1.0 / 2.4)) - 0.055;
+		};
+		// Clamp to [0, 1] range during conversion to LDR sRGB space
+		return new Color(
+			Math.max(0, Math.min(1, linearToSRGB(this._r))),
+			Math.max(0, Math.min(1, linearToSRGB(this._g))),
+			Math.max(0, Math.min(1, linearToSRGB(this._b))),
+			this._a,
+		);
+	}
+
+	/**
+	 * Applies Reinhard tone mapping to this color and returns a new LDR Color instance.
+	 * Formulated as: C_out = (C_in * exposure) / (1 + C_in * exposure)
+	 * @param {number} [exposure=1.0] - The exposure value
+	 * @returns {Color} A new tone-mapped Color
+	 */
+	public toneMapReinhard(exposure: number = 1.0): Color {
+		const r = (this._r * exposure) / (1.0 + this._r * exposure);
+		const g = (this._g * exposure) / (1.0 + this._g * exposure);
+		const b = (this._b * exposure) / (1.0 + this._b * exposure);
+		return new Color(r, g, b, this._a);
+	}
+
+	/**
+	 * Applies Narkowicz ACES filmic tone mapping approximation to this color and returns a new LDR Color instance.
+	 * This curves the highlights and shadows to mimic physical film stock.
+	 * @returns {Color} A new tone-mapped Color
+	 */
+	public toneMapACES(): Color {
+		const aces = (c: number) => {
+			const a = 2.51;
+			const b = 0.03;
+			const cc = 2.43;
+			const d = 0.59;
+			const e = 0.14;
+			const val = (c * (a * c + b)) / (c * (cc * c + d) + e);
+			return Math.max(0, Math.min(1, val));
+		};
+		return new Color(aces(this._r), aces(this._g), aces(this._b), this._a);
 	}
 
 	/**

@@ -25,6 +25,36 @@ export class Vec2 {
 		this.y = y;
 	}
 
+	/** Returns a new Vec2 representing (0, 0) */
+	public static get zero(): Vec2 {
+		return new Vec2(0, 0);
+	}
+
+	/** Returns a new Vec2 representing (1, 1) */
+	public static get one(): Vec2 {
+		return new Vec2(1, 1);
+	}
+
+	/** Returns a new Vec2 representing (0, 1) */
+	public static get up(): Vec2 {
+		return new Vec2(0, 1);
+	}
+
+	/** Returns a new Vec2 representing (0, -1) */
+	public static get down(): Vec2 {
+		return new Vec2(0, -1);
+	}
+
+	/** Returns a new Vec2 representing (-1, 0) */
+	public static get left(): Vec2 {
+		return new Vec2(-1, 0);
+	}
+
+	/** Returns a new Vec2 representing (1, 0) */
+	public static get right(): Vec2 {
+		return new Vec2(1, 0);
+	}
+
 	/**
 	 * Set the x and y components of this vector
 	 * @param {number} x - The new x value
@@ -64,6 +94,19 @@ export class Vec2 {
 	public add(v: Vec2): this {
 		this.x += v.x;
 		this.y += v.y;
+		return this;
+	}
+
+	/**
+	 * Adds a scaled vector to this one (in-place) without allocating temporary objects.
+	 * Computes: this += v * s
+	 * @param {Vec2} v - The vector to scale and add
+	 * @param {number} s - The scalar factor
+	 * @returns {this} The current vector (for chaining)
+	 */
+	public addScaled(v: Vec2, s: number): this {
+		this.x += v.x * s;
+		this.y += v.y * s;
 		return this;
 	}
 

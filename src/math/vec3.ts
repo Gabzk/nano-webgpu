@@ -56,6 +56,46 @@ export class Vec3 {
 		this._z = z;
 	}
 
+	/** Returns a new Vec3 representing (0, 0, 0) */
+	public static get zero(): Vec3 {
+		return new Vec3(0, 0, 0);
+	}
+
+	/** Returns a new Vec3 representing (1, 1, 1) */
+	public static get one(): Vec3 {
+		return new Vec3(1, 1, 1);
+	}
+
+	/** Returns a new Vec3 representing (0, 1, 0) */
+	public static get up(): Vec3 {
+		return new Vec3(0, 1, 0);
+	}
+
+	/** Returns a new Vec3 representing (0, -1, 0) */
+	public static get down(): Vec3 {
+		return new Vec3(0, -1, 0);
+	}
+
+	/** Returns a new Vec3 representing (-1, 0, 0) */
+	public static get left(): Vec3 {
+		return new Vec3(-1, 0, 0);
+	}
+
+	/** Returns a new Vec3 representing (1, 0, 0) */
+	public static get right(): Vec3 {
+		return new Vec3(1, 0, 0);
+	}
+
+	/** Returns a new Vec3 representing (0, 0, -1) (standard OpenGL/WebGPU forward direction) */
+	public static get forward(): Vec3 {
+		return new Vec3(0, 0, -1);
+	}
+
+	/** Returns a new Vec3 representing (0, 0, 1) */
+	public static get back(): Vec3 {
+		return new Vec3(0, 0, 1);
+	}
+
 	/**
 	 * Set the x, y and z components of this vector
 	 * @param {number} x - The new x value
@@ -105,6 +145,21 @@ export class Vec3 {
 		this._x += v.x;
 		this._y += v.y;
 		this._z += v.z;
+		if (this.onChange) this.onChange();
+		return this;
+	}
+
+	/**
+	 * Adds a scaled vector to this one (in-place) without allocating temporary objects.
+	 * Computes: this += v * s
+	 * @param {Vec3} v - The vector to scale and add
+	 * @param {number} s - The scalar factor
+	 * @returns {this} The current vector (for chaining)
+	 */
+	public addScaled(v: Vec3, s: number): this {
+		this._x += v.x * s;
+		this._y += v.y * s;
+		this._z += v.z * s;
 		if (this.onChange) this.onChange();
 		return this;
 	}

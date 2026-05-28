@@ -72,6 +72,7 @@ export { Texture } from "./graphics/texture";
 export { AABB } from "./math/aabb";
 export { Color, type ColorLike, type ColorName } from "./math/color";
 export { Mat4 } from "./math/mat4";
+export { Quaternion } from "./math/quaternion";
 export { Vec2 } from "./math/vec2";
 export { Vec3 } from "./math/vec3";
 export { VERSION } from "./version";
