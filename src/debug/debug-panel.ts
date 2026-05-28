@@ -68,6 +68,8 @@ export class DebugPanel {
 
 	/** Reference to the VRAM allocation tracking source. */
 	private vram: VRAMTracker;
+	/** @internal Signature of VRAM entries to avoid useless DOM recreation. */
+	private lastVramSignature = "";
 
 	/**
 	 * Instantiates a new DebugPanel, assembling HTML overlay DOM elements.
@@ -314,6 +316,7 @@ export class DebugPanel {
 	 */
 	private switchTab(tab: TabName): void {
 		this.activeTab = tab;
+		this.lastVramSignature = ""; // Force re-render on tab switch
 		for (const [name, btn] of this.tabButtons) {
 			btn.style.cssText = this.getTabButtonStyle(name === tab);
 		}
@@ -385,6 +388,13 @@ export class DebugPanel {
 		const entries = this.vram.getEntries();
 		const summary = this.vram.getSummary();
 
+		// Check if VRAM list actually changed to prevent DOM recreation from resetting hover tooltips
+		const signature = entries.map(e => `${e.id}-${e.sizeBytes}`).join(",");
+		if (signature === this.lastVramSignature && this.tabContentEl.querySelector(".vram-scroll-container")) {
+			return;
+		}
+		this.lastVramSignature = signature;
+
 		const scrollContainer = this.tabContentEl.querySelector(
 			".vram-scroll-container",
 		);
@@ -395,10 +405,17 @@ export class DebugPanel {
 			const icon = e.type === "texture" ? "🟦" : "🟩";
 			const typeName = e.type === "texture" ? "Tex" : "Buf";
 
+			const ageSeconds = (performance.now() - e.createdAt) / 1000;
+			const ageStr = ageSeconds < 60
+				? `${ageSeconds.toFixed(1)}s`
+				: `${(ageSeconds / 60).toFixed(1)}m`;
+
+			const tooltip = `${e.label}\nOwner: ${e.owner}\nSize: ${VRAMTracker.formatBytes(e.sizeBytes)} (${e.sizeBytes} B)\nAllocated: ${ageStr} ago`;
+
 			tableRows += `
-				<tr style="border-bottom: 1px solid rgba(255,255,255,0.02)">
+				<tr style="border-bottom: 1px solid rgba(255,255,255,0.02)" title="${tooltip.replace(/"/g, "&quot;")}">
 					<td style="padding: 4px; white-space: nowrap;">${icon} ${typeName}</td>
-					<td style="padding: 4px; color: #ccc; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${e.label}">${e.label}</td>
+					<td style="padding: 4px; color: #ccc; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${e.label}</td>
 					<td style="padding: 4px; text-align: right; color: #a0e8ff; white-space: nowrap;">${VRAMTracker.formatBytes(e.sizeBytes)}</td>
 					<td style="padding: 4px; color: #888; white-space: nowrap;">${e.owner}</td>
 				</tr>
@@ -482,6 +499,18 @@ export class DebugPanel {
 	 * @internal Repaints active rolling FPS charts.
 	 */
 	private drawFpsGraph(): void {
+		// Adjust back-buffer size to match display size and device pixel ratio for pixel-perfect rendering
+		const rect = this.fpsCanvas.getBoundingClientRect();
+		if (rect.width > 0 && rect.height > 0) {
+			const dpr = window.devicePixelRatio || 1;
+			const desiredWidth = Math.round(rect.width * dpr);
+			const desiredHeight = Math.round(rect.height * dpr);
+			if (this.fpsCanvas.width !== desiredWidth || this.fpsCanvas.height !== desiredHeight) {
+				this.fpsCanvas.width = desiredWidth;
+				this.fpsCanvas.height = desiredHeight;
+			}
+		}
+
 		const ctx = this.fpsCtx;
 		const w = this.fpsCanvas.width;
 		const h = this.fpsCanvas.height;
