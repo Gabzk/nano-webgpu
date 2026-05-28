@@ -57,6 +57,9 @@ export class Context {
 	/** Local input manager instance for this context. */
 	public input!: InputManager;
 
+	/** If true, enables extended runtime validation and debug logging. Defaults to `false`. */
+	public debug = false;
+
 	/** @internal requestAnimationFrame recursion frame ID. */
 	private _frameId: number | null = null;
 
@@ -121,9 +124,14 @@ export class Context {
 
 		this.device = await adapter.requestDevice();
 
-		this.device.addEventListener("uncapturederror", (event) => {
-			console.error("WebGPU Device Validation Error:", event.error.message);
-		});
+		if (this.device.addEventListener) {
+			this.device.addEventListener("uncapturederror", (event) => {
+				const errorMsg = event.error && typeof event.error === "object" && "message" in event.error 
+					? (event.error as any).message 
+					: String(event.error);
+				console.error("WebGPU Device Validation Error:", errorMsg);
+			});
+		}
 
 		this.context = canvas.getContext("webgpu") as GPUCanvasContext;
 		this.format = navigator.gpu.getPreferredCanvasFormat();

@@ -15,9 +15,9 @@
  * resolution ambiguity of abstract integer literals in some WebGPU compilers.
  */
 export function getShadowChunk(usePCF: boolean, useCSM = false): string {
-	if (useCSM) {
-		if (usePCF) {
-			return /* wgsl */ `
+    if (useCSM) {
+        if (usePCF) {
+            return /* wgsl */ `  
 // PCF + CSM variant: 3×3 kernel across dynamic cascades with uniform control flow
 fn getShadow(fragPos: vec3<f32>, depth: f32, bias: f32, texelSize: f32) -> f32 {
     var cascadeIdx = 0u;
@@ -60,9 +60,9 @@ fn getShadow(fragPos: vec3<f32>, depth: f32, bias: f32, texelSize: f32) -> f32 {
     return mix(1.0, shadow, inBounds * inCascadeRange);
 }
 `;
-		}
+        }
 
-		return /* wgsl */ `
+        return /* wgsl */ `
 // Hard + CSM variant: single tap across dynamic cascades with uniform control flow
 fn getShadow(fragPos: vec3<f32>, depth: f32, bias: f32, _texelSize: f32) -> f32 {
     var cascadeIdx = 0u;
@@ -94,10 +94,10 @@ fn getShadow(fragPos: vec3<f32>, depth: f32, bias: f32, _texelSize: f32) -> f32 
     return mix(1.0, shadow, inBounds * inCascadeRange);
 }
 `;
-	}
+    }
 
-	if (usePCF) {
-		return /* wgsl */ `
+    if (usePCF) {
+        return /* wgsl */ `
 // PCF variant: 3×3 kernel — 9 samples, soft shadow edges.
 // Uniform-control-flow-safe: loop always executes, UVs are clamped so
 // out-of-bounds samples are masked via the inBounds multiplier.
@@ -121,9 +121,9 @@ fn getShadow(shadowPos: vec4<f32>, bias: f32, texelSize: f32) -> f32 {
     return mix(1.0, shadow, inBounds);
 }
 `;
-	}
+    }
 
-	return /* wgsl */ `
+    return /* wgsl */ `
 // Hard shadow variant: single textureSampleCompare — ~9× cheaper than PCF.
 // Still called unconditionally to satisfy WGSL uniform control flow rules.
 fn getShadow(shadowPos: vec4<f32>, bias: f32, _texelSize: f32) -> f32 {

@@ -376,17 +376,19 @@ export class PipelineManager {
 			code: shaderCode,
 		});
 
-		shaderModule.getCompilationInfo().then((info) => {
-			const errors = info.messages.filter((m) => m.type === "error");
-			if (errors.length > 0) {
-				console.error(
-					`WGSL Shader Compilation Failed for variant [${variantKey}]:`,
-				);
-				for (const msg of errors) {
-					console.error(`Line ${msg.lineNum}:${msg.linePos} - ${msg.message}`);
+		if (this.ctx.debug && shaderModule.getCompilationInfo) {
+			shaderModule.getCompilationInfo().then((info) => {
+				const errors = info.messages.filter((m) => m.type === "error");
+				if (errors.length > 0) {
+					console.error(
+						`WGSL Shader Compilation Failed for variant [${variantKey}]:`,
+					);
+					for (const msg of errors) {
+						console.error(`Line ${msg.lineNum}:${msg.linePos} - ${msg.message}`);
+					}
 				}
-			}
-		});
+			});
+		}
 
 		const pipeline = this.ctx.device.createRenderPipeline(
 			this.buildRenderPipelineDescriptor(

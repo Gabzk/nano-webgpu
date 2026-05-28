@@ -64,7 +64,7 @@ const sun = scene.addLight({
   color: "#ffffff",
   intensity: 0.5,
   castShadow: true,
-  shadowMapSize: 8192,
+  shadowMapSize: 2048,
   usePCF: true,
   shadowRadius: 75.0, // Stretched to 150 units wide/long to cover the runway
   shadowDepthRange: 250.0,
@@ -79,10 +79,10 @@ const csm = scene.addLight({
   color: "#ffffff",
   intensity: 0.5,
   castShadow: true,
-  shadowMapSize: 8192,
+  shadowMapSize: 2048,
   usePCF: true,
   useCSM: true,
-  cascadeCount: 1,
+  cascadeCount: 3,
   csmMaxDistance: 150.0,
   cascadeSplitLambda: 0.85,
   shadowBias: 0.0001

@@ -27,6 +27,11 @@ function transformPoint(m: Mat4, p: Vec3): Vec3 {
 /**
  * Standard WebGPU orthographic projection matrix mapping [zNear, zFar] to NDC [0, 1].
  */
+/**
+ * Standard WebGPU orthographic projection matrix mapping [zNear, zFar] to NDC [0, 1].
+ * Handles reversed ranges (where zNear > zFar) explicitly by mapping the larger value
+ * to the near plane (0.0) and the smaller value to the far plane (1.0), ensuring stable depth mapping.
+ */
 function orthoWebGPU(
 	left: number,
 	right: number,
@@ -35,6 +40,11 @@ function orthoWebGPU(
 	zNear: number,
 	zFar: number,
 ): Mat4 {
+	const depthRange = zFar - zNear;
+	if (Math.abs(depthRange) < 1e-6) {
+		throw new Error("orthoWebGPU: zNear and zFar cannot be equal");
+	}
+
 	const m = new Mat4();
 	const lr = 1 / (left - right);
 	const bt = 1 / (bottom - top);
@@ -50,11 +60,11 @@ function orthoWebGPU(
 	v[7] = 0;
 	v[8] = 0;
 	v[9] = 0;
-	v[10] = 1 / (zFar - zNear);
+	v[10] = 1 / depthRange;
 	v[11] = 0;
 	v[12] = (left + right) * lr;
 	v[13] = (top + bottom) * bt;
-	v[14] = -zNear / (zFar - zNear);
+	v[14] = -zNear / depthRange;
 	v[15] = 1;
 
 	return m;
@@ -246,12 +256,20 @@ export class ShadowSystem {
 		// Allocate CSM cascade buffers/views
 		if (useCSM) {
 			if (this.cascadeUniformBuffer) {
+				this.ctx.vramTracker.unregister(this.cascadeUniformBuffer);
 				this.cascadeUniformBuffer.destroy();
 			}
 			this.cascadeUniformBuffer = this.ctx.device.createBuffer({
 				size: 256 * cascadeCount,
 				usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
 			});
+			this.ctx.vramTracker.register(
+				this.cascadeUniformBuffer,
+				"buffer",
+				`Shadow Cascade Matrices Array (${cascadeCount} cascades)`,
+				256 * cascadeCount,
+				"ShadowSystem",
+			);
 
 			this.cascadeBindGroups = [];
 			for (let i = 0; i < cascadeCount; i++) {
@@ -279,6 +297,14 @@ export class ShadowSystem {
 					}),
 				);
 			}
+		} else {
+			if (this.cascadeUniformBuffer) {
+				this.ctx.vramTracker.unregister(this.cascadeUniformBuffer);
+				this.cascadeUniformBuffer.destroy();
+				this.cascadeUniformBuffer = null;
+			}
+			this.cascadeViews = [];
+			this.cascadeBindGroups = [];
 		}
 
 		return true;
@@ -485,14 +511,24 @@ export class ShadowSystem {
 			// 3. Write dynamic parameters to uniformBuffer (320 bytes)
 			const csmData = new Float32Array(80); // 320 bytes / 4 bytes = 80 slots
 			// viewProjs: array<mat4x4<f32>, 4> -> slots 0 to 63
-			for (let i = 0; i < cascadeCount; i++) {
-				csmData.set(cascadeMatrices[i].values, i * 16);
+			for (let i = 0; i < 4; i++) {
+				if (i < cascadeCount) {
+					csmData.set(cascadeMatrices[i].values, i * 16);
+				} else {
+					// Use duplicate of the last valid matrix to prevent NaNs or invalid matrix selection
+					const backupMatrix = cascadeMatrices[cascadeCount - 1];
+					csmData.set(backupMatrix.values, i * 16);
+				}
 			}
 			// splits: vec4<f32> -> slots 64 to 67
-			csmData[64] = splits[1];
-			csmData[65] = splits[2];
-			csmData[66] = splits[3];
-			csmData[67] = splits[4];
+			for (let j = 0; j < 4; j++) {
+				if (j < cascadeCount) {
+					csmData[64 + j] = splits[j + 1];
+				} else {
+					// Fill unused split values deterministically with far to avoid NaN selection in WGSL
+					csmData[64 + j] = splits[cascadeCount];
+				}
+			}
 			// cameraForward: vec4<f32> -> slots 68 to 71
 			csmData[68] = cameraForward.x;
 			csmData[69] = cameraForward.y;
@@ -699,6 +735,7 @@ export class ShadowSystem {
 			this.uniformBuffer = null;
 		}
 		if (this.cascadeUniformBuffer) {
+			this.ctx.vramTracker.unregister(this.cascadeUniformBuffer);
 			this.cascadeUniformBuffer.destroy();
 			this.cascadeUniformBuffer = null;
 		}

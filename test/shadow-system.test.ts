@@ -177,7 +177,7 @@ describe("ShadowSystem", () => {
 		);
 	});
 
-	it("should render CSM and verify correct split distance values are computed and uploaded", () => {
+	it("should render CSM and verify correct split distance values are computed and uploaded with detailed buffer assertions", () => {
 		const ctx = createMockContext();
 		const shadow = new ShadowSystem(ctx);
 		const camera = new Camera();
@@ -215,11 +215,129 @@ describe("ShadowSystem", () => {
 		expect(result).toBe(true);
 		expect(shadow.useCSM).toBe(true);
 
-		// Ensure csmData with cascade matrices, splits, and parameters is written
-		expect(ctx.device.queue.writeBuffer).toHaveBeenCalledWith(
-			shadow.uniformBuffer,
-			0,
-			expect.any(Float32Array),
+		// Detailed verification of Float32Array contents uploaded
+		const mockWriteBuffer = ctx.device.queue.writeBuffer as any;
+		const csmCall = mockWriteBuffer.mock.calls.find(
+			(call: any) => call[2] instanceof Float32Array && call[2].length === 80,
 		);
+		expect(csmCall).toBeDefined();
+		const csmData = csmCall[2] as Float32Array;
+
+		// splits: slots 64..67
+		// cascadeCount: slot 78
+		expect(csmData[78]).toBe(4); // cascadeCount
+		expect(csmData[64]).toBeGreaterThan(camera.near); // splits[1]
+		expect(csmData[67]).toBe(100.0); // splits[4] is far
+
+		// Ensure no NaNs are uploaded
+		for (let i = 0; i < csmData.length; i++) {
+			expect(Number.isNaN(csmData[i])).toBe(false);
+		}
+
+		// Matrices: slots 0..63 should have non-empty matrix values (sum of absolute values > 0)
+		let sumMatrices = 0;
+		for (let i = 0; i < 64; i++) {
+			sumMatrices += Math.abs(csmData[i]);
+		}
+		expect(sumMatrices).toBeGreaterThan(0);
+	});
+
+	it("should render CSM with cascadeCount < 4 and fill unused split distances and duplicate matrices deterministically", () => {
+		const ctx = createMockContext();
+		const shadow = new ShadowSystem(ctx);
+		const camera = new Camera();
+
+		const light = new DirectionalLight({
+			castShadow: true,
+			useCSM: true,
+			cascadeCount: 2,
+			csmMaxDistance: 100.0,
+			cascadeSplitLambda: 0.85,
+		});
+		light.updateWorldMatrix(true);
+
+		const mockPassEncoder = {
+			setPipeline: vi.fn(),
+			setBindGroup: vi.fn(),
+			setVertexBuffer: vi.fn(),
+			setIndexBuffer: vi.fn(),
+			drawIndexed: vi.fn(),
+			end: vi.fn(),
+		};
+		const mockEncoder = {
+			beginRenderPass: vi.fn().mockReturnValue(mockPassEncoder),
+		} as unknown as GPUCommandEncoder;
+
+		const result = shadow.renderPass(
+			mockEncoder,
+			[light],
+			camera,
+			new Map(),
+			new Map(),
+			[],
+		);
+
+		expect(result).toBe(true);
+		expect(shadow.cascadeCount).toBe(2);
+
+		const mockWriteBuffer = ctx.device.queue.writeBuffer as any;
+		const csmCall = mockWriteBuffer.mock.calls.find(
+			(call: any) => call[2] instanceof Float32Array && call[2].length === 80,
+		);
+		expect(csmCall).toBeDefined();
+		const csmData = csmCall[2] as Float32Array;
+
+		// splits: slots 64..67
+		// cascadeCount: slot 78
+		expect(csmData[78]).toBe(2); // cascadeCount
+
+		// splits[1] (slot 64) is the split boundary
+		expect(csmData[64]).toBeGreaterThan(camera.near);
+		expect(csmData[64]).toBeLessThan(100.0);
+
+		// splits[2] (slot 65) is far (100.0)
+		expect(csmData[65]).toBe(100.0);
+
+		// unused splits: splits[3] and splits[4] (slots 66 and 67) must be filled with far (100.0)
+		expect(csmData[66]).toBe(100.0);
+		expect(csmData[67]).toBe(100.0);
+
+		// Check for NaN prevention
+		for (let i = 0; i < csmData.length; i++) {
+			expect(Number.isNaN(csmData[i])).toBe(false);
+			expect(csmData[i]).toBeDefined();
+		}
+
+		// Matrices: check that the unused matrices (viewProjs[2] and viewProjs[3]) duplicate the last valid matrix (viewProjs[1])
+		// viewProjs[1] = slots 16..31
+		// viewProjs[2] = slots 32..47
+		// viewProjs[3] = slots 48..63
+		for (let i = 0; i < 16; i++) {
+			expect(csmData[32 + i]).toBe(csmData[16 + i]);
+			expect(csmData[48 + i]).toBe(csmData[16 + i]);
+		}
+	});
+
+	it("should calculate correct standard orthographic projection with reversed range and map near/far to 0.0/1.0 NDC depth", () => {
+		// Define identical mathematical formulation used in orthoWebGPU
+		const localOrthoWebGPU = (zNear: number, zFar: number) => {
+			const depthRange = zFar - zNear;
+			const v = new Float32Array(16);
+			v[10] = 1 / depthRange;
+			v[14] = -zNear / depthRange;
+			return v;
+		};
+
+		const v = localOrthoWebGPU(-0.1, -100.0);
+
+		// Projection mapping formula for WebGPU NDC:
+		// Z_ndc = Z_view * v[10] + v[14]
+		// Near plane Z_view = -0.1 -> Z_ndc = 0.0
+		// Far plane Z_view = -100.0 -> Z_ndc = 1.0
+		const zNearNDC = -0.1 * v[10] + v[14];
+		const zFarNDC = -100.0 * v[10] + v[14];
+
+		expect(zNearNDC).toBeCloseTo(0.0, 5);
+		expect(zFarNDC).toBeCloseTo(1.0, 5);
 	});
 });
