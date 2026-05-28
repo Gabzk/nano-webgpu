@@ -34,6 +34,7 @@ export class StandardMaterial extends Material {
 		HAS_AO_MAP: 11,
 		HAS_ORM_MAP: 12,
 		CULL_MODE: 13,
+		EMISSIVE_STRENGTH: 14,
 		EMISSIVE_R: 16,
 		EMISSIVE_G: 17,
 		EMISSIVE_B: 18,
@@ -98,7 +99,7 @@ export class StandardMaterial extends Material {
 
 		this.bufferData[offsets.HAS_ORM_MAP] = this.ormTexture ? 1.0 : 0.0;
 		this.bufferData[offsets.CULL_MODE] = cullModeFlag;
-		this.bufferData[14] = 0.0;
+		this.bufferData[offsets.EMISSIVE_STRENGTH] = this.emissiveStrength;
 		this.bufferData[15] = 0.0;
 
 		this.bufferData[offsets.EMISSIVE_R] = this.emissiveColor.r;

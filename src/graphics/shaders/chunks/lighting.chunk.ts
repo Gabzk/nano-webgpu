@@ -178,7 +178,7 @@ fn fs_main(in: VertexOutput, @builtin(front_facing) isFrontFace: bool) -> @locat
         finalColor += (diffuse + specular) * lightColor * shadow;
     }
 
-    var emissiveColor = material.emissive.rgb;
+    var emissiveColor = material.emissive.rgb * material.emissiveStrength;
     if (material.useEmissiveMap > 0.5) {
         emissiveColor *= textureSample(emissiveTex, mySampler, in.uv).rgb;
     }

@@ -3,4 +3,4 @@
  *
  * @group Core
  */
-export const VERSION = "0.8.2";
+export const VERSION = "0.9.0";

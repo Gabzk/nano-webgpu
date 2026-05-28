@@ -209,6 +209,13 @@ class GLTFParser implements ModelParser {
 				out.emissiveColor = `#${toHex(r)}${toHex(g)}${toHex(b)}`;
 			}
 
+			// KHR_materials_emissive_strength — HDR emissive multiplier (can exceed 1.0)
+			const emissiveStrength =
+				mat.extensions?.KHR_materials_emissive_strength?.emissiveStrength ?? 1.0;
+			if (emissiveStrength !== 1.0) {
+				out.emissiveStrength = emissiveStrength;
+			}
+
 			if (mat.doubleSided) out.doubleSided = true;
 
 			return out;

@@ -284,7 +284,7 @@ export class PipelineManager {
 				entryPoint: "fs_main",
 				targets: [
 					{
-						format: this.ctx.format,
+						format: "rgba16float",
 						blend: {
 							color: {
 								srcFactor: "src-alpha",
@@ -767,7 +767,7 @@ export class PipelineManager {
 	private bindGroupLayout_PostProcess: GPUBindGroupLayout | null = null;
 
 	/**
-	 * Resolves the bind group layout driving fullscreen post processing passes (sampler, color attachment, render settings).
+	 * Resolves the bind group layout driving fullscreen post processing passes (sampler, color attachment, render settings, bloom).
 	 *
 	 * @returns The post process GPUBindGroupLayout.
 	 */
@@ -784,12 +784,17 @@ export class PipelineManager {
 					{
 						binding: 1,
 						visibility: GPUShaderStage.FRAGMENT,
-						texture: { sampleType: "float", viewDimension: "2d" },
+						texture: { sampleType: "float", viewDimension: "2d" }, // Scene color
 					},
 					{
 						binding: 2,
 						visibility: GPUShaderStage.FRAGMENT,
 						buffer: { type: "uniform" }, // RenderSettings (fxaa_enabled, etc)
+					},
+					{
+						binding: 3,
+						visibility: GPUShaderStage.FRAGMENT,
+						texture: { sampleType: "float", viewDimension: "2d" }, // Bloom texture
 					},
 				],
 			});

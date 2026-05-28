@@ -312,6 +312,46 @@ export class Scene extends Node {
 	}
 
 	/**
+	 * Access to the Bloom post-processing configuration system.
+	 * Allows configuring bloom settings e.g. `scene.bloom.enabled = true`.
+	 */
+	public get bloom() {
+		const system = this.renderer.bloom;
+		return {
+			get enabled(): boolean {
+				return system.options.enabled;
+			},
+			set enabled(value: boolean) {
+				system.options.enabled = value;
+			},
+			get threshold(): number {
+				return system.options.threshold;
+			},
+			set threshold(value: number) {
+				system.options.threshold = value;
+			},
+			get intensity(): number {
+				return system.options.intensity;
+			},
+			set intensity(value: number) {
+				system.options.intensity = value;
+			},
+			get passes(): number {
+				return system.options.passes;
+			},
+			set passes(value: number) {
+				system.options.passes = value;
+			},
+			get knee(): number {
+				return system.options.knee;
+			},
+			set knee(value: number) {
+				system.options.knee = value;
+			}
+		};
+	}
+
+	/**
 	 * Registers and configures the active Camera viewpoints driving render passes.
 	 * Automatically appends the Camera to the scene tree if it is not already present.
 	 *

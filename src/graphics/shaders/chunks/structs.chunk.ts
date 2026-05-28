@@ -84,7 +84,7 @@ struct MaterialUniform {
 
     useORMMap: f32,
     cullMode: f32, // 0=back/default, 1=front, 2=disabled (none)
-    _pad2: f32,
+    emissiveStrength: f32,
     _pad3: f32,
 
     emissive: vec3<f32>,

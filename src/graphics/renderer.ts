@@ -2,6 +2,7 @@ import type { Context } from "../core/context";
 import type { PerformanceTracker } from "../debug/performance-tracker";
 import { Mat4 } from "../math/mat4";
 import { BatchManager } from "./batch-manager";
+import { BloomSystem } from "./bloom-system";
 import type { Camera } from "./camera";
 import { normalizeCullMode } from "./cull-mode";
 import type { Light } from "./light";
@@ -65,6 +66,8 @@ export class Renderer {
 	private shadow: ShadowSystem;
 	/** Instanced geometry batching coordinator. */
 	private batcher: BatchManager;
+	/** Bloom post-processing system. */
+	public readonly bloom: BloomSystem;
 
 	/** @internal Pipeline used to draw unlit debug gizmos. */
 	private gizmoPipeline: GPURenderPipeline | null = null;
@@ -85,6 +88,7 @@ export class Renderer {
 		this.ctx = ctx;
 		this.shadow = new ShadowSystem(ctx);
 		this.batcher = new BatchManager(ctx);
+		this.bloom = new BloomSystem(ctx);
 		this.initPostProcess();
 		this.resizeDepthTexture();
 		this.ensureLightsBufferSize(0);
@@ -147,7 +151,7 @@ export class Renderer {
 
 		this.sceneTexture = this.ctx.device.createTexture({
 			size: [w, h, 1],
-			format: this.ctx.format,
+			format: "rgba16float",
 			usage:
 				GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
 		});
@@ -156,10 +160,15 @@ export class Renderer {
 			this.sceneTexture,
 			"texture",
 			"Scene Color Texture",
-			w * h * 4,
+			w * h * 8,
 			"Renderer",
 		);
 		this.sceneTextureView = this.sceneTexture.createView();
+
+		// Notify bloom system of new size and scene texture
+		if (this.bloom) {
+			this.bloom.resize(this.ctx, w, h, this.sceneTextureView);
+		}
 
 		this.postProcessBindGroup = this.ctx.device.createBindGroup({
 			layout: this.ctx.pipelineManager.getPostProcessBindGroupLayout(),
@@ -167,6 +176,7 @@ export class Renderer {
 				{ binding: 0, resource: this.postProcessSampler },
 				{ binding: 1, resource: this.sceneTextureView },
 				{ binding: 2, resource: { buffer: this.renderSettingsBuffer } },
+				{ binding: 3, resource: this.bloom?.bloomTextureView ?? this.sceneTextureView },
 			],
 		});
 	}
@@ -295,6 +305,9 @@ export class Renderer {
 		this.renderSettingsFloat[9] = scene.ambientGroundColor.g;
 		this.renderSettingsFloat[10] = scene.ambientGroundColor.b;
 		this.renderSettingsFloat[11] = 1.0;
+
+		// Update bloom enabled flag in RenderSettings (uint32 index 2)
+		this.renderSettingsUint32[2] = this.bloom.options.enabled ? 1 : 0;
 
 		this.ctx.device.queue.writeBuffer(
 			this.renderSettingsBuffer,
@@ -512,6 +525,9 @@ export class Renderer {
 		}
 
 		passEncoder.end();
+
+		// 5d. Bloom passes (bright-pass + gaussian blur ping-pong)
+		this.bloom.renderPasses(this.ctx, commandEncoder);
 
 		// 6. Post-processing pass
 		const postProcessPassDescriptor: GPURenderPassDescriptor = {
@@ -761,6 +777,9 @@ export class Renderer {
 		}
 		if (this.batcher) {
 			this.batcher.destroy();
+		}
+		if (this.bloom) {
+			this.bloom.destroy();
 		}
 		if (this.depthTexture) {
 			this.ctx.vramTracker.unregister(this.depthTexture);

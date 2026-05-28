@@ -56,6 +56,8 @@ export interface MaterialOptions {
 	emissiveColor?: ColorLike;
 	/** Map containing emissive light data, or file path. */
 	emissiveTexture?: Texture | string;
+	/** Emissive intensity multiplier (supports values > 1 for HDR emission). Defaults to `1.0`. */
+	emissiveStrength?: number;
 
 	/** When true, disables face culling so back and front polygons are rendered. */
 	doubleSided?: boolean;
@@ -130,6 +132,8 @@ export abstract class Material {
 	protected _emissiveColor: Color = new Color();
 	/** @internal Map containing surface emissive light data. */
 	protected _emissiveTexture: Texture | null = null;
+	/** @internal Emissive intensity multiplier (supports HDR values > 1). */
+	protected _emissiveStrength: number = 1.0;
 
 	/** @internal Path names of textures queued to load asynchronously in the background. */
 	protected pendingTextures: { [key: string]: string } = {};
@@ -225,6 +229,7 @@ export abstract class Material {
 		this._metallic = options.metallic ?? 0.0;
 		this._normalScale = options.normalScale ?? 1.0;
 		this._aoIntensity = options.aoIntensity ?? 1.0;
+		this._emissiveStrength = options.emissiveStrength ?? 1.0;
 
 		if (options.cullMode !== undefined) {
 			this.cullMode = options.cullMode;
@@ -538,6 +543,19 @@ export abstract class Material {
 		}
 	}
 
+	/** Gets the emissive intensity multiplier. */
+	public get emissiveStrength(): number {
+		return this._emissiveStrength;
+	}
+
+	/** Sets the emissive intensity multiplier and marks the material parameters as dirty. */
+	public set emissiveStrength(val: number) {
+		if (this._emissiveStrength !== val) {
+			this._emissiveStrength = val;
+			this.onPropertyChange();
+		}
+	}
+
 	/** Gets the double-sided rendering state. */
 	public get doubleSided(): boolean {
 		return isCullDisabled(this._cullMode);
@@ -589,7 +607,9 @@ export abstract class Material {
 				this._ownedTextures.add(tex);
 			}
 			if (this.pendingTextures.emissive) {
-				const tex = Texture.loadBackground(ctx, this.pendingTextures.emissive);
+				const tex = Texture.loadBackground(ctx, this.pendingTextures.emissive, {
+					format: "rgba8unorm-srgb",
+				});
 				this._emissiveTexture = tex;
 				this._ownedTextures.add(tex);
 			}

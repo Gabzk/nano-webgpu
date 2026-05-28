@@ -29,16 +29,26 @@ export const postProcessShader = /* wgsl */ `
 
     @group(0) @binding(0) var screenSampler: sampler;
     @group(0) @binding(1) var screenTexture: texture_2d<f32>;
+    @group(0) @binding(3) var bloomTexture: texture_2d<f32>;
 
     struct RenderSettings {
         fxaa_enabled: u32,
         time_bits: u32,
-        _pad2: u32,
+        bloom_enabled: u32,
         _pad3: u32,
     }
     @group(0) @binding(2) var <uniform> settings: RenderSettings;
 
     ${postProcessChunk}
+
+    fn aces_approx(v: vec3<f32>) -> vec3<f32> {
+        let a = 2.51;
+        let b = 0.03;
+        let c = 2.43;
+        let d = 0.59;
+        let e = 0.14;
+        return clamp((v * (a * v + b)) / (v * (c * v + d) + e), vec3<f32>(0.0), vec3<f32>(1.0));
+    }
 
     @fragment
     fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
@@ -51,10 +61,19 @@ export const postProcessShader = /* wgsl */ `
         } else {
             finalColor = textureSample(screenTexture, screenSampler, in.uv);
         }
-        
+
+        // Additive bloom blend
+        if (settings.bloom_enabled > 0u) {
+            let bloomSample = textureSample(bloomTexture, screenSampler, in.uv).rgb;
+            finalColor = vec4<f32>(finalColor.rgb + bloomSample, finalColor.a);
+        }
+
+        // ACES Filmic Tone Mapping to bring HDR values into standard displayable [0.0, 1.0] range
+        let toneMapped = aces_approx(finalColor.rgb);
+
         // Linear to sRGB gamma correction (approx 2.2)
         // Since alpha is linear and we're writing to standard canvas, we only map RGB.
-        let srgbColor = pow(finalColor.rgb, vec3<f32>(1.0 / 2.2));
+        let srgbColor = pow(max(toneMapped, vec3<f32>(0.0)), vec3<f32>(1.0 / 2.2));
         return vec4<f32>(srgbColor, finalColor.a);
     }
 `;
