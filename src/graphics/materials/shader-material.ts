@@ -66,8 +66,23 @@ export interface ShaderMaterialOptions extends MaterialOptions {
  * @group Materials
  */
 export class ShaderMaterial extends Material {
-	/** WGSL custom shader code containing entry points. */
-	public shaderCode: string;
+	/** @internal WGSL custom shader code containing entry points. */
+	private _shaderCode: string;
+
+	/** Gets the WGSL custom shader code containing entry points. */
+	get shaderCode(): string {
+		return this._shaderCode;
+	}
+
+	/** Sets the WGSL custom shader code and marks the material as dirty. */
+	set shaderCode(val: string) {
+		if (this._shaderCode !== val) {
+			this._shaderCode = val;
+			this.isDirty = true;
+			this._defaultBindGroup = null;
+			this._paramsBindGroup = null;
+		}
+	}
 
 	/** @deprecated Direct custom bind group override. Set `customBindGroup` directly for fully custom group(2) setups. */
 	public customBindGroup: GPUBindGroup | null = null;
@@ -100,7 +115,7 @@ export class ShaderMaterial extends Material {
 	constructor(options: ShaderMaterialOptions) {
 		super(options);
 		this.type = "ShaderMaterial";
-		this.shaderCode = options.shaderCode;
+		this._shaderCode = options.shaderCode;
 
 		const params = options.parameters ?? options.uniforms;
 		if (params) {
@@ -143,11 +158,10 @@ export class ShaderMaterial extends Material {
 	 */
 	public setParameters(params: ShaderParameters): void {
 		this._paramsData = ShaderMaterial._packParams(params);
+		this.isDirty = true;
 		if (this._paramsBuffer) {
 			const data = this._paramsData;
-			if (this._paramsBuffer.size >= data.byteLength) {
-				this.isDirty = true;
-			} else {
+			if (this._paramsBuffer.size < data.byteLength) {
 				// Buffer too small — destroy and recreate
 				if (this._ctx) {
 					this._ctx.vramTracker.unregister(this._paramsBuffer);

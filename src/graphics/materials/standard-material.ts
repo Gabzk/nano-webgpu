@@ -75,31 +75,31 @@ export class StandardMaterial extends Material {
 
 	/** @internal Solid base color coefficients. */
 	private _albedoColor: Color = new Color();
-	/** Map containing surface color data. */
-	public albedoTexture: Texture | null = null;
+	/** @internal Map containing surface color data. */
+	private _albedoTexture: Texture | null = null;
 
-	/** Tangent-space normal map detailing surface folds. */
-	public normalTexture: Texture | null = null;
+	/** @internal Tangent-space normal map detailing surface folds. */
+	private _normalTexture: Texture | null = null;
 	/** @internal Scaling factor applied to normal tangent values. */
 	private _normalScale: number = 1.0;
 
 	/** @internal Surface roughness microfacet scattering coefficient. */
 	private _roughness: number = 0.5;
-	/** Map detailing roughness values. */
-	public roughnessTexture: Texture | null = null;
+	/** @internal Map detailing roughness values. */
+	private _roughnessTexture: Texture | null = null;
 
 	/** @internal Surface metallic conduction microfacet value. */
 	private _metallic: number = 0.0;
-	/** Map detailing metallic coefficients. */
-	public metallicTexture: Texture | null = null;
+	/** @internal Map detailing metallic coefficients. */
+	private _metallicTexture: Texture | null = null;
 
-	/** Map containing ambient occlusion details. */
-	public aoTexture: Texture | null = null;
+	/** @internal Map containing ambient occlusion details. */
+	private _aoTexture: Texture | null = null;
 	/** @internal Intensity multiplier of ambient occlusion shadows. */
 	private _aoIntensity: number = 1.0;
 
-	/** Map containing packed Ambient Occlusion, Roughness, and Metallic (ORM) values. */
-	public ormTexture: Texture | null = null;
+	/** @internal Map containing packed Ambient Occlusion, Roughness, and Metallic (ORM) values. */
+	private _ormTexture: Texture | null = null;
 
 	/** Gets the base albedo color. */
 	get albedoColor(): Color {
@@ -107,12 +107,38 @@ export class StandardMaterial extends Material {
 	}
 
 	/** Sets the base albedo color, setting dirty status upon color component modifications. */
-	set albedoColor(val: Color) {
-		this._albedoColor = val;
+	set albedoColor(val: ColorLike) {
+		if (val instanceof Color) {
+			this._albedoColor = val;
+		} else if (typeof val === "string") {
+			this._albedoColor = Color.fromHex(val);
+		} else if (Array.isArray(val)) {
+			this._albedoColor = new Color(val[0], val[1], val[2], val[3] ?? 1.0);
+		}
 		this._albedoColor.onChange = () => {
 			this.isDirty = true;
 		};
 		this.isDirty = true;
+	}
+
+	/** Gets the base albedo texture. */
+	get albedoTexture(): Texture | null {
+		return this._albedoTexture;
+	}
+
+	/** Sets the base albedo texture, marking parameters and bind groups as dirty. */
+	set albedoTexture(val: Texture | string | null) {
+		if (typeof val === "string") {
+			this.pendingTextures.albedo = val;
+			this.isDirty = true;
+			this.bindGroup = null;
+			this._bindGroupPCFVariant = null;
+		} else if (this._albedoTexture !== val) {
+			this._albedoTexture = val;
+			this.isDirty = true;
+			this.bindGroup = null;
+			this._bindGroupPCFVariant = null;
+		}
 	}
 
 	/** Gets the normal tangent scale. */
@@ -126,6 +152,26 @@ export class StandardMaterial extends Material {
 		this.isDirty = true;
 	}
 
+	/** Gets the normal texture. */
+	get normalTexture(): Texture | null {
+		return this._normalTexture;
+	}
+
+	/** Sets the normal texture, marking parameters and bind groups as dirty. */
+	set normalTexture(val: Texture | string | null) {
+		if (typeof val === "string") {
+			this.pendingTextures.normal = val;
+			this.isDirty = true;
+			this.bindGroup = null;
+			this._bindGroupPCFVariant = null;
+		} else if (this._normalTexture !== val) {
+			this._normalTexture = val;
+			this.isDirty = true;
+			this.bindGroup = null;
+			this._bindGroupPCFVariant = null;
+		}
+	}
+
 	/** Gets the microfacet roughness factor. */
 	get roughness(): number {
 		return this._roughness;
@@ -135,6 +181,26 @@ export class StandardMaterial extends Material {
 	set roughness(val: number) {
 		this._roughness = val;
 		this.isDirty = true;
+	}
+
+	/** Gets the roughness texture. */
+	get roughnessTexture(): Texture | null {
+		return this._roughnessTexture;
+	}
+
+	/** Sets the roughness texture, marking parameters and bind groups as dirty. */
+	set roughnessTexture(val: Texture | string | null) {
+		if (typeof val === "string") {
+			this.pendingTextures.roughness = val;
+			this.isDirty = true;
+			this.bindGroup = null;
+			this._bindGroupPCFVariant = null;
+		} else if (this._roughnessTexture !== val) {
+			this._roughnessTexture = val;
+			this.isDirty = true;
+			this.bindGroup = null;
+			this._bindGroupPCFVariant = null;
+		}
 	}
 
 	/** Gets the microfacet metallic factor. */
@@ -148,6 +214,26 @@ export class StandardMaterial extends Material {
 		this.isDirty = true;
 	}
 
+	/** Gets the metallic texture. */
+	get metallicTexture(): Texture | null {
+		return this._metallicTexture;
+	}
+
+	/** Sets the metallic texture, marking parameters and bind groups as dirty. */
+	set metallicTexture(val: Texture | string | null) {
+		if (typeof val === "string") {
+			this.pendingTextures.metallic = val;
+			this.isDirty = true;
+			this.bindGroup = null;
+			this._bindGroupPCFVariant = null;
+		} else if (this._metallicTexture !== val) {
+			this._metallicTexture = val;
+			this.isDirty = true;
+			this.bindGroup = null;
+			this._bindGroupPCFVariant = null;
+		}
+	}
+
 	/** Gets the ambient occlusion shadow intensity multiplier. */
 	get aoIntensity(): number {
 		return this._aoIntensity;
@@ -157,6 +243,46 @@ export class StandardMaterial extends Material {
 	set aoIntensity(val: number) {
 		this._aoIntensity = val;
 		this.isDirty = true;
+	}
+
+	/** Gets the ambient occlusion texture. */
+	get aoTexture(): Texture | null {
+		return this._aoTexture;
+	}
+
+	/** Sets the ambient occlusion texture, marking parameters and bind groups as dirty. */
+	set aoTexture(val: Texture | string | null) {
+		if (typeof val === "string") {
+			this.pendingTextures.ao = val;
+			this.isDirty = true;
+			this.bindGroup = null;
+			this._bindGroupPCFVariant = null;
+		} else if (this._aoTexture !== val) {
+			this._aoTexture = val;
+			this.isDirty = true;
+			this.bindGroup = null;
+			this._bindGroupPCFVariant = null;
+		}
+	}
+
+	/** Gets the ORM texture. */
+	get ormTexture(): Texture | null {
+		return this._ormTexture;
+	}
+
+	/** Sets the ORM texture, marking parameters and bind groups as dirty. */
+	set ormTexture(val: Texture | string | null) {
+		if (typeof val === "string") {
+			this.pendingTextures.orm = val;
+			this.isDirty = true;
+			this.bindGroup = null;
+			this._bindGroupPCFVariant = null;
+		} else if (this._ormTexture !== val) {
+			this._ormTexture = val;
+			this.isDirty = true;
+			this.bindGroup = null;
+			this._bindGroupPCFVariant = null;
+		}
 	}
 
 	/** Gets the cull mode settings. */

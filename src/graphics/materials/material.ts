@@ -39,14 +39,17 @@ export abstract class Material {
 	/** Flag indicating if parameter properties are dirty, requiring a new bind group build. */
 	public isDirty: boolean = true;
 
-	/** Toggle depth buffer updates. Defaults to `true`. */
-	public depthWriteEnabled: boolean = true;
+	/** @internal Toggle depth buffer updates. Defaults to `true`. */
+	private _depthWriteEnabled: boolean = true;
 
-	/** Depth check comparison function. Defaults to `"less"`. */
-	public depthCompare: GPUCompareFunction = "less";
+	/** @internal Depth check comparison function. Defaults to `"less"`. */
+	private _depthCompare: GPUCompareFunction = "less";
 
 	/** @internal Material back/front face culling settings. */
 	protected _cullMode: CullMode | undefined = undefined;
+
+	/** @internal Toggle alpha transparency blending support. */
+	protected _transparent: boolean = false;
 
 	/**
 	 * Secondary material rendered on top of the current pass.
@@ -64,9 +67,50 @@ export abstract class Material {
 		this.id = Material._nextId++;
 		if (options.cullMode !== undefined) this._cullMode = options.cullMode;
 		if (options.depthWriteEnabled !== undefined)
-			this.depthWriteEnabled = options.depthWriteEnabled;
+			this._depthWriteEnabled = options.depthWriteEnabled;
 		if (options.depthCompare !== undefined)
-			this.depthCompare = options.depthCompare;
+			this._depthCompare = options.depthCompare;
+		if (options.transparent !== undefined)
+			this._transparent = options.transparent;
+	}
+
+	/** Gets whether depth buffer updates are enabled. */
+	public get depthWriteEnabled(): boolean {
+		return this._depthWriteEnabled;
+	}
+
+	/** Sets whether depth buffer updates are enabled. */
+	public set depthWriteEnabled(value: boolean) {
+		if (this._depthWriteEnabled !== value) {
+			this._depthWriteEnabled = value;
+			this.isDirty = true;
+		}
+	}
+
+	/** Gets the depth check comparison function. */
+	public get depthCompare(): GPUCompareFunction {
+		return this._depthCompare;
+	}
+
+	/** Sets the depth check comparison function. */
+	public set depthCompare(value: GPUCompareFunction) {
+		if (this._depthCompare !== value) {
+			this._depthCompare = value;
+			this.isDirty = true;
+		}
+	}
+
+	/** Gets whether transparency blending is enabled. */
+	public get transparent(): boolean {
+		return this._transparent;
+	}
+
+	/** Sets whether transparency blending is enabled. */
+	public set transparent(value: boolean) {
+		if (this._transparent !== value) {
+			this._transparent = value;
+			this.isDirty = true;
+		}
 	}
 
 	/** Gets the culling mode settings. */
@@ -76,7 +120,10 @@ export abstract class Material {
 
 	/** Sets the culling mode settings. */
 	public set cullMode(value: CullMode | undefined) {
-		this._cullMode = value;
+		if (this._cullMode !== value) {
+			this._cullMode = value;
+			this.isDirty = true;
+		}
 	}
 
 	/**

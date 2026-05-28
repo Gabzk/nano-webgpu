@@ -21,6 +21,7 @@ import {
 } from "./materials/standard-material";
 import { Mesh } from "./mesh";
 import { Renderer } from "./renderer";
+import { Texture } from "./texture";
 
 /**
  * Scene specific options for adding light sources.
@@ -70,6 +71,8 @@ export interface SceneGeometryOptions extends StandardMaterialOptions {
 	scale?: number | number[] | Vec3;
 	/** Automatically append the resulting node to the scene hierarchy. Defaults to `true`. */
 	addToScene?: boolean;
+	/** Texture applied to the mesh */
+	texture?: Texture | string;
 }
 
 /**

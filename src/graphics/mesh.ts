@@ -5,7 +5,7 @@ import { AABB } from "../math/aabb";
 import { Vec3 } from "../math/vec3";
 import type { CullMode } from "./cull-mode";
 import { Geometry } from "./geometry";
-import { Material } from "./materials/material";
+import { Material, isStandardMaterial } from "./materials/material";
 import {
 	StandardMaterial,
 	type StandardMaterialOptions,
@@ -85,7 +85,7 @@ export class Mesh extends Node3D {
 	private _material!: Material;
 
 	/** Gets the active Material shader instance. */
-	public override get material(): Material {
+	public override get material(): Material  {
 		return this._material;
 	}
 
@@ -246,7 +246,7 @@ export class Mesh extends Node3D {
 				material instanceof Material
 					? material.cullMode !== undefined
 					: material &&
-						(material as StandardMaterialOptions).cullMode !== undefined;
+					(material as StandardMaterialOptions).cullMode !== undefined;
 			if (!hasMaterialCull) {
 				finalMaterial.cullMode = "none";
 			}
@@ -289,6 +289,20 @@ export class Mesh extends Node3D {
 			this.material = new StandardMaterial({ albedoTexture: tex });
 		} else {
 			this.material = new StandardMaterial();
+		}
+	}
+
+	public loadTexture(texture: Texture | string) {
+		if (typeof texture === "string") {
+			texture = Texture.loadBackground(this.ctx, texture);
+		}
+
+		if (isStandardMaterial(this.material)) {
+			this.material.albedoTexture = texture;
+		} else {
+			this.material = new StandardMaterial({
+				albedoTexture: texture,
+			});
 		}
 	}
 

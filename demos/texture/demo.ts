@@ -11,6 +11,7 @@ const roughness = "./Brick_Wall_028_SD/Brick_Wall_028_roughness.png";
 const height = "./Brick_Wall_028_SD/Brick_Wall_028_height.png";
 
 const cube = scene.addCube();
+
 cube.material = new StandardMaterial({
 	albedoTexture: texture,
 	normalTexture: normal,
