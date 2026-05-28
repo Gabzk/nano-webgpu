@@ -165,29 +165,41 @@ export class AABB {
 	}
 
 	/**
-	 * Returns a new AABB transformed into world-space by a Mat4.
+	 * Returns an AABB transformed into world-space by a Mat4.
 	 * Uses the "8-corner transform" technique — correct for any affine transform.
+	 *
+	 * @param matrix - The transformation matrix.
+	 * @param out - Optional pre-allocated AABB to store the result, avoiding Garbage Collection allocations.
 	 */
-	public transformed(matrix: Mat4): AABB {
-		const corners = [
-			new Vec3(this.min.x, this.min.y, this.min.z),
-			new Vec3(this.max.x, this.min.y, this.min.z),
-			new Vec3(this.min.x, this.max.y, this.min.z),
-			new Vec3(this.max.x, this.max.y, this.min.z),
-			new Vec3(this.min.x, this.min.y, this.max.z),
-			new Vec3(this.max.x, this.min.y, this.max.z),
-			new Vec3(this.min.x, this.max.y, this.max.z),
-			new Vec3(this.max.x, this.max.y, this.max.z),
-		];
-
-		const result = new AABB();
+	public transformed(matrix: Mat4, out?: AABB): AABB {
+		const result = out || new AABB();
 		const v = matrix.values;
 
-		for (const c of corners) {
+		const minX = this.min.x;
+		const minY = this.min.y;
+		const minZ = this.min.z;
+		const maxX = this.max.x;
+		const maxY = this.max.y;
+		const maxZ = this.max.z;
+
+		// Reset result bounds
+		result.min.x = Infinity;
+		result.min.y = Infinity;
+		result.min.z = Infinity;
+		result.max.x = -Infinity;
+		result.max.y = -Infinity;
+		result.max.z = -Infinity;
+
+		// Transform the 8 corners without allocating Vec3 objects
+		for (let i = 0; i < 8; i++) {
+			const cx = (i & 1) === 0 ? minX : maxX;
+			const cy = (i & 2) === 0 ? minY : maxY;
+			const cz = (i & 4) === 0 ? minZ : maxZ;
+
 			// Full 4x4 point transform (w = 1)
-			const x = c.x * v[0] + c.y * v[4] + c.z * v[8] + v[12];
-			const y = c.x * v[1] + c.y * v[5] + c.z * v[9] + v[13];
-			const z = c.x * v[2] + c.y * v[6] + c.z * v[10] + v[14];
+			const x = cx * v[0] + cy * v[4] + cz * v[8] + v[12];
+			const y = cx * v[1] + cy * v[5] + cz * v[9] + v[13];
+			const z = cx * v[2] + cy * v[6] + cz * v[10] + v[14];
 
 			if (x < result.min.x) result.min.x = x;
 			if (y < result.min.y) result.min.y = y;

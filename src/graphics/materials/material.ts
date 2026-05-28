@@ -268,7 +268,7 @@ export abstract class Material {
 			this.albedoColor.r,
 			this.albedoColor.g,
 			this.albedoColor.b,
-			value
+			value,
 		);
 		if (value < 1.0) {
 			this._transparent = true;

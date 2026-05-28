@@ -1,6 +1,7 @@
 import { VRAMTracker } from "../debug/vram-tracker";
 import { PipelineManager } from "../graphics/pipeline";
 import { PrimitivesFactory } from "../graphics/primitives-factory";
+import type { ITexture } from "../graphics/texture-interface";
 import { InputManager, setActiveInput } from "./input";
 import { Loader } from "./loader";
 
@@ -65,13 +66,12 @@ export class Context {
 
 	/**
 	 * Shared fallback textures representing solid white colors and flat normal vectors.
-	 * Declared as `unknown` to avoid direct circular dependencies with the `Texture` class.
 	 */
 	public defaultTextures: {
 		/** Standard solid white 1x1 pixels texture. */
-		white?: unknown;
+		white?: ITexture;
 		/** Default tangent-space normal map fallback (128, 128, 255). */
-		normal?: unknown;
+		normal?: ITexture;
 	} = {};
 
 	/**
@@ -191,11 +191,11 @@ export class Context {
 
 		// Destroy default textures
 		if (this.defaultTextures.white) {
-			(this.defaultTextures.white as any).destroy(this);
+			this.defaultTextures.white.destroy(this);
 			this.defaultTextures.white = undefined;
 		}
 		if (this.defaultTextures.normal) {
-			(this.defaultTextures.normal as any).destroy(this);
+			this.defaultTextures.normal.destroy(this);
 			this.defaultTextures.normal = undefined;
 		}
 

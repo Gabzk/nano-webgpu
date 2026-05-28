@@ -1,4 +1,5 @@
 import type { Context } from "../core/context";
+import type { ITexture } from "./texture-interface";
 
 /**
  * Texture is a high-level wrapper around the native WebGPU `GPUTexture`.
@@ -8,7 +9,7 @@ import type { Context } from "../core/context";
  *
  * @group Graphics
  */
-export class Texture {
+export class Texture implements ITexture {
 	/** Active native WebGPU GPUTexture resource. */
 	public gpuTexture!: GPUTexture;
 

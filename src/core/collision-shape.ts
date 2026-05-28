@@ -33,6 +33,9 @@ export class CollisionShape {
 	 */
 	public radius: number;
 
+	/** @internal Cached local-space AABB. */
+	private _localAABB: AABB | null = null;
+
 	/**
 	 * Internal constructor to initialize a CollisionShape with given attributes.
 	 * Use static factory methods `.box()` or `.sphere()` to instantiate.
@@ -45,6 +48,9 @@ export class CollisionShape {
 		this.type = type;
 		this.halfExtents = halfExtents;
 		this.radius = radius;
+		this.halfExtents.onChange = () => {
+			this._localAABB = null;
+		};
 	}
 
 	/**
@@ -84,7 +90,10 @@ export class CollisionShape {
 	 * @returns The calculated local-space AABB.
 	 */
 	public getLocalAABB(): AABB {
-		const he = this.halfExtents;
-		return AABB.fromCenterHalfExtents(new Vec3(0, 0, 0), he);
+		if (!this._localAABB) {
+			const he = this.halfExtents;
+			this._localAABB = AABB.fromCenterHalfExtents(new Vec3(0, 0, 0), he);
+		}
+		return this._localAABB;
 	}
 }

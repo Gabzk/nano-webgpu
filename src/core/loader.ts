@@ -336,26 +336,43 @@ class OBJParser implements ModelParser {
 			line = line.trim();
 			if (line === "" || line.startsWith("#")) continue;
 
-			const parts = line.split(/\s+/);
+			// Fast whitespace split without regex
+			const parts: string[] = [];
+			let start = 0;
+			const len = line.length;
+			for (let i = 0; i < len; i++) {
+				const c = line.charCodeAt(i);
+				if (c === 32 || c === 9 || c === 13) {
+					// space, tab, carriage return
+					if (start < i) {
+						parts.push(line.substring(start, i));
+					}
+					start = i + 1;
+				}
+			}
+			if (start < len) {
+				parts.push(line.substring(start));
+			}
+
 			const type = parts[0];
 
 			switch (type) {
 				case "v":
 					inputVertices.push(
-						parseFloat(parts[1]),
-						parseFloat(parts[2]),
-						parseFloat(parts[3]),
+						Number(parts[1]),
+						Number(parts[2]),
+						Number(parts[3]),
 					);
 					break;
 				case "vn":
 					inputNormals.push(
-						parseFloat(parts[1]),
-						parseFloat(parts[2]),
-						parseFloat(parts[3]),
+						Number(parts[1]),
+						Number(parts[2]),
+						Number(parts[3]),
 					);
 					break;
 				case "vt":
-					inputUVs.push(parseFloat(parts[1]), parseFloat(parts[2]));
+					inputUVs.push(Number(parts[1]), Number(parts[2]));
 					break;
 				case "f": {
 					const faceIndices = [];
@@ -368,14 +385,14 @@ class OBJParser implements ModelParser {
 						} else {
 							const indices = key.split("/");
 
-							const vIdx = (parseInt(indices[0], 10) - 1) * 3;
+							const vIdx = (Number(indices[0]) - 1) * 3;
 							const vtIdx =
 								indices.length > 1 && indices[1] !== ""
-									? (parseInt(indices[1], 10) - 1) * 2
+									? (Number(indices[1]) - 1) * 2
 									: -1;
 							const vnIdx =
 								indices.length > 2 && indices[2] !== ""
-									? (parseInt(indices[2], 10) - 1) * 3
+									? (Number(indices[2]) - 1) * 3
 									: -1;
 
 							interleavedVertices.push(

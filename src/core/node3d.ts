@@ -1,5 +1,5 @@
 import type { Material } from "../graphics/materials/material";
-import type { AABB } from "../math/aabb";
+import { AABB } from "../math/aabb";
 import { Vec3 } from "../math/vec3";
 import type { CollisionShape } from "./collision-shape";
 import { Node } from "./node";
@@ -29,6 +29,9 @@ export class Node3D extends Node {
 	 * Utilized for standard AABB intersection tests and spatial overlap checks.
 	 */
 	public collisionShape: CollisionShape | null = null;
+
+	/** @internal Pre-allocated AABB to avoid GC allocations during getWorldAABB. */
+	private _worldAABB: AABB = new AABB();
 
 	/**
 	 * Creates a new Node3D instance with default identity transformations:
@@ -208,7 +211,7 @@ export class Node3D extends Node {
 	public getWorldAABB(): AABB | null {
 		if (!this.collisionShape) return null;
 		const localAABB = this.collisionShape.getLocalAABB();
-		return localAABB.transformed(this.worldMatrix);
+		return localAABB.transformed(this.worldMatrix, this._worldAABB);
 	}
 
 	/**
@@ -254,6 +257,47 @@ export class Node3D extends Node {
 				c.material = value;
 			}
 		});
+	}
+
+	/**
+	 * Gets all unique materials associated with this node and its descendants.
+	 *
+	 * @returns An array of Material instances.
+	 */
+	get materials(): Material[] {
+		const list: Material[] = [];
+		this.traverse((child) => {
+			const c = child as unknown as MeshLike;
+			if (c.isMesh && c.material) {
+				if (!list.includes(c.material)) {
+					list.push(c.material);
+				}
+			}
+		});
+		return list;
+	}
+
+	/**
+	 * Sets materials for this node and its descendants.
+	 * If value is a single Material, it is applied to all meshes.
+	 * If value is an array of Materials, they are applied to the descendant meshes in order.
+	 *
+	 * @param value - A single Material or an array of Materials.
+	 */
+	set materials(value: Material | Material[] | null) {
+		if (!value) return;
+
+		if (Array.isArray(value)) {
+			let index = 0;
+			this.traverse((child) => {
+				const c = child as unknown as MeshLike;
+				if (c.isMesh && index < value.length) {
+					c.material = value[index++];
+				}
+			});
+		} else {
+			this.material = value;
+		}
 	}
 
 	/**
