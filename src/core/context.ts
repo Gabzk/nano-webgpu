@@ -126,9 +126,12 @@ export class Context {
 
 		if (this.device.addEventListener) {
 			this.device.addEventListener("uncapturederror", (event) => {
-				const errorMsg = event.error && typeof event.error === "object" && "message" in event.error 
-					? (event.error as any).message 
-					: String(event.error);
+				const errorMsg =
+					event.error &&
+					typeof event.error === "object" &&
+					"message" in event.error
+						? (event.error as any).message
+						: String(event.error);
 				console.error("WebGPU Device Validation Error:", errorMsg);
 			});
 		}

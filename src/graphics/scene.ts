@@ -12,7 +12,6 @@ import {
 	type LightOptions,
 	PointLight,
 	SpotLight,
-	type SpotLightOptions,
 } from "./light";
 import { Material } from "./materials/material";
 import {
@@ -21,7 +20,7 @@ import {
 } from "./materials/standard-material";
 import { Mesh } from "./mesh";
 import { Renderer } from "./renderer";
-import { Texture } from "./texture";
+import type { Texture } from "./texture";
 
 /**
  * Scene specific options for adding light sources.
@@ -183,11 +182,7 @@ export class Scene extends Node {
 			return;
 		}
 
-		if (typeof color === "string") {
-			this._backgroundColor = Color.fromHex(color);
-		} else {
-			this._backgroundColor = color;
-		}
+		this._backgroundColor = Color.from(color);
 	}
 
 	/** @internal Default directory path prepended to asset relative file paths. */

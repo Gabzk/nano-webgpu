@@ -1,6 +1,7 @@
 import type { Context } from "../../core/context";
 import { Texture } from "../texture";
 import { Material, type MaterialOptions } from "./material";
+import { StandardMaterial } from "./standard-material";
 
 /**
  * A record mapping custom WGSL parameter names to their numeric values, arrays, or Float32Arrays.
@@ -78,9 +79,7 @@ export class ShaderMaterial extends Material {
 	set shaderCode(val: string) {
 		if (this._shaderCode !== val) {
 			this._shaderCode = val;
-			this.isDirty = true;
-			this._defaultBindGroup = null;
-			this._paramsBindGroup = null;
+			this.onPropertyChange();
 		}
 	}
 
@@ -182,6 +181,13 @@ export class ShaderMaterial extends Material {
 		this.setParameters(uniforms);
 	}
 
+	/** Invalidate cached bind group when properties change. */
+	protected override onPropertyChange(): void {
+		super.onPropertyChange();
+		this._defaultBindGroup = null;
+		this._paramsBindGroup = null;
+	}
+
 	// ─── Material interface ────────────────────────────────────────────────────
 
 	/**
@@ -224,7 +230,7 @@ export class ShaderMaterial extends Material {
 
 	/**
 	 * Resolves GPUBindGroup (group index 2) containing baseline material bindings.
-	 * Feeds placeholder dummy textures to comply with universal forward shader signatures.
+	 * Updates baseline uniform buffers and binds actual standard textures.
 	 *
 	 * @param ctx - Active context.
 	 * @param topology - Geometry topology.
@@ -237,7 +243,8 @@ export class ShaderMaterial extends Material {
 		_indexFormat: GPUIndexFormat = "uint16",
 	): GPUBindGroup {
 		if (this.customBindGroup) return this.customBindGroup;
-		if (this._defaultBindGroup) return this._defaultBindGroup;
+
+		this.resolvePendingTextures(ctx);
 
 		this._ctx = ctx;
 		if (!this._defaultUniformBuffer) {
@@ -253,17 +260,60 @@ export class ShaderMaterial extends Material {
 				64,
 				"ShaderMaterial",
 			);
+			this.isDirty = true;
 		}
+
+		if (this.isDirty) {
+			// Write standard PBR properties to the Group 2 uniform buffer immediately so a custom shader
+			// can easily access them from group 2 at binding 0!
+			const bufferData = new Float32Array(16);
+			const offsets = StandardMaterial.UNIFORM_OFFSETS;
+
+			bufferData[offsets.ALBEDO_R] = this.albedoColor.r;
+			bufferData[offsets.ALBEDO_G] = this.albedoColor.g;
+			bufferData[offsets.ALBEDO_B] = this.albedoColor.b;
+			bufferData[offsets.ALBEDO_A] = this.albedoColor.a ?? 1.0;
+
+			bufferData[offsets.ROUGHNESS] = this.roughness;
+			bufferData[offsets.METALLIC] = this.metallic;
+			bufferData[offsets.NORMAL_SCALE] = this.normalScale;
+			bufferData[offsets.AO_INTENSITY] = this.aoIntensity;
+
+			bufferData[offsets.HAS_NORMAL_MAP] = this.normalTexture ? 1.0 : 0.0;
+			bufferData[offsets.HAS_ROUGHNESS_MAP] = this.roughnessTexture ? 1.0 : 0.0;
+			bufferData[offsets.HAS_METALLIC_MAP] = this.metallicTexture ? 1.0 : 0.0;
+			bufferData[offsets.HAS_AO_MAP] = this.aoTexture ? 1.0 : 0.0;
+			bufferData[offsets.HAS_ORM_MAP] = this.ormTexture ? 1.0 : 0.0;
+
+			const cullModeFlag =
+				this.cullMode === "front" ? 1.0 : this.cullMode === "none" ? 2.0 : 0.0;
+			bufferData[offsets.CULL_MODE] = cullModeFlag;
+
+			ctx.device.queue.writeBuffer(
+				this._defaultUniformBuffer,
+				0,
+				bufferData.buffer,
+			);
+			this.isDirty = false;
+		}
+
+		if (this._defaultBindGroup) return this._defaultBindGroup;
 
 		if (!this._defaultSampler) {
 			this._defaultSampler = ctx.device.createSampler({
 				minFilter: "linear",
 				magFilter: "linear",
+				mipmapFilter: "linear",
+				maxAnisotropy: 4,
 			});
 		}
 
-		const dummyWhite = Texture.getDummyWhite(ctx);
-		const dummyNormal = Texture.getDummyNormal(ctx);
+		const tAlbedo = this.albedoTexture || Texture.getDummyWhite(ctx);
+		const tNormal = this.normalTexture || Texture.getDummyNormal(ctx);
+		const tRoughness = this.roughnessTexture || Texture.getDummyWhite(ctx);
+		const tMetallic = this.metallicTexture || Texture.getDummyWhite(ctx);
+		const tAO = this.aoTexture || Texture.getDummyWhite(ctx);
+		const tORM = this.ormTexture || Texture.getDummyWhite(ctx);
 
 		const layout = ctx.pipelineManager.getMaterialBindGroupLayout();
 
@@ -273,14 +323,34 @@ export class ShaderMaterial extends Material {
 			entries: [
 				{ binding: 0, resource: { buffer: this._defaultUniformBuffer } },
 				{ binding: 1, resource: this._defaultSampler },
-				{ binding: 2, resource: dummyWhite.gpuTexture.createView() },
-				{ binding: 3, resource: dummyNormal.gpuTexture.createView() },
-				{ binding: 4, resource: dummyWhite.gpuTexture.createView() },
-				{ binding: 5, resource: dummyWhite.gpuTexture.createView() },
-				{ binding: 6, resource: dummyWhite.gpuTexture.createView() },
-				{ binding: 7, resource: dummyWhite.gpuTexture.createView() },
+				{ binding: 2, resource: tAlbedo.gpuTexture.createView() },
+				{ binding: 3, resource: tNormal.gpuTexture.createView() },
+				{ binding: 4, resource: tRoughness.gpuTexture.createView() },
+				{ binding: 5, resource: tMetallic.gpuTexture.createView() },
+				{ binding: 6, resource: tAO.gpuTexture.createView() },
+				{ binding: 7, resource: tORM.gpuTexture.createView() },
 			],
 		});
+
+		// Listen for async texture loading — rebuild the bind group when a texture is ready
+		const textures = [tAlbedo, tNormal, tRoughness, tMetallic, tAO, tORM];
+		for (const tex of textures) {
+			if (tex && !tex.isLoaded) {
+				if (!this._textureUnsubscribes.has(tex)) {
+					const unsub = tex.onUpdate(() => {
+						this._defaultBindGroup = null;
+						if (tex.isLoaded) {
+							const u = this._textureUnsubscribes.get(tex);
+							if (u) {
+								u();
+								this._textureUnsubscribes.delete(tex);
+							}
+						}
+					});
+					this._textureUnsubscribes.set(tex, unsub);
+				}
+			}
+		}
 
 		return this._defaultBindGroup;
 	}
@@ -347,6 +417,12 @@ export class ShaderMaterial extends Material {
 	 */
 	public destroy(ctx: Context): void {
 		this._ctx = ctx;
+		// Unsubscribe all active loading listeners
+		for (const unsub of this._textureUnsubscribes.values()) {
+			unsub();
+		}
+		this._textureUnsubscribes.clear();
+
 		if (this._defaultUniformBuffer) {
 			ctx.vramTracker.unregister(this._defaultUniformBuffer);
 			this._defaultUniformBuffer.destroy();
@@ -357,6 +433,20 @@ export class ShaderMaterial extends Material {
 			this._paramsBuffer.destroy();
 			this._paramsBuffer = null;
 		}
+
+		// Only destroy owned textures
+		for (const tex of this._ownedTextures) {
+			tex.destroy(ctx);
+		}
+		this._ownedTextures.clear();
+
+		this._albedoTexture = null;
+		this._normalTexture = null;
+		this._roughnessTexture = null;
+		this._metallicTexture = null;
+		this._aoTexture = null;
+		this._ormTexture = null;
+
 		this._defaultBindGroup = null;
 		this._defaultSampler = null;
 		this._paramsBindGroup = null;

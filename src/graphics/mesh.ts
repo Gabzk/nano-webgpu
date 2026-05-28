@@ -5,7 +5,7 @@ import { AABB } from "../math/aabb";
 import { Vec3 } from "../math/vec3";
 import type { CullMode } from "./cull-mode";
 import { Geometry } from "./geometry";
-import { Material, isStandardMaterial } from "./materials/material";
+import { Material } from "./materials/material";
 import {
 	StandardMaterial,
 	type StandardMaterialOptions,
@@ -85,7 +85,7 @@ export class Mesh extends Node3D {
 	private _material!: Material;
 
 	/** Gets the active Material shader instance. */
-	public override get material(): Material  {
+	public override get material(): Material {
 		return this._material;
 	}
 
@@ -246,7 +246,7 @@ export class Mesh extends Node3D {
 				material instanceof Material
 					? material.cullMode !== undefined
 					: material &&
-					(material as StandardMaterialOptions).cullMode !== undefined;
+						(material as StandardMaterialOptions).cullMode !== undefined;
 			if (!hasMaterialCull) {
 				finalMaterial.cullMode = "none";
 			}
@@ -296,14 +296,31 @@ export class Mesh extends Node3D {
 		if (typeof texture === "string") {
 			texture = Texture.loadBackground(this.ctx, texture);
 		}
+		this.material.albedoTexture = texture;
+	}
 
-		if (isStandardMaterial(this.material)) {
-			this.material.albedoTexture = texture;
+	/** Shorthand proxy property to get the mesh's main texture (albedoTexture). */
+	public get texture(): Texture | null {
+		return this.material.albedoTexture;
+	}
+
+	/** Shorthand proxy property to set or load the mesh's main texture (albedoTexture). */
+	public set texture(val: Texture | string | null) {
+		if (val) {
+			this.loadTexture(val);
 		} else {
-			this.material = new StandardMaterial({
-				albedoTexture: texture,
-			});
+			this.material.albedoTexture = null;
 		}
+	}
+
+	/** Shorthand proxy property to get the mesh material's opacity. */
+	public get opacity(): number {
+		return this.material.opacity;
+	}
+
+	/** Shorthand proxy property to set the mesh material's opacity. */
+	public set opacity(value: number) {
+		this.material.opacity = value;
 	}
 
 	/**

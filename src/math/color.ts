@@ -163,7 +163,7 @@ export type ColorName =
  *
  * @group Math
  */
-export type ColorLike = Color | ColorName | (string & {});
+export type ColorLike = Color | ColorName | [number, number, number, number?] | (string & {});
 
 /**
  * Color representation utilizing RGBA float values ranging from 0.0 to 1.0.

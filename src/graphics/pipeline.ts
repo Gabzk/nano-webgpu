@@ -384,7 +384,9 @@ export class PipelineManager {
 						`WGSL Shader Compilation Failed for variant [${variantKey}]:`,
 					);
 					for (const msg of errors) {
-						console.error(`Line ${msg.lineNum}:${msg.linePos} - ${msg.message}`);
+						console.error(
+							`Line ${msg.lineNum}:${msg.linePos} - ${msg.message}`,
+						);
 					}
 				}
 			});

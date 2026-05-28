@@ -1,8 +1,8 @@
-import { OrbitCameraController, Scene, StandardMaterial } from "nano-webgpu";
+import { Scene } from "nano-webgpu";
 
 const scene = await Scene.init("#canvas");
 const camera = scene.setCamera({ position: [0, 2, 7] });
-scene.backgroundColor = "#c6c6c6";
+scene.backgroundColor = "skyblue";
 
 const texture = "./Brick_Wall_028_SD/Brick_Wall_028_basecolor.png";
 const normal = "./Brick_Wall_028_SD/Brick_Wall_028_normal.png";
@@ -12,12 +12,12 @@ const height = "./Brick_Wall_028_SD/Brick_Wall_028_height.png";
 
 const cube = scene.addCube();
 
-cube.material = new StandardMaterial({
-	albedoTexture: texture,
-	normalTexture: normal,
-	roughnessTexture: roughness,
-	aoTexture: ao,
-});
+
+cube.material.texture = texture; // ou cube.loadTexture(texture);
+cube.material.normalTexture = normal;
+cube.material.roughnessTexture = roughness;
+cube.material.aoTexture = ao;
+
 
 const ctrl = camera.addController("orbit", {
 	center: cube.position,

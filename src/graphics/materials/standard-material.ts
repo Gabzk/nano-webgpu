@@ -1,11 +1,5 @@
 import type { Context } from "../../core/context";
-import { Color, type ColorLike } from "../../math/color";
-import type { CullMode } from "../cull-mode";
-import {
-	isCullDisabled,
-	normalizeCullMode,
-	resolveCullMode,
-} from "../cull-mode";
+import { normalizeCullMode, resolveCullMode } from "../cull-mode";
 import { Texture } from "../texture";
 import { Material, type MaterialOptions } from "./material";
 
@@ -14,38 +8,7 @@ import { Material, type MaterialOptions } from "./material";
  *
  * @group Materials
  */
-export interface StandardMaterialOptions extends MaterialOptions {
-	/** Solid base color value or hex string representation. Defaults to white. */
-	albedoColor?: ColorLike;
-	/** Map containing surface color data, or file path. */
-	albedoTexture?: Texture | string;
-
-	/** Tangent-space normal map detailing high-frequency surface folds, or file path. */
-	normalTexture?: Texture | string;
-	/** Scaling factor applied to normal tangent values. Defaults to `1.0`. */
-	normalScale?: number;
-
-	/** Surface roughness microfacet scattering coefficient. Defaults to `0.5`. */
-	roughness?: number;
-	/** Map detailing roughness values, or file path. */
-	roughnessTexture?: Texture | string;
-
-	/** Surface metallic conduction microfacet value. Defaults to `0.0`. */
-	metallic?: number;
-	/** Map detailing metallic coefficients, or file path. */
-	metallicTexture?: Texture | string;
-
-	/** Map containing ambient occlusion details, or file path. */
-	aoTexture?: Texture | string;
-	/** Intensity multiplier of ambient occlusion shadows. Defaults to `1.0`. */
-	aoIntensity?: number;
-
-	/** Map containing packed Ambient Occlusion, Roughness, and Metallic (ORM) values, or file path. */
-	ormTexture?: Texture | string;
-
-	/** When true, disables face culling so back and front polygons are rendered. */
-	doubleSided?: boolean;
-}
+export interface StandardMaterialOptions extends MaterialOptions {}
 
 /**
  * StandardMaterial represents a Physically-Based Rendering (PBR) metallic-roughness material.
@@ -73,253 +36,6 @@ export class StandardMaterial extends Material {
 		CULL_MODE: 13,
 	} as const;
 
-	/** @internal Solid base color coefficients. */
-	private _albedoColor: Color = new Color();
-	/** @internal Map containing surface color data. */
-	private _albedoTexture: Texture | null = null;
-
-	/** @internal Tangent-space normal map detailing surface folds. */
-	private _normalTexture: Texture | null = null;
-	/** @internal Scaling factor applied to normal tangent values. */
-	private _normalScale: number = 1.0;
-
-	/** @internal Surface roughness microfacet scattering coefficient. */
-	private _roughness: number = 0.5;
-	/** @internal Map detailing roughness values. */
-	private _roughnessTexture: Texture | null = null;
-
-	/** @internal Surface metallic conduction microfacet value. */
-	private _metallic: number = 0.0;
-	/** @internal Map detailing metallic coefficients. */
-	private _metallicTexture: Texture | null = null;
-
-	/** @internal Map containing ambient occlusion details. */
-	private _aoTexture: Texture | null = null;
-	/** @internal Intensity multiplier of ambient occlusion shadows. */
-	private _aoIntensity: number = 1.0;
-
-	/** @internal Map containing packed Ambient Occlusion, Roughness, and Metallic (ORM) values. */
-	private _ormTexture: Texture | null = null;
-
-	/** Gets the base albedo color. */
-	get albedoColor(): Color {
-		return this._albedoColor;
-	}
-
-	/** Sets the base albedo color, setting dirty status upon color component modifications. */
-	set albedoColor(val: ColorLike) {
-		if (val instanceof Color) {
-			this._albedoColor = val;
-		} else if (typeof val === "string") {
-			this._albedoColor = Color.fromHex(val);
-		} else if (Array.isArray(val)) {
-			this._albedoColor = new Color(val[0], val[1], val[2], val[3] ?? 1.0);
-		}
-		this._albedoColor.onChange = () => {
-			this.isDirty = true;
-		};
-		this.isDirty = true;
-	}
-
-	/** Gets the base albedo texture. */
-	get albedoTexture(): Texture | null {
-		return this._albedoTexture;
-	}
-
-	/** Sets the base albedo texture, marking parameters and bind groups as dirty. */
-	set albedoTexture(val: Texture | string | null) {
-		if (typeof val === "string") {
-			this.pendingTextures.albedo = val;
-			this.isDirty = true;
-			this.bindGroup = null;
-			this._bindGroupPCFVariant = null;
-		} else if (this._albedoTexture !== val) {
-			this._albedoTexture = val;
-			this.isDirty = true;
-			this.bindGroup = null;
-			this._bindGroupPCFVariant = null;
-		}
-	}
-
-	/** Gets the normal tangent scale. */
-	get normalScale(): number {
-		return this._normalScale;
-	}
-
-	/** Sets the normal tangent scale and marks the material parameters as dirty. */
-	set normalScale(val: number) {
-		this._normalScale = val;
-		this.isDirty = true;
-	}
-
-	/** Gets the normal texture. */
-	get normalTexture(): Texture | null {
-		return this._normalTexture;
-	}
-
-	/** Sets the normal texture, marking parameters and bind groups as dirty. */
-	set normalTexture(val: Texture | string | null) {
-		if (typeof val === "string") {
-			this.pendingTextures.normal = val;
-			this.isDirty = true;
-			this.bindGroup = null;
-			this._bindGroupPCFVariant = null;
-		} else if (this._normalTexture !== val) {
-			this._normalTexture = val;
-			this.isDirty = true;
-			this.bindGroup = null;
-			this._bindGroupPCFVariant = null;
-		}
-	}
-
-	/** Gets the microfacet roughness factor. */
-	get roughness(): number {
-		return this._roughness;
-	}
-
-	/** Sets the microfacet roughness factor and marks the material parameters as dirty. */
-	set roughness(val: number) {
-		this._roughness = val;
-		this.isDirty = true;
-	}
-
-	/** Gets the roughness texture. */
-	get roughnessTexture(): Texture | null {
-		return this._roughnessTexture;
-	}
-
-	/** Sets the roughness texture, marking parameters and bind groups as dirty. */
-	set roughnessTexture(val: Texture | string | null) {
-		if (typeof val === "string") {
-			this.pendingTextures.roughness = val;
-			this.isDirty = true;
-			this.bindGroup = null;
-			this._bindGroupPCFVariant = null;
-		} else if (this._roughnessTexture !== val) {
-			this._roughnessTexture = val;
-			this.isDirty = true;
-			this.bindGroup = null;
-			this._bindGroupPCFVariant = null;
-		}
-	}
-
-	/** Gets the microfacet metallic factor. */
-	get metallic(): number {
-		return this._metallic;
-	}
-
-	/** Sets the microfacet metallic factor and marks the material parameters as dirty. */
-	set metallic(val: number) {
-		this._metallic = val;
-		this.isDirty = true;
-	}
-
-	/** Gets the metallic texture. */
-	get metallicTexture(): Texture | null {
-		return this._metallicTexture;
-	}
-
-	/** Sets the metallic texture, marking parameters and bind groups as dirty. */
-	set metallicTexture(val: Texture | string | null) {
-		if (typeof val === "string") {
-			this.pendingTextures.metallic = val;
-			this.isDirty = true;
-			this.bindGroup = null;
-			this._bindGroupPCFVariant = null;
-		} else if (this._metallicTexture !== val) {
-			this._metallicTexture = val;
-			this.isDirty = true;
-			this.bindGroup = null;
-			this._bindGroupPCFVariant = null;
-		}
-	}
-
-	/** Gets the ambient occlusion shadow intensity multiplier. */
-	get aoIntensity(): number {
-		return this._aoIntensity;
-	}
-
-	/** Sets the ambient occlusion shadow intensity multiplier and marks the material parameters as dirty. */
-	set aoIntensity(val: number) {
-		this._aoIntensity = val;
-		this.isDirty = true;
-	}
-
-	/** Gets the ambient occlusion texture. */
-	get aoTexture(): Texture | null {
-		return this._aoTexture;
-	}
-
-	/** Sets the ambient occlusion texture, marking parameters and bind groups as dirty. */
-	set aoTexture(val: Texture | string | null) {
-		if (typeof val === "string") {
-			this.pendingTextures.ao = val;
-			this.isDirty = true;
-			this.bindGroup = null;
-			this._bindGroupPCFVariant = null;
-		} else if (this._aoTexture !== val) {
-			this._aoTexture = val;
-			this.isDirty = true;
-			this.bindGroup = null;
-			this._bindGroupPCFVariant = null;
-		}
-	}
-
-	/** Gets the ORM texture. */
-	get ormTexture(): Texture | null {
-		return this._ormTexture;
-	}
-
-	/** Sets the ORM texture, marking parameters and bind groups as dirty. */
-	set ormTexture(val: Texture | string | null) {
-		if (typeof val === "string") {
-			this.pendingTextures.orm = val;
-			this.isDirty = true;
-			this.bindGroup = null;
-			this._bindGroupPCFVariant = null;
-		} else if (this._ormTexture !== val) {
-			this._ormTexture = val;
-			this.isDirty = true;
-			this.bindGroup = null;
-			this._bindGroupPCFVariant = null;
-		}
-	}
-
-	/** Gets the cull mode settings. */
-	public override get cullMode(): CullMode | undefined {
-		return this._cullMode;
-	}
-
-	/** Sets the cull mode settings and marks the material parameters as dirty. */
-	public override set cullMode(value: CullMode | undefined) {
-		this._cullMode = value;
-		this.isDirty = true;
-	}
-
-	/** Gets the double-sided rendering state. */
-	get doubleSided(): boolean {
-		return isCullDisabled(this._cullMode);
-	}
-
-	/** Sets the double-sided rendering state, adjusting internal cull modes accordingly. */
-	set doubleSided(val: boolean) {
-		if (val) {
-			this.cullMode = "disabled";
-		} else if (isCullDisabled(this._cullMode)) {
-			this.cullMode = undefined;
-		}
-		this.isDirty = true;
-	}
-
-	/** @internal Path names of textures queued to load asynchronously in the background. */
-	private pendingTextures: { [key: string]: string } = {};
-
-	/** @internal Collection of active texture load listener unsubscribes. */
-	private _textureUnsubscribes: Map<Texture, () => void> = new Map();
-
-	/** @internal Collection of texture assets created internally from string paths that this material owns. */
-	private _ownedTextures: Set<Texture> = new Set();
-
 	/** @internal Physical uniform buffer allocated in VRAM containing material parameters. */
 	private uniformBuffer!: GPUBuffer;
 	/** @internal Standard PBR bind group 2 containing parameter and texture bindings. */
@@ -342,59 +58,6 @@ export class StandardMaterial extends Material {
 	constructor(options: StandardMaterialOptions = {}) {
 		super(options);
 		this.type = "StandardMaterial";
-
-		let initialColor: Color;
-		if (options.albedoColor instanceof Color) {
-			initialColor = options.albedoColor;
-		} else if (typeof options.albedoColor === "string") {
-			initialColor = Color.fromHex(options.albedoColor);
-		} else {
-			initialColor = Color.fromHex("#ffffff");
-		}
-		this._albedoColor = initialColor;
-		this._albedoColor.onChange = () => {
-			this.isDirty = true;
-		};
-
-		if (options.albedoTexture instanceof Texture)
-			this.albedoTexture = options.albedoTexture;
-		else if (typeof options.albedoTexture === "string")
-			this.pendingTextures.albedo = options.albedoTexture;
-
-		if (options.normalTexture instanceof Texture)
-			this.normalTexture = options.normalTexture;
-		else if (typeof options.normalTexture === "string")
-			this.pendingTextures.normal = options.normalTexture;
-
-		if (options.roughnessTexture instanceof Texture)
-			this.roughnessTexture = options.roughnessTexture;
-		else if (typeof options.roughnessTexture === "string")
-			this.pendingTextures.roughness = options.roughnessTexture;
-
-		if (options.metallicTexture instanceof Texture)
-			this.metallicTexture = options.metallicTexture;
-		else if (typeof options.metallicTexture === "string")
-			this.pendingTextures.metallic = options.metallicTexture;
-
-		if (options.aoTexture instanceof Texture)
-			this.aoTexture = options.aoTexture;
-		else if (typeof options.aoTexture === "string")
-			this.pendingTextures.ao = options.aoTexture;
-
-		if (options.ormTexture instanceof Texture)
-			this.ormTexture = options.ormTexture;
-		else if (typeof options.ormTexture === "string")
-			this.pendingTextures.orm = options.ormTexture;
-
-		this._roughness = options.roughness ?? 0.5;
-		this._metallic = options.metallic ?? 0.0;
-		this._normalScale = options.normalScale ?? 1.0;
-		this._aoIntensity = options.aoIntensity ?? 1.0;
-		if (options.cullMode !== undefined) {
-			this.cullMode = options.cullMode;
-		} else if (options.doubleSided) {
-			this.cullMode = "disabled";
-		}
 
 		// 16 floats (64 bytes)
 		this.bufferData = new Float32Array(16);
@@ -453,6 +116,13 @@ export class StandardMaterial extends Material {
 		}
 	}
 
+	/** Invalidate cached bind group when properties change. */
+	protected override onPropertyChange(): void {
+		super.onPropertyChange();
+		this.bindGroup = null;
+		this._bindGroupPCFVariant = null;
+	}
+
 	/**
 	 * Retrieves or compiles standard PBR pipelines matching specific primitive topology layouts.
 	 *
@@ -472,7 +142,7 @@ export class StandardMaterial extends Material {
 		const resolvedCullMode = resolveCullMode(cullMode, topology);
 		if (this._lightingCullMode !== resolvedCullMode) {
 			this._lightingCullMode = resolvedCullMode;
-			this.isDirty = true;
+			this.onPropertyChange();
 		}
 		return ctx.pipelineManager.getStandardPipeline(
 			this._usePCF,
@@ -500,42 +170,8 @@ export class StandardMaterial extends Material {
 		_topology?: GPUPrimitiveTopology,
 		_indexFormat?: GPUIndexFormat,
 	): GPUBindGroup {
-		if (Object.keys(this.pendingTextures).length > 0) {
-			if (this.pendingTextures.albedo) {
-				const tex = Texture.loadBackground(ctx, this.pendingTextures.albedo, {
-					format: "rgba8unorm-srgb",
-				});
-				this.albedoTexture = tex;
-				this._ownedTextures.add(tex);
-			}
-			if (this.pendingTextures.normal) {
-				const tex = Texture.loadBackground(ctx, this.pendingTextures.normal);
-				this.normalTexture = tex;
-				this._ownedTextures.add(tex);
-			}
-			if (this.pendingTextures.roughness) {
-				const tex = Texture.loadBackground(ctx, this.pendingTextures.roughness);
-				this.roughnessTexture = tex;
-				this._ownedTextures.add(tex);
-			}
-			if (this.pendingTextures.metallic) {
-				const tex = Texture.loadBackground(ctx, this.pendingTextures.metallic);
-				this.metallicTexture = tex;
-				this._ownedTextures.add(tex);
-			}
-			if (this.pendingTextures.ao) {
-				const tex = Texture.loadBackground(ctx, this.pendingTextures.ao);
-				this.aoTexture = tex;
-				this._ownedTextures.add(tex);
-			}
-			if (this.pendingTextures.orm) {
-				const tex = Texture.loadBackground(ctx, this.pendingTextures.orm);
-				this.ormTexture = tex;
-				this._ownedTextures.add(tex);
-			}
-			this.pendingTextures = {}; // clear and only do this once
-			this.isDirty = true;
-		}
+		this.resolvePendingTextures(ctx);
+
 		if (!this.uniformBuffer) {
 			this.uniformBuffer = ctx.device.createBuffer({
 				label: `StandardMaterial_${this.id}_Buffer`,
@@ -656,12 +292,12 @@ export class StandardMaterial extends Material {
 		}
 		this._ownedTextures.clear();
 
-		this.albedoTexture = null;
-		this.normalTexture = null;
-		this.roughnessTexture = null;
-		this.metallicTexture = null;
-		this.aoTexture = null;
-		this.ormTexture = null;
+		this._albedoTexture = null;
+		this._normalTexture = null;
+		this._roughnessTexture = null;
+		this._metallicTexture = null;
+		this._aoTexture = null;
+		this._ormTexture = null;
 
 		this.bindGroup = null;
 		this.sampler = null;
