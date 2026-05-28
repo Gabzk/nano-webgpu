@@ -16,9 +16,6 @@ const csm = scene.addLight({
     rotationDegrees: [-45, 45, 0],
     color: "#ffffff",
     intensity: 0.5,
-    useCSM: true,
-    cascadeCount: 3,
-    csmMaxDistance: 150.0,
 });
 
 const highlight = new ShaderMaterial({
