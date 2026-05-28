@@ -192,6 +192,45 @@ export class Texture implements ITexture {
 	}
 
 	/**
+	 * Resolves a global, cached 1x1 solid black pixel placeholder texture.
+	 * Reuses the same instance across the entire context lifetime to optimize memory.
+	 *
+	 * @param ctx - Active context.
+	 * @returns The black placeholder Texture.
+	 */
+	public static getDummyBlack(ctx: Context): Texture {
+		if (ctx.defaultTextures.black) return ctx.defaultTextures.black as Texture;
+
+		const tex = new Texture();
+		tex.url = "dummy_black";
+		tex.gpuTexture = ctx.device.createTexture({
+			size: [1, 1, 1],
+			format: "rgba8unorm",
+			usage:
+				GPUTextureUsage.TEXTURE_BINDING |
+				GPUTextureUsage.COPY_DST |
+				GPUTextureUsage.RENDER_ATTACHMENT,
+		});
+		ctx.vramTracker.register(
+			tex.gpuTexture,
+			"texture",
+			"Dummy Black",
+			4,
+			"Texture",
+		);
+		const blackPixel = new Uint8Array([0, 0, 0, 255]);
+		ctx.device.queue.writeTexture(
+			{ texture: tex.gpuTexture },
+			blackPixel,
+			{ bytesPerRow: 4, rowsPerImage: 1 },
+			[1, 1, 1],
+		);
+		tex.isLoaded = true;
+		ctx.defaultTextures.black = tex;
+		return tex;
+	}
+
+	/**
 	 * Releases texture resources from GPU memory and unregisters entries from the VRAM tracker.
 	 *
 	 * @param ctx - Active context.

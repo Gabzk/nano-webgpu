@@ -389,8 +389,11 @@ export class DebugPanel {
 		const summary = this.vram.getSummary();
 
 		// Check if VRAM list actually changed to prevent DOM recreation from resetting hover tooltips
-		const signature = entries.map(e => `${e.id}-${e.sizeBytes}`).join(",");
-		if (signature === this.lastVramSignature && this.tabContentEl.querySelector(".vram-scroll-container")) {
+		const signature = entries.map((e) => `${e.id}-${e.sizeBytes}`).join(",");
+		if (
+			signature === this.lastVramSignature &&
+			this.tabContentEl.querySelector(".vram-scroll-container")
+		) {
 			return;
 		}
 		this.lastVramSignature = signature;
@@ -406,9 +409,10 @@ export class DebugPanel {
 			const typeName = e.type === "texture" ? "Tex" : "Buf";
 
 			const ageSeconds = (performance.now() - e.createdAt) / 1000;
-			const ageStr = ageSeconds < 60
-				? `${ageSeconds.toFixed(1)}s`
-				: `${(ageSeconds / 60).toFixed(1)}m`;
+			const ageStr =
+				ageSeconds < 60
+					? `${ageSeconds.toFixed(1)}s`
+					: `${(ageSeconds / 60).toFixed(1)}m`;
 
 			const tooltip = `${e.label}\nOwner: ${e.owner}\nSize: ${VRAMTracker.formatBytes(e.sizeBytes)} (${e.sizeBytes} B)\nAllocated: ${ageStr} ago`;
 
@@ -505,7 +509,10 @@ export class DebugPanel {
 			const dpr = window.devicePixelRatio || 1;
 			const desiredWidth = Math.round(rect.width * dpr);
 			const desiredHeight = Math.round(rect.height * dpr);
-			if (this.fpsCanvas.width !== desiredWidth || this.fpsCanvas.height !== desiredHeight) {
+			if (
+				this.fpsCanvas.width !== desiredWidth ||
+				this.fpsCanvas.height !== desiredHeight
+			) {
 				this.fpsCanvas.width = desiredWidth;
 				this.fpsCanvas.height = desiredHeight;
 			}

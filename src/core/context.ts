@@ -72,6 +72,8 @@ export class Context {
 		white?: ITexture;
 		/** Default tangent-space normal map fallback (128, 128, 255). */
 		normal?: ITexture;
+		/** Standard solid black 1x1 pixels texture fallback (used for black emission). */
+		black?: ITexture;
 	} = {};
 
 	/**
@@ -197,6 +199,10 @@ export class Context {
 		if (this.defaultTextures.normal) {
 			this.defaultTextures.normal.destroy(this);
 			this.defaultTextures.normal = undefined;
+		}
+		if (this.defaultTextures.black) {
+			this.defaultTextures.black.destroy(this);
+			this.defaultTextures.black = undefined;
 		}
 
 		// Destroy primitives

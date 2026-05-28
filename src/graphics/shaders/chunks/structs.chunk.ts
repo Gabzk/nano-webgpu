@@ -13,6 +13,8 @@ struct RenderSettings {
     time_bits: u32,  // f32 bit-cast: use bitcast<f32>(settings.time_bits)
     _pad2: u32,
     _pad3: u32,
+    ambientSkyColor: vec4<f32>,
+    ambientGroundColor: vec4<f32>,
 }
 
 @group(0) @binding(5) var <uniform> settings: RenderSettings;
@@ -84,6 +86,9 @@ struct MaterialUniform {
     cullMode: f32, // 0=back/default, 1=front, 2=disabled (none)
     _pad2: f32,
     _pad3: f32,
+
+    emissive: vec3<f32>,
+    useEmissiveMap: f32,
 }
 @group(2) @binding(0) var<uniform> material: MaterialUniform;
 @group(2) @binding(1) var mySampler: sampler;
@@ -93,6 +98,7 @@ struct MaterialUniform {
 @group(2) @binding(5) var metallicTex: texture_2d<f32>;
 @group(2) @binding(6) var aoTex: texture_2d<f32>;
 @group(2) @binding(7) var ormTex: texture_2d<f32>;
+@group(2) @binding(8) var emissiveTex: texture_2d<f32>;
 
 // --- IO FORMATS ---
 struct VertexInput {

@@ -380,3 +380,176 @@ export function createSphereGeometry(
 		{ hasUVs: true, hasNormals: true },
 	);
 }
+
+/**
+ * Creates a Geometry representing a cone pointing along the -Z axis.
+ * Tip of the cone is at the origin (0, 0, 0), and the base is at (0, 0, -1) with radius 1.0.
+ *
+ * @param ctx - Active context.
+ * @param radialSegments - Subdivision segments around the cone base. Defaults to `16`.
+ * @returns An allocated Cone Geometry instance.
+ */
+export function createConeGeometry(
+	ctx: Context,
+	radialSegments: number = 16,
+): Geometry {
+	const vertices: number[] = [];
+	const indices: number[] = [];
+
+	// Vertex 0: Tip of the cone
+	vertices.push(0, 0, 0, 0, 0, 1, 0.5, 0.5);
+
+	// Vertex 1: Base center of the cone
+	vertices.push(0, 0, -1, 0, 0, -1, 0.5, 0.5);
+
+	const baseIdx = 2;
+
+	// Base ring vertices
+	for (let i = 0; i <= radialSegments; i++) {
+		const theta = (i / radialSegments) * Math.PI * 2;
+		const x = Math.cos(theta);
+		const y = Math.sin(theta);
+
+		// Surface normal approximation
+		vertices.push(x, y, -1, x, y, 0, i / radialSegments, 1);
+	}
+
+	// Build cone triangles
+	for (let i = 0; i < radialSegments; i++) {
+		const vCurrent = baseIdx + i;
+		const vNext = baseIdx + i + 1;
+
+		// Outer surface (Tip to ring)
+		indices.push(0, vNext, vCurrent);
+
+		// Base cap (Center to ring)
+		indices.push(1, vCurrent, vNext);
+	}
+
+	return new Geometry(
+		ctx,
+		new Float32Array(vertices),
+		new Uint16Array(indices),
+		{ hasUVs: true, hasNormals: true },
+	);
+}
+
+/**
+ * Creates a Geometry representing a 3D arrow pointing along the -Z axis.
+ * Uses a cylinder for the shaft and a cone for the head.
+ *
+ * @param ctx - Active context.
+ * @param radialSegments - Subdivision segments around the arrow body. Defaults to `8`.
+ * @returns An allocated Arrow Geometry instance.
+ */
+export function createArrowGeometry(
+	ctx: Context,
+	radialSegments: number = 8,
+): Geometry {
+	const vertices: number[] = [];
+	const indices: number[] = [];
+
+	// Vertex 0: Tip of the arrow head at (0, 0, -1.2)
+	vertices.push(0, 0, -1.2, 0, 0, -1, 0.5, 0.5);
+
+	// Vertex 1: Base center of the shaft at (0, 0, 0)
+	vertices.push(0, 0, 0, 0, 0, 1, 0.5, 0.5);
+
+	const baseIdx = 2;
+
+	// 1. Shaft base ring at z = 0, radius = 0.03
+	for (let i = 0; i <= radialSegments; i++) {
+		const theta = (i / radialSegments) * Math.PI * 2;
+		const x = Math.cos(theta) * 0.03;
+		const y = Math.sin(theta) * 0.03;
+		vertices.push(
+			x,
+			y,
+			0,
+			Math.cos(theta),
+			Math.sin(theta),
+			0,
+			i / radialSegments,
+			0,
+		);
+	}
+
+	// 2. Shaft top ring at z = -0.7, radius = 0.03
+	const shaftTopStart = baseIdx + radialSegments + 1;
+	for (let i = 0; i <= radialSegments; i++) {
+		const theta = (i / radialSegments) * Math.PI * 2;
+		const x = Math.cos(theta) * 0.03;
+		const y = Math.sin(theta) * 0.03;
+		vertices.push(
+			x,
+			y,
+			-0.7,
+			Math.cos(theta),
+			Math.sin(theta),
+			0,
+			i / radialSegments,
+			0.5,
+		);
+	}
+
+	// 3. Arrow head base ring at z = -0.7, radius = 0.1
+	const headBaseStart = shaftTopStart + radialSegments + 1;
+	for (let i = 0; i <= radialSegments; i++) {
+		const theta = (i / radialSegments) * Math.PI * 2;
+		const x = Math.cos(theta) * 0.1;
+		const y = Math.sin(theta) * 0.1;
+		vertices.push(
+			x,
+			y,
+			-0.7,
+			Math.cos(theta),
+			Math.sin(theta),
+			0,
+			i / radialSegments,
+			0.5,
+		);
+	}
+
+	// Indices for Shaft Base Cap (Vertex 1 connected to Shaft base ring)
+	for (let i = 0; i < radialSegments; i++) {
+		const vCurrent = baseIdx + i;
+		const vNext = baseIdx + i + 1;
+		indices.push(1, vCurrent, vNext);
+	}
+
+	// Indices for Shaft Cylinder (Shaft base ring to Shaft top ring)
+	for (let i = 0; i < radialSegments; i++) {
+		const bCurrent = baseIdx + i;
+		const bNext = baseIdx + i + 1;
+		const tCurrent = shaftTopStart + i;
+		const tNext = shaftTopStart + i + 1;
+
+		indices.push(bCurrent, tNext, tCurrent);
+		indices.push(bCurrent, bNext, tNext);
+	}
+
+	// Indices for Arrow Head Base Cap (Collar connecting Shaft top ring to Head base ring)
+	for (let i = 0; i < radialSegments; i++) {
+		const tCurrent = shaftTopStart + i;
+		const tNext = shaftTopStart + i + 1;
+		const hCurrent = headBaseStart + i;
+		const hNext = headBaseStart + i + 1;
+
+		indices.push(tCurrent, hCurrent, hNext);
+		indices.push(tCurrent, hNext, tNext);
+	}
+
+	// Indices for Arrow Head Cone (Tip to Head base ring)
+	for (let i = 0; i < radialSegments; i++) {
+		const hCurrent = headBaseStart + i;
+		const hNext = headBaseStart + i + 1;
+		indices.push(0, hNext, hCurrent);
+	}
+
+	return new Geometry(
+		ctx,
+		new Float32Array(vertices),
+		new Uint16Array(indices),
+		{ hasUVs: true, hasNormals: true },
+	);
+}

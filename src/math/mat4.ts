@@ -4,7 +4,7 @@
  * 3D transformations, camera rotations, and projections.
  */
 
-import { Quaternion } from "./quaternion";
+import type { Quaternion } from "./quaternion";
 import { Vec3 } from "./vec3";
 
 /**

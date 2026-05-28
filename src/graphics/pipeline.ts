@@ -201,6 +201,11 @@ export class PipelineManager {
 					visibility: GPUShaderStage.FRAGMENT,
 					texture: { sampleType: "float", viewDimension: "2d" }, // PBR Packed ORM Map
 				},
+				{
+					binding: 8,
+					visibility: GPUShaderStage.FRAGMENT,
+					texture: { sampleType: "float", viewDimension: "2d" }, // Emissive Map
+				},
 			],
 		});
 

@@ -196,6 +196,19 @@ class GLTFParser implements ModelParser {
 				out.aoTexture = occ;
 			}
 
+			// Emissive factor and texture
+			const em = getTexUri(mat.emissiveTexture);
+			if (em) out.emissiveTexture = em;
+
+			if (mat.emissiveFactor) {
+				const [r, g, b] = mat.emissiveFactor as number[];
+				const toHex = (v: number) =>
+					Math.round(Math.min(1, Math.max(0, v)) * 255)
+						.toString(16)
+						.padStart(2, "0");
+				out.emissiveColor = `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+			}
+
 			if (mat.doubleSided) out.doubleSided = true;
 
 			return out;
@@ -271,6 +284,7 @@ class GLTFParser implements ModelParser {
 				}
 
 				parts.push({
+					name: mesh.name || "",
 					vertices: partVertices,
 					indices: partIndices,
 					materialOptions,
@@ -467,6 +481,12 @@ export class Loader {
 	private parsers: ModelParser[] = [new GLTFParser(), new OBJParser()];
 
 	/**
+	 * @internal Internal cache mapping texture URLs to their loaded GPUTexture promises.
+	 * Optimizes network requests and VRAM allocation by preventing redundant assets.
+	 */
+	private textureCache = new Map<string, Promise<GPUTexture>>();
+
+	/**
 	 * Creates a Loader instance associated with a GPUDevice.
 	 *
 	 * @param device - Standard WebGPU device interface.
@@ -517,38 +537,50 @@ export class Loader {
 		url: string,
 		options: { format?: GPUTextureFormat; usage?: GPUTextureUsageFlags } = {},
 	): Promise<GPUTexture> {
-		const response = await fetch(url);
-		if (!response.ok) {
-			throw new Error(
-				`Failed to load texture: ${url} (HTTP ${response.status})`,
+		const cacheKey = `${url}:${options.format || "rgba8unorm"}:${options.usage ?? ""}`;
+		const cached = this.textureCache.get(cacheKey);
+		if (cached) return cached;
+
+		const loadPromise = (async () => {
+			const response = await fetch(url);
+			if (!response.ok) {
+				throw new Error(
+					`Failed to load texture: ${url} (HTTP ${response.status})`,
+				);
+			}
+
+			const imageBitmap = await globalThis.createImageBitmap(
+				await response.blob(),
 			);
-		}
 
-		const imageBitmap = await globalThis.createImageBitmap(
-			await response.blob(),
-		);
+			const format = options.format || "rgba8unorm";
+			const usage =
+				options.usage ??
+				GPUTextureUsage.TEXTURE_BINDING |
+					GPUTextureUsage.COPY_DST |
+					GPUTextureUsage.RENDER_ATTACHMENT;
 
-		const format = options.format || "rgba8unorm";
-		const usage =
-			options.usage ??
-			GPUTextureUsage.TEXTURE_BINDING |
-				GPUTextureUsage.COPY_DST |
-				GPUTextureUsage.RENDER_ATTACHMENT;
+			const texture = this.device.createTexture({
+				label: `Texture: ${url}`,
+				size: [imageBitmap.width, imageBitmap.height, 1],
+				format: format,
+				usage: usage,
+			});
 
-		const texture = this.device.createTexture({
-			label: `Texture: ${url}`,
-			size: [imageBitmap.width, imageBitmap.height, 1],
-			format: format,
-			usage: usage,
+			this.device.queue.copyExternalImageToTexture(
+				{ source: imageBitmap },
+				{ texture: texture },
+				[imageBitmap.width, imageBitmap.height],
+			);
+
+			return texture;
+		})().catch((err) => {
+			this.textureCache.delete(cacheKey);
+			throw err;
 		});
 
-		this.device.queue.copyExternalImageToTexture(
-			{ source: imageBitmap },
-			{ texture: texture },
-			[imageBitmap.width, imageBitmap.height],
-		);
-
-		return texture;
+		this.textureCache.set(cacheKey, loadPromise);
+		return loadPromise;
 	}
 
 	/**

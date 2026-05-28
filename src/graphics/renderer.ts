@@ -1,10 +1,13 @@
 import type { Context } from "../core/context";
 import type { PerformanceTracker } from "../debug/performance-tracker";
+import { Mat4 } from "../math/mat4";
 import { BatchManager } from "./batch-manager";
 import type { Camera } from "./camera";
 import { normalizeCullMode } from "./cull-mode";
 import type { Light } from "./light";
+import { SpotLight } from "./light";
 import type { Scene } from "./scene";
+import { gizmoShader } from "./shaders/gizmo";
 import { ShadowSystem } from "./shadow-system";
 
 /**
@@ -48,8 +51,8 @@ export class Renderer {
 	private postProcessBindGroup!: GPUBindGroup;
 	/** Uniform buffer containing FXAA configuration flags and accumulated frame time. */
 	public renderSettingsBuffer!: GPUBuffer;
-	/** float32 render settings array. [0] = FXAA enable flag, [1] = elapsed seconds. */
-	public renderSettingsFloat = new Float32Array(4);
+	/** float32 render settings array. [0] = FXAA enable flag, [1] = elapsed seconds, [4..7] = sky color, [8..11] = ground color. */
+	public renderSettingsFloat = new Float32Array(12);
 	/** uint32 render settings array mapping the float array buffer directly. */
 	public renderSettingsUint32 = new Uint32Array(
 		this.renderSettingsFloat.buffer,
@@ -62,6 +65,15 @@ export class Renderer {
 	private shadow: ShadowSystem;
 	/** Instanced geometry batching coordinator. */
 	private batcher: BatchManager;
+
+	/** @internal Pipeline used to draw unlit debug gizmos. */
+	private gizmoPipeline: GPURenderPipeline | null = null;
+	/** @internal Bind group layout for gizmo model uniforms. */
+	private gizmoBindGroupLayout: GPUBindGroupLayout | null = null;
+	/** @internal Pool of uniform buffers for gizmo matrices and colors. */
+	private gizmoUniformBuffers: GPUBuffer[] = [];
+	/** @internal Pool of bind groups for gizmo rendering. */
+	private gizmoBindGroups: GPUBindGroup[] = [];
 
 	/**
 	 * Instantiates a new Renderer, allocating uniform buffers, depth attachments,
@@ -83,7 +95,7 @@ export class Renderer {
 	 */
 	private initPostProcess() {
 		this.renderSettingsBuffer = this.ctx.device.createBuffer({
-			size: 16,
+			size: 48,
 			usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
 		});
 		// Enable FXAA by default
@@ -272,12 +284,22 @@ export class Renderer {
 		// Update elapsed time for shader animations (settings.time_bits = bitcast of f32 seconds)
 		this.elapsedTime += dt;
 		this.renderSettingsFloat[1] = this.elapsedTime;
+
+		// Update ambient colors from scene
+		this.renderSettingsFloat[4] = scene.ambientSkyColor.r;
+		this.renderSettingsFloat[5] = scene.ambientSkyColor.g;
+		this.renderSettingsFloat[6] = scene.ambientSkyColor.b;
+		this.renderSettingsFloat[7] = 1.0;
+
+		this.renderSettingsFloat[8] = scene.ambientGroundColor.r;
+		this.renderSettingsFloat[9] = scene.ambientGroundColor.g;
+		this.renderSettingsFloat[10] = scene.ambientGroundColor.b;
+		this.renderSettingsFloat[11] = 1.0;
+
 		this.ctx.device.queue.writeBuffer(
 			this.renderSettingsBuffer,
-			4,
+			0,
 			this.renderSettingsFloat.buffer,
-			4,
-			4,
 		);
 		if (
 			camera.aspect !==
@@ -484,6 +506,11 @@ export class Renderer {
 			}
 		}
 
+		// 5c. Render Debug Gizmos/Helpers if enabled
+		if (scene.showHelpers) {
+			this.renderGizmos(scene, passEncoder);
+		}
+
 		passEncoder.end();
 
 		// 6. Post-processing pass
@@ -508,9 +535,227 @@ export class Renderer {
 	}
 
 	/**
+	 * @internal Renders unlit debug helpers for active lights in the scene.
+	 */
+	private renderGizmos(scene: Scene, passEncoder: GPURenderPassEncoder) {
+		const lights = scene.lights;
+		const count = lights.length;
+		if (count === 0) return;
+
+		// Calculate total visualizer drawing steps
+		let drawCount = 0;
+		for (const light of lights) {
+			const data = light.getLightData();
+			const isSpot = data.typeFlag > 3.5;
+			drawCount += isSpot ? 2 : 1;
+		}
+
+		// Initialize pipeline and layouts
+		if (!this.gizmoPipeline) {
+			this.gizmoBindGroupLayout = this.ctx.device.createBindGroupLayout({
+				label: "Gizmo Bind Group Layout",
+				entries: [
+					{
+						binding: 0,
+						visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT,
+						buffer: { type: "uniform" },
+					},
+				],
+			});
+
+			const shaderModule = this.ctx.device.createShaderModule({
+				label: "Gizmo Shader Module",
+				code: gizmoShader,
+			});
+
+			const layout = this.ctx.device.createPipelineLayout({
+				label: "Gizmo Pipeline Layout",
+				bindGroupLayouts: [
+					this.ctx.pipelineManager.getGlobalsBindGroupLayout(
+						this.shadow.useCSM,
+					),
+					this.gizmoBindGroupLayout,
+				],
+			});
+
+			this.gizmoPipeline = this.ctx.device.createRenderPipeline({
+				label: "Gizmo Render Pipeline",
+				layout,
+				vertex: {
+					module: shaderModule,
+					entryPoint: "vs_main",
+					buffers: [
+						{
+							attributes: [
+								{ shaderLocation: 0, offset: 0, format: "float32x3" },
+							], // Position only
+							arrayStride: 44, // Matches standard vertex layout
+							stepMode: "vertex",
+						},
+					],
+				},
+				fragment: {
+					module: shaderModule,
+					entryPoint: "fs_main",
+					targets: [
+						{
+							format: this.ctx.format,
+							blend: {
+								color: {
+									srcFactor: "src-alpha",
+									dstFactor: "one-minus-src-alpha",
+									operation: "add",
+								},
+								alpha: {
+									srcFactor: "one",
+									dstFactor: "one-minus-src-alpha",
+									operation: "add",
+								},
+							},
+						},
+					],
+				},
+				primitive: {
+					topology: "triangle-list",
+					cullMode: "none",
+				},
+				depthStencil: {
+					depthWriteEnabled: false,
+					depthCompare: "less-equal",
+					format: "depth24plus",
+				},
+			});
+		}
+
+		// Ensure we have enough resources in the pool
+		while (this.gizmoUniformBuffers.length < drawCount) {
+			const buf = this.ctx.device.createBuffer({
+				label: `GizmoUniformBuffer_${this.gizmoUniformBuffers.length}`,
+				size: 80, // 64 bytes (mat4x4) + 16 bytes (vec4 color)
+				usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+			});
+			this.gizmoUniformBuffers.push(buf);
+
+			const bg = this.ctx.device.createBindGroup({
+				label: `GizmoBindGroup_${this.gizmoBindGroups.length}`,
+				layout: this.gizmoBindGroupLayout!,
+				entries: [{ binding: 0, resource: { buffer: buf } }],
+			});
+			this.gizmoBindGroups.push(bg);
+		}
+
+		passEncoder.setPipeline(this.gizmoPipeline);
+
+		// Primitives
+		const sphere = this.ctx.primitives.getSphere(this.ctx, 0.15, 8, 8);
+		const cube = this.ctx.primitives.getCube(this.ctx, 0.15);
+		const cone = this.ctx.primitives.getCone(this.ctx, 16);
+		const arrow = this.ctx.primitives.getArrow(this.ctx, 8);
+
+		let bufferIdx = 0;
+
+		for (let i = 0; i < count; i++) {
+			const light = lights[i];
+			const data = light.getLightData();
+			const isSpot = data.typeFlag > 3.5;
+
+			if (isSpot) {
+				// SpotLight Helper: Draw BOTH directional arrow and frustum cone
+				// 1. DIRECTIONAL ARROW
+				const arrowMatrix = light.worldMatrix.clone().scale(1.5);
+				const arrowUniforms = new Float32Array(20);
+				arrowUniforms.set(arrowMatrix.values, 0);
+				arrowUniforms[16] = data.r;
+				arrowUniforms[17] = data.g;
+				arrowUniforms[18] = data.b;
+				arrowUniforms[19] = 1.0; // Fully solid arrow
+
+				let buffer = this.gizmoUniformBuffers[bufferIdx];
+				this.ctx.device.queue.writeBuffer(buffer, 0, arrowUniforms);
+
+				passEncoder.setBindGroup(1, this.gizmoBindGroups[bufferIdx]);
+				passEncoder.setVertexBuffer(0, arrow.vertexBuffer);
+				passEncoder.setIndexBuffer(arrow.indexBuffer, arrow.indexFormat);
+				passEncoder.drawIndexed(arrow.indexCount);
+
+				bufferIdx++;
+
+				// 2. FRUSTUM CONE
+				let range = 20.0;
+				let outerAngleRad = (45.0 * Math.PI) / 180.0;
+				if (light instanceof SpotLight) {
+					range = light.range;
+					outerAngleRad = (light.outerAngle * Math.PI) / 180.0;
+				} else {
+					range = data.range ?? 20.0;
+					outerAngleRad =
+						data.outerAngleCos !== undefined
+							? Math.acos(data.outerAngleCos)
+							: (45.0 * Math.PI) / 180.0;
+				}
+
+				const tanAngle = Math.tan(outerAngleRad);
+				const coneScaleX = range * tanAngle;
+				const coneScaleY = range * tanAngle;
+				const coneScaleZ = range;
+
+				const coneMatrix = light.worldMatrix
+					.clone()
+					.scale(coneScaleX, coneScaleY, coneScaleZ);
+
+				const coneUniforms = new Float32Array(20);
+				coneUniforms.set(coneMatrix.values, 0);
+				coneUniforms[16] = data.r;
+				coneUniforms[17] = data.g;
+				coneUniforms[18] = data.b;
+				coneUniforms[19] = 0.3; // Beautiful semi-transparent light cone beam
+
+				buffer = this.gizmoUniformBuffers[bufferIdx];
+				this.ctx.device.queue.writeBuffer(buffer, 0, coneUniforms);
+
+				passEncoder.setBindGroup(1, this.gizmoBindGroups[bufferIdx]);
+				passEncoder.setVertexBuffer(0, cone.vertexBuffer);
+				passEncoder.setIndexBuffer(cone.indexBuffer, cone.indexFormat);
+				passEncoder.drawIndexed(cone.indexCount);
+
+				bufferIdx++;
+			} else {
+				// Point or Directional Light: Draw single primitive representation
+				const modelMatrix = new Mat4().translate(light.position);
+				const isPoint = data.typeFlag > 1.5 && data.typeFlag < 3.5;
+				const geom = isPoint ? sphere : cube;
+
+				const uniformData = new Float32Array(20);
+				uniformData.set(modelMatrix.values, 0);
+				uniformData[16] = data.r;
+				uniformData[17] = data.g;
+				uniformData[18] = data.b;
+				uniformData[19] = 1.0;
+
+				const buffer = this.gizmoUniformBuffers[bufferIdx];
+				this.ctx.device.queue.writeBuffer(buffer, 0, uniformData);
+
+				passEncoder.setBindGroup(1, this.gizmoBindGroups[bufferIdx]);
+				passEncoder.setVertexBuffer(0, geom.vertexBuffer);
+				passEncoder.setIndexBuffer(geom.indexBuffer, geom.indexFormat);
+				passEncoder.drawIndexed(geom.indexCount);
+
+				bufferIdx++;
+			}
+		}
+	}
+
+	/**
 	 * Releases depth targets, color buffers, lights storage buffers, and cascades destruction to subsystems.
 	 */
 	public destroy(): void {
+		// Release pool buffers
+		for (const buf of this.gizmoUniformBuffers) {
+			buf.destroy();
+		}
+		this.gizmoUniformBuffers = [];
+		this.gizmoBindGroups = [];
+
 		if (this.shadow) {
 			this.shadow.destroy();
 		}

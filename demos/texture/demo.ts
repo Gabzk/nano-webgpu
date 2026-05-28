@@ -1,38 +1,59 @@
-import { Scene } from "nano-webgpu";
+import { Scene, Mesh } from "nano-webgpu";
 
 const scene = await Scene.init("#canvas");
 const camera = scene.setCamera({ position: [0, 2, 7] });
-scene.backgroundColor = "skyblue";
+const canvas = scene.getCanvas();
 
-const texture = "./Brick_Wall_028_SD/Brick_Wall_028_basecolor.png";
-const normal = "./Brick_Wall_028_SD/Brick_Wall_028_normal.png";
-const ao = "./Brick_Wall_028_SD/Brick_Wall_028_ambientOcclusion.png";
-const roughness = "./Brick_Wall_028_SD/Brick_Wall_028_roughness.png";
-const height = "./Brick_Wall_028_SD/Brick_Wall_028_height.png";
+scene.backgroundColor = "#000000";
 
-const cube = scene.addCube();
+scene.ambientGroundColor = "#101010";
+scene.ambientSkyColor = "#323232";
+scene.showHelpers = false;
 
+const crt = await scene.loadMesh("crt-tv.glb", {
+	scale: 0.5,
+	rotationDegrees: [-90, 0, 0],
+	
+});
 
-cube.material.texture = texture; // ou cube.loadTexture(texture);
-cube.material.normalTexture = normal;
-cube.material.roughnessTexture = roughness;
-cube.material.aoTexture = ao;
+const spotlight = scene.addLight({
+	type: "spotlight",
+	position: [0, 0, 0.1],
+	rotationDegrees: [0, 180, 0],
+	color: "#ffffff",
+	intensity: 1,
+	innerAngle: 40,
+	outerAngle: 80,
+	castShadow: true,
+});
 
+const plane = scene.addPlane({
+	scale: 10,
+	position: [0, -0.9, 0],
+	material: {
+		albedoTexture: "./Brick_Wall_028_SD/Brick_Wall_028_basecolor.png",
+		roughnessTexture: "./Brick_Wall_028_SD/Brick_Wall_028_roughness.png",
+		normalTexture: "./Brick_Wall_028_SD/Brick_Wall_028_normal.png",
+		aoTexture: "./Brick_Wall_028_SD/Brick_Wall_028_ambientOcclusion.png",
+		normalScale: 5
+	}
+});
 
 const ctrl = camera.addController("orbit", {
-	center: cube.position,
-	distance: 5,
+	center: crt.position,
+	distance: 7,
 });
 
 const sun = scene.addLight({
 	type: "directional",
-	rotationDegrees: [0, 0, 0],
+	rotationDegrees: [-75, 0, 0],
 	color: "#ffffff",
-	intensity: 1,
+	intensity: 0,
 });
 
-const canvas = scene.getCanvas();
+
 scene.enableDebug();
+
 scene.render(() => {
 	// Redimensiona o canvas para preencher a tela
 	if (

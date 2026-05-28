@@ -185,6 +185,40 @@ export class Scene extends Node {
 		this._backgroundColor = Color.from(color);
 	}
 
+	/** @internal The hemispherical ambient sky color. */
+	private _ambientSkyColor: Color = Color.fromHex("#73788c");
+
+	/** @internal The hemispherical ambient ground color. */
+	private _ambientGroundColor: Color = Color.fromHex("#1f1a14");
+
+	/** Gets the hemispherical ambient sky color (surfaces pointing upward). */
+	public get ambientSkyColor(): Color {
+		return this._ambientSkyColor;
+	}
+
+	/** Sets the hemispherical ambient sky color, parsing hex strings, arrays, or objects automatically. */
+	public set ambientSkyColor(color: ColorLike) {
+		if (!color) {
+			console.warn("nano-webgpu: ambientSkyColor cannot be null. Ignoring");
+			return;
+		}
+		this._ambientSkyColor = Color.from(color);
+	}
+
+	/** Gets the hemispherical ambient ground color (surfaces pointing downward). */
+	public get ambientGroundColor(): Color {
+		return this._ambientGroundColor;
+	}
+
+	/** Sets the hemispherical ambient ground color, parsing hex strings, arrays, or objects automatically. */
+	public set ambientGroundColor(color: ColorLike) {
+		if (!color) {
+			console.warn("nano-webgpu: ambientGroundColor cannot be null. Ignoring");
+			return;
+		}
+		this._ambientGroundColor = Color.from(color);
+	}
+
 	/** @internal Default directory path prepended to asset relative file paths. */
 	private _defaultDir: string = "";
 
@@ -227,6 +261,9 @@ export class Scene extends Node {
 
 	/** High-performance CPU profiling metrics recorder. */
 	public readonly perfTracker: PerformanceTracker;
+
+	/** Toggle debug visualization helpers for lights and collision bounds. Defaults to `false`. */
+	public showHelpers = false;
 
 	/** @internal Debug overlay UI panel. */
 	private debugPanel: DebugPanel | null = null;
@@ -375,6 +412,8 @@ export class Scene extends Node {
 					matProps.aoTexture = this.defaultDir + matProps.aoTexture;
 				if (typeof matProps.ormTexture === "string")
 					matProps.ormTexture = this.defaultDir + matProps.ormTexture;
+				if (typeof matProps.emissiveTexture === "string")
+					matProps.emissiveTexture = this.defaultDir + matProps.emissiveTexture;
 			}
 			parsedOptions.material = new StandardMaterial(matProps);
 		}

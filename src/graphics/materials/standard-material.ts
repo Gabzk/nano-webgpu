@@ -34,6 +34,10 @@ export class StandardMaterial extends Material {
 		HAS_AO_MAP: 11,
 		HAS_ORM_MAP: 12,
 		CULL_MODE: 13,
+		EMISSIVE_R: 16,
+		EMISSIVE_G: 17,
+		EMISSIVE_B: 18,
+		HAS_EMISSIVE_MAP: 19,
 	} as const;
 
 	/** @internal Physical uniform buffer allocated in VRAM containing material parameters. */
@@ -59,8 +63,8 @@ export class StandardMaterial extends Material {
 		super(options);
 		this.type = "StandardMaterial";
 
-		// 16 floats (64 bytes)
-		this.bufferData = new Float32Array(16);
+		// 20 floats (80 bytes)
+		this.bufferData = new Float32Array(20);
 	}
 
 	/**
@@ -96,6 +100,13 @@ export class StandardMaterial extends Material {
 		this.bufferData[offsets.CULL_MODE] = cullModeFlag;
 		this.bufferData[14] = 0.0;
 		this.bufferData[15] = 0.0;
+
+		this.bufferData[offsets.EMISSIVE_R] = this.emissiveColor.r;
+		this.bufferData[offsets.EMISSIVE_G] = this.emissiveColor.g;
+		this.bufferData[offsets.EMISSIVE_B] = this.emissiveColor.b;
+		this.bufferData[offsets.HAS_EMISSIVE_MAP] = this.emissiveTexture
+			? 1.0
+			: 0.0;
 	}
 
 	/** @internal Active shadow PCF option key. */
@@ -175,14 +186,14 @@ export class StandardMaterial extends Material {
 		if (!this.uniformBuffer) {
 			this.uniformBuffer = ctx.device.createBuffer({
 				label: `StandardMaterial_${this.id}_Buffer`,
-				size: 64, // 16 floats * 4 bytes
+				size: 80, // 20 floats * 4 bytes
 				usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
 			});
 			ctx.vramTracker.register(
 				this.uniformBuffer,
 				"buffer",
 				`StandardMaterial_${this.id}_Buffer`,
-				64,
+				80,
 				"StandardMaterial",
 			);
 			this.isDirty = true;
@@ -205,12 +216,21 @@ export class StandardMaterial extends Material {
 		const tMetallic = this.metallicTexture || Texture.getDummyWhite(ctx);
 		const tAO = this.aoTexture || Texture.getDummyWhite(ctx);
 		const tORM = this.ormTexture || Texture.getDummyWhite(ctx);
+		const tEmissive = this.emissiveTexture || Texture.getDummyBlack(ctx);
 
 		// Return cached bind group if already built for the current PCF variant
 		if (this.bindGroup && this._bindGroupPCFVariant === this._usePCF)
 			return this.bindGroup;
 
-		const textures = [tAlbedo, tNormal, tRoughness, tMetallic, tAO, tORM];
+		const textures = [
+			tAlbedo,
+			tNormal,
+			tRoughness,
+			tMetallic,
+			tAO,
+			tORM,
+			tEmissive,
+		];
 
 		if (!this.sampler) {
 			this.sampler = ctx.device.createSampler({
@@ -236,6 +256,7 @@ export class StandardMaterial extends Material {
 					{ binding: 5, resource: tMetallic.gpuTexture.createView() },
 					{ binding: 6, resource: tAO.gpuTexture.createView() },
 					{ binding: 7, resource: tORM.gpuTexture.createView() },
+					{ binding: 8, resource: tEmissive.gpuTexture.createView() },
 				],
 			});
 			this._bindGroupPCFVariant = this._usePCF;
@@ -298,6 +319,7 @@ export class StandardMaterial extends Material {
 		this._metallicTexture = null;
 		this._aoTexture = null;
 		this._ormTexture = null;
+		this._emissiveTexture = null;
 
 		this.bindGroup = null;
 		this.sampler = null;

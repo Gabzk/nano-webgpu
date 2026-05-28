@@ -52,6 +52,11 @@ export interface MaterialOptions {
 	/** Map containing packed Ambient Occlusion, Roughness, and Metallic (ORM) values, or file path. */
 	ormTexture?: Texture | string;
 
+	/** Solid emissive color value or hex string representation. Defaults to black. */
+	emissiveColor?: ColorLike;
+	/** Map containing emissive light data, or file path. */
+	emissiveTexture?: Texture | string;
+
 	/** When true, disables face culling so back and front polygons are rendered. */
 	doubleSided?: boolean;
 	/** Surface opacity level (alpha). Automatically handles transparent rendering and depth buffer updates. */
@@ -121,6 +126,10 @@ export abstract class Material {
 	protected _aoIntensity: number = 1.0;
 	/** @internal Map containing packed Ambient Occlusion, Roughness, and Metallic (ORM) values. */
 	protected _ormTexture: Texture | null = null;
+	/** @internal Solid emissive color coefficients. */
+	protected _emissiveColor: Color = new Color();
+	/** @internal Map containing surface emissive light data. */
+	protected _emissiveTexture: Texture | null = null;
 
 	/** @internal Path names of textures queued to load asynchronously in the background. */
 	protected pendingTextures: { [key: string]: string } = {};
@@ -191,6 +200,26 @@ export abstract class Material {
 			this._ormTexture = options.ormTexture;
 		else if (typeof options.ormTexture === "string")
 			this.pendingTextures.orm = options.ormTexture;
+
+		// Initialize Emissive properties
+		let initialEmissive: Color;
+		if (options.emissiveColor instanceof Color) {
+			initialEmissive = options.emissiveColor;
+		} else if (typeof options.emissiveColor === "string") {
+			initialEmissive = Color.fromHex(options.emissiveColor);
+		} else {
+			initialEmissive = Color.fromHex("#000000");
+		}
+		this._emissiveColor = initialEmissive;
+		this._emissiveColor.onChange = () => {
+			this.onPropertyChange();
+		};
+
+		if (options.emissiveTexture instanceof Texture) {
+			this._emissiveTexture = options.emissiveTexture;
+		} else if (typeof options.emissiveTexture === "string") {
+			this.pendingTextures.emissive = options.emissiveTexture;
+		}
 
 		this._roughness = options.roughness ?? 0.5;
 		this._metallic = options.metallic ?? 0.0;
@@ -473,6 +502,42 @@ export abstract class Material {
 		}
 	}
 
+	/** Gets the solid emissive color coefficients. */
+	public get emissiveColor(): Color {
+		return this._emissiveColor;
+	}
+
+	/** Sets the solid emissive color coefficients, setting dirty status upon color component modifications. */
+	public set emissiveColor(val: ColorLike) {
+		if (val instanceof Color) {
+			this._emissiveColor = val;
+		} else if (typeof val === "string") {
+			this._emissiveColor = Color.fromHex(val);
+		} else if (Array.isArray(val)) {
+			this._emissiveColor = new Color(val[0], val[1], val[2], val[3] ?? 1.0);
+		}
+		this._emissiveColor.onChange = () => {
+			this.onPropertyChange();
+		};
+		this.onPropertyChange();
+	}
+
+	/** Gets the emissive texture. */
+	public get emissiveTexture(): Texture | null {
+		return this._emissiveTexture;
+	}
+
+	/** Sets the emissive texture, marking parameters and bind groups as dirty. */
+	public set emissiveTexture(val: Texture | string | null) {
+		if (typeof val === "string") {
+			this.pendingTextures.emissive = val;
+			this.onPropertyChange();
+		} else if (this._emissiveTexture !== val) {
+			this._emissiveTexture = val;
+			this.onPropertyChange();
+		}
+	}
+
 	/** Gets the double-sided rendering state. */
 	public get doubleSided(): boolean {
 		return isCullDisabled(this._cullMode);
@@ -521,6 +586,11 @@ export abstract class Material {
 			if (this.pendingTextures.orm) {
 				const tex = Texture.loadBackground(ctx, this.pendingTextures.orm);
 				this._ormTexture = tex;
+				this._ownedTextures.add(tex);
+			}
+			if (this.pendingTextures.emissive) {
+				const tex = Texture.loadBackground(ctx, this.pendingTextures.emissive);
+				this._emissiveTexture = tex;
 				this._ownedTextures.add(tex);
 			}
 			this.pendingTextures = {}; // Clear pending queue

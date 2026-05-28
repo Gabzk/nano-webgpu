@@ -314,6 +314,53 @@ f  1/1/1   2/2/1   3/3/1   4/4/1
 			expect(part.materialOptions!.albedoTexture).toBeUndefined();
 		});
 
+		it("should extract emissiveFactor and emissiveTexture from glTF materials", async () => {
+			const gltf = {
+				asset: { version: "2.0" },
+				meshes: [{
+					primitives: [
+						{
+							attributes: { POSITION: 0 },
+							material: 0,
+						},
+					],
+				}],
+				materials: [{
+					emissiveFactor: [1.0, 0.5, 0.0], // orange glow
+					emissiveTexture: { index: 0 },
+					pbrMetallicRoughness: {
+						baseColorFactor: [1.0, 1.0, 1.0, 1.0],
+					},
+				}],
+				textures: [{ source: 0 }],
+				images: [{ uri: "glow.png" }],
+				accessors: [
+					{ bufferView: 0, byteOffset: 0, componentType: 5126, count: 0, type: "VEC3" },
+				],
+				bufferViews: [
+					{ buffer: 0, byteOffset: 0, byteLength: 0 },
+				],
+				buffers: [{ byteLength: 0, uri: "data:application/octet-stream;base64," }],
+			};
+
+			const glbBuffer = buildGlb(gltf);
+
+			window.fetch = vi.fn().mockResolvedValue({
+				ok: true,
+				arrayBuffer: vi.fn().mockResolvedValue(glbBuffer),
+			});
+
+			const result = await loader.loadModel("emissive_model.glb");
+
+			expect(result.parts).toBeDefined();
+			expect(result.parts!.length).toBe(1);
+
+			const part = result.parts![0];
+			expect(part.materialOptions).toBeDefined();
+			expect(part.materialOptions!.emissiveColor).toBe("#ff8000");
+			expect(part.materialOptions!.emissiveTexture).toContain("glow.png");
+		});
+
 		it("should produce one part per GLTF primitive with independent materials", async () => {
 			const gltf = {
 				asset: { version: "2.0" },

@@ -12,6 +12,11 @@
  */
 export interface ModelPart {
 	/**
+	 * Friendly name of this model part or submesh.
+	 */
+	name?: string;
+
+	/**
 	 * Interleaved floating-point vertex buffer components.
 	 * Typically ordered sequentially as: Position (X, Y, Z), Normal (X, Y, Z), and UV (U, V).
 	 */

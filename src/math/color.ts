@@ -372,7 +372,7 @@ export class Color {
 	 */
 	public toSRGB(): Color {
 		const linearToSRGB = (c: number) => {
-			return c <= 0.0031308 ? c * 12.92 : 1.055 * (c ** (1.0 / 2.4)) - 0.055;
+			return c <= 0.0031308 ? c * 12.92 : 1.055 * c ** (1.0 / 2.4) - 0.055;
 		};
 		// Clamp to [0, 1] range during conversion to LDR sRGB space
 		return new Color(

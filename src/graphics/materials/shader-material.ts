@@ -250,14 +250,14 @@ export class ShaderMaterial extends Material {
 		if (!this._defaultUniformBuffer) {
 			this._defaultUniformBuffer = ctx.device.createBuffer({
 				label: `ShaderMaterial_${this.id}_UniformBuffer`,
-				size: 64, // 16 floats × 4 bytes
+				size: 80, // 20 floats × 4 bytes
 				usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
 			});
 			ctx.vramTracker.register(
 				this._defaultUniformBuffer,
 				"buffer",
 				`ShaderMaterial_${this.id}_UniformBuffer`,
-				64,
+				80,
 				"ShaderMaterial",
 			);
 			this.isDirty = true;
@@ -266,7 +266,7 @@ export class ShaderMaterial extends Material {
 		if (this.isDirty) {
 			// Write standard PBR properties to the Group 2 uniform buffer immediately so a custom shader
 			// can easily access them from group 2 at binding 0!
-			const bufferData = new Float32Array(16);
+			const bufferData = new Float32Array(20);
 			const offsets = StandardMaterial.UNIFORM_OFFSETS;
 
 			bufferData[offsets.ALBEDO_R] = this.albedoColor.r;
@@ -288,6 +288,11 @@ export class ShaderMaterial extends Material {
 			const cullModeFlag =
 				this.cullMode === "front" ? 1.0 : this.cullMode === "none" ? 2.0 : 0.0;
 			bufferData[offsets.CULL_MODE] = cullModeFlag;
+
+			bufferData[offsets.EMISSIVE_R] = this.emissiveColor.r;
+			bufferData[offsets.EMISSIVE_G] = this.emissiveColor.g;
+			bufferData[offsets.EMISSIVE_B] = this.emissiveColor.b;
+			bufferData[offsets.HAS_EMISSIVE_MAP] = this.emissiveTexture ? 1.0 : 0.0;
 
 			ctx.device.queue.writeBuffer(
 				this._defaultUniformBuffer,
@@ -314,6 +319,7 @@ export class ShaderMaterial extends Material {
 		const tMetallic = this.metallicTexture || Texture.getDummyWhite(ctx);
 		const tAO = this.aoTexture || Texture.getDummyWhite(ctx);
 		const tORM = this.ormTexture || Texture.getDummyWhite(ctx);
+		const tEmissive = this.emissiveTexture || Texture.getDummyBlack(ctx);
 
 		const layout = ctx.pipelineManager.getMaterialBindGroupLayout();
 
@@ -329,11 +335,20 @@ export class ShaderMaterial extends Material {
 				{ binding: 5, resource: tMetallic.gpuTexture.createView() },
 				{ binding: 6, resource: tAO.gpuTexture.createView() },
 				{ binding: 7, resource: tORM.gpuTexture.createView() },
+				{ binding: 8, resource: tEmissive.gpuTexture.createView() },
 			],
 		});
 
 		// Listen for async texture loading — rebuild the bind group when a texture is ready
-		const textures = [tAlbedo, tNormal, tRoughness, tMetallic, tAO, tORM];
+		const textures = [
+			tAlbedo,
+			tNormal,
+			tRoughness,
+			tMetallic,
+			tAO,
+			tORM,
+			tEmissive,
+		];
 		for (const tex of textures) {
 			if (tex && !tex.isLoaded) {
 				if (!this._textureUnsubscribes.has(tex)) {
@@ -446,6 +461,7 @@ export class ShaderMaterial extends Material {
 		this._metallicTexture = null;
 		this._aoTexture = null;
 		this._ormTexture = null;
+		this._emissiveTexture = null;
 
 		this._defaultBindGroup = null;
 		this._defaultSampler = null;

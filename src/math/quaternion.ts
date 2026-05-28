@@ -86,7 +86,8 @@ export class Quaternion {
 	 * @returns {this} The current Quaternion (for chaining)
 	 */
 	public normalize(): this {
-		let len = this.x * this.x + this.y * this.y + this.z * this.z + this.w * this.w;
+		let len =
+			this.x * this.x + this.y * this.y + this.z * this.z + this.w * this.w;
 		if (len > 0) {
 			len = 1 / Math.sqrt(len);
 			this.x *= len;
@@ -103,8 +104,14 @@ export class Quaternion {
 	 * @returns {this} The current Quaternion (for chaining)
 	 */
 	public multiply(b: Quaternion): this {
-		const ax = this.x, ay = this.y, az = this.z, aw = this.w;
-		const bx = b.x, by = b.y, bz = b.z, bw = b.w;
+		const ax = this.x,
+			ay = this.y,
+			az = this.z,
+			aw = this.w;
+		const bx = b.x,
+			by = b.y,
+			bz = b.z,
+			bw = b.w;
 
 		this.x = ax * bw + aw * bx + ay * bz - az * by;
 		this.y = ay * bw + aw * by + az * bx - ax * bz;
@@ -126,8 +133,14 @@ export class Quaternion {
 		b: Quaternion,
 		out: Quaternion = new Quaternion(),
 	): Quaternion {
-		const ax = a.x, ay = a.y, az = a.z, aw = a.w;
-		const bx = b.x, by = b.y, bz = b.z, bw = b.w;
+		const ax = a.x,
+			ay = a.y,
+			az = a.z,
+			aw = a.w;
+		const bx = b.x,
+			by = b.y,
+			bz = b.z,
+			bw = b.w;
 
 		out.x = ax * bw + aw * bx + ay * bz - az * by;
 		out.y = ay * bw + aw * by + az * bx - ax * bz;
@@ -171,8 +184,14 @@ export class Quaternion {
 	 * @returns {this} The current Quaternion (for chaining)
 	 */
 	public slerp(target: Quaternion, t: number): this {
-		let ax = this.x, ay = this.y, az = this.z, aw = this.w;
-		let bx = target.x, by = target.y, bz = target.z, bw = target.w;
+		const ax = this.x,
+			ay = this.y,
+			az = this.z,
+			aw = this.w;
+		let bx = target.x,
+			by = target.y,
+			bz = target.z,
+			bw = target.w;
 
 		let cosOmega = ax * bx + ay * by + az * bz + aw * bw;
 
@@ -234,7 +253,10 @@ export class Quaternion {
 	 */
 	public toMat4(out: Mat4 = new Mat4()): Mat4 {
 		const v = out.values;
-		const x = this.x, y = this.y, z = this.z, w = this.w;
+		const x = this.x,
+			y = this.y,
+			z = this.z,
+			w = this.w;
 
 		const x2 = x + x;
 		const y2 = y + y;

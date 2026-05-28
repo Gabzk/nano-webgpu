@@ -1,6 +1,8 @@
 import type { Context } from "../core/context";
 import type { Geometry } from "./geometry";
 import {
+	createArrowGeometry,
+	createConeGeometry,
 	createCubeGeometry,
 	createPlaneGeometry,
 	createSphereGeometry,
@@ -19,6 +21,10 @@ export class PrimitivesFactory {
 	private _plane: Geometry | null = null;
 	/** @internal Cached sphere geometry block. */
 	private _sphere: Geometry | null = null;
+	/** @internal Cached cone geometry block. */
+	private _cone: Geometry | null = null;
+	/** @internal Cached arrow geometry block. */
+	private _arrow: Geometry | null = null;
 
 	/**
 	 * Returns the shared unit cube geometry, instantiating it on the very first call.
@@ -76,6 +82,34 @@ export class PrimitivesFactory {
 	}
 
 	/**
+	 * Returns the shared cone geometry, instantiating it on the very first call.
+	 *
+	 * @param ctx - Active context.
+	 * @param radialSegments - Subdivision segments around base. Defaults to `16`.
+	 * @returns The cached or newly allocated Cone Geometry.
+	 */
+	public getCone(ctx: Context, radialSegments = 16): Geometry {
+		if (!this._cone) {
+			this._cone = createConeGeometry(ctx, radialSegments);
+		}
+		return this._cone;
+	}
+
+	/**
+	 * Returns the shared arrow geometry, instantiating it on the very first call.
+	 *
+	 * @param ctx - Active context.
+	 * @param radialSegments - Subdivision segments. Defaults to `8`.
+	 * @returns The cached or newly allocated Arrow Geometry.
+	 */
+	public getArrow(ctx: Context, radialSegments = 8): Geometry {
+		if (!this._arrow) {
+			this._arrow = createArrowGeometry(ctx, radialSegments);
+		}
+		return this._arrow;
+	}
+
+	/**
 	 * Releases all cached primitive geometries from GPU memory and unregisters them from the VRAM tracker.
 	 *
 	 * @param ctx - Active context.
@@ -92,6 +126,14 @@ export class PrimitivesFactory {
 		if (this._sphere) {
 			this._sphere.destroy(ctx);
 			this._sphere = null;
+		}
+		if (this._cone) {
+			this._cone.destroy(ctx);
+			this._cone = null;
+		}
+		if (this._arrow) {
+			this._arrow.destroy(ctx);
+			this._arrow = null;
 		}
 	}
 }

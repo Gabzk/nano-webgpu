@@ -82,8 +82,8 @@ fn fs_main(in: VertexOutput, @builtin(front_facing) isFrontFace: bool) -> @locat
     //   upFactor=1  (N points up)   → receives full sky color
     //   upFactor=0  (N points down) → receives only dim ground bounce
     // ------------------------------------------------------------------
-    let skyColor    = vec3<f32>(0.45, 0.47, 0.55); // cool blue-grey sky (strong fill)
-    let groundColor = vec3<f32>(0.12, 0.10, 0.08); // warm ground bounce
+    let skyColor    = settings.ambientSkyColor.xyz;
+    let groundColor = settings.ambientGroundColor.xyz;
     let upFactor    = clamp(N.y * 0.5 + 0.5, 0.0, 1.0);
     let ambient     = mix(groundColor, skyColor, upFactor) * baseColor * ao;
     finalColor     += ambient;
@@ -178,7 +178,12 @@ fn fs_main(in: VertexOutput, @builtin(front_facing) isFrontFace: bool) -> @locat
         finalColor += (diffuse + specular) * lightColor * shadow;
     }
 
-    return vec4<f32>(finalColor, alpha);
+    var emissiveColor = material.emissive.rgb;
+    if (material.useEmissiveMap > 0.5) {
+        emissiveColor *= textureSample(emissiveTex, mySampler, in.uv).rgb;
+    }
+
+    return vec4<f32>(finalColor + emissiveColor, alpha);
 }
 `;
 }

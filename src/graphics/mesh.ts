@@ -514,6 +514,7 @@ export class Mesh extends Node3D {
 				}
 
 				const mesh = new Mesh(ctx, { geometry, ...partFinalOptions });
+				if (part.name) mesh.name = part.name;
 
 				const localAABB = AABB.fromVertices(part.vertices, 8);
 				const halfExtents = localAABB.getHalfExtents();

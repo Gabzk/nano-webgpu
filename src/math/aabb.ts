@@ -192,45 +192,99 @@ export class AABB {
 
 		// For each matrix column, multiply min/max components according to the sign of the matrix elements.
 		// This is Jim Arvo's O(1) algorithm for transforming Axis-Aligned Bounding Boxes.
-		
+
 		// X Component of Output
 		let a = v[0] * minX;
 		let b = v[0] * maxX;
-		if (a < b) { min_x += a; max_x += b; } else { min_x += b; max_x += a; }
+		if (a < b) {
+			min_x += a;
+			max_x += b;
+		} else {
+			min_x += b;
+			max_x += a;
+		}
 
 		a = v[4] * minY;
 		b = v[4] * maxY;
-		if (a < b) { min_x += a; max_x += b; } else { min_x += b; max_x += a; }
+		if (a < b) {
+			min_x += a;
+			max_x += b;
+		} else {
+			min_x += b;
+			max_x += a;
+		}
 
 		a = v[8] * minZ;
 		b = v[8] * maxZ;
-		if (a < b) { min_x += a; max_x += b; } else { min_x += b; max_x += a; }
+		if (a < b) {
+			min_x += a;
+			max_x += b;
+		} else {
+			min_x += b;
+			max_x += a;
+		}
 
 		// Y Component of Output
 		a = v[1] * minX;
 		b = v[1] * maxX;
-		if (a < b) { min_y += a; max_y += b; } else { min_y += b; max_y += a; }
+		if (a < b) {
+			min_y += a;
+			max_y += b;
+		} else {
+			min_y += b;
+			max_y += a;
+		}
 
 		a = v[5] * minY;
 		b = v[5] * maxY;
-		if (a < b) { min_y += a; max_y += b; } else { min_y += b; max_y += a; }
+		if (a < b) {
+			min_y += a;
+			max_y += b;
+		} else {
+			min_y += b;
+			max_y += a;
+		}
 
 		a = v[9] * minZ;
 		b = v[9] * maxZ;
-		if (a < b) { min_y += a; max_y += b; } else { min_y += b; max_y += a; }
+		if (a < b) {
+			min_y += a;
+			max_y += b;
+		} else {
+			min_y += b;
+			max_y += a;
+		}
 
 		// Z Component of Output
 		a = v[2] * minX;
 		b = v[2] * maxX;
-		if (a < b) { min_z += a; max_z += b; } else { min_z += b; max_z += a; }
+		if (a < b) {
+			min_z += a;
+			max_z += b;
+		} else {
+			min_z += b;
+			max_z += a;
+		}
 
 		a = v[6] * minY;
 		b = v[6] * maxY;
-		if (a < b) { min_z += a; max_z += b; } else { min_z += b; max_z += a; }
+		if (a < b) {
+			min_z += a;
+			max_z += b;
+		} else {
+			min_z += b;
+			max_z += a;
+		}
 
 		a = v[10] * minZ;
 		b = v[10] * maxZ;
-		if (a < b) { min_z += a; max_z += b; } else { min_z += b; max_z += a; }
+		if (a < b) {
+			min_z += a;
+			max_z += b;
+		} else {
+			min_z += b;
+			max_z += a;
+		}
 
 		result.min.x = min_x;
 		result.min.y = min_y;
