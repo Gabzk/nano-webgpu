@@ -1320,14 +1320,14 @@ async function run() {
 
     let bloomTexA = device.createTexture({
         size: [bloomWidth, bloomHeight, 1],
-        format: "rgba8unorm",
+        format: "rgba16float",
         usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING
     });
     let bloomTexAView = bloomTexA.createView();
 
     let bloomTexB = device.createTexture({
         size: [bloomWidth, bloomHeight, 1],
-        format: "rgba8unorm",
+        format: "rgba16float",
         usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING
     });
     let bloomTexBView = bloomTexB.createView();
@@ -1361,21 +1361,21 @@ async function run() {
     const brightPipeline = device.createRenderPipeline({
         layout: device.createPipelineLayout({ bindGroupLayouts: [post2Layout] }),
         vertex: { module: postProcessVSModule, entryPoint: "vs_main" },
-        fragment: { module: brightPassFSModule, entryPoint: "fs_main", targets: [{ format: "rgba8unorm" }] },
+        fragment: { module: brightPassFSModule, entryPoint: "fs_main", targets: [{ format: "rgba16float" }] },
         primitive: { topology: "triangle-list" }
     });
 
     const blurHPipeline = device.createRenderPipeline({
         layout: device.createPipelineLayout({ bindGroupLayouts: [post2Layout] }),
         vertex: { module: postProcessVSModule, entryPoint: "vs_main" },
-        fragment: { module: blurHFSModule, entryPoint: "fs_main", targets: [{ format: "rgba8unorm" }] },
+        fragment: { module: blurHFSModule, entryPoint: "fs_main", targets: [{ format: "rgba16float" }] },
         primitive: { topology: "triangle-list" }
     });
 
     const blurVPipeline = device.createRenderPipeline({
         layout: device.createPipelineLayout({ bindGroupLayouts: [post2Layout] }),
         vertex: { module: postProcessVSModule, entryPoint: "vs_main" },
-        fragment: { module: blurVFSModule, entryPoint: "fs_main", targets: [{ format: "rgba8unorm" }] },
+        fragment: { module: blurVFSModule, entryPoint: "fs_main", targets: [{ format: "rgba16float" }] },
         primitive: { topology: "triangle-list" }
     });
 
@@ -1560,7 +1560,7 @@ async function run() {
             bloomTexA.destroy();
             bloomTexA = device.createTexture({
                 size: [bw, bh, 1],
-                format: "rgba8unorm",
+                format: "rgba16float",
                 usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING
             });
             bloomTexAView = bloomTexA.createView();
@@ -1568,7 +1568,7 @@ async function run() {
             bloomTexB.destroy();
             bloomTexB = device.createTexture({
                 size: [bw, bh, 1],
-                format: "rgba8unorm",
+                format: "rgba16float",
                 usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING
             });
             bloomTexBView = bloomTexB.createView();

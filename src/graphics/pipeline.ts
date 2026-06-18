@@ -846,6 +846,20 @@ export class PipelineManager {
 function preprocessShader(shaderCode: string, useCSM: boolean): string {
 	let processed = shaderCode.trim();
 
+	// If CSM is disabled, automatically translate any CSM-specific shadow calls/struct accesses
+	if (!useCSM) {
+		// Rewrite 4-argument getShadow(fragPos, depth, bias, texelSize) to 3-argument getShadow(shadowPos, bias, texelSize)
+		processed = processed.replace(
+			/getShadow\s*\(\s*([^,]+)\s*,\s*([^,]+)\s*,\s*([^,]+)\s*,\s*([^)]+)\)/g,
+			"getShadow(shadowCamera.viewProj * vec4<f32>($1, 1.0), $3, $4)",
+		);
+		// Replace shadowCamera.cameraForward with a dummy vector since it only exists in CSM
+		processed = processed.replace(
+			/shadowCamera\.cameraForward/g,
+			"vec4<f32>(0.0, 0.0, -1.0, 0.0)",
+		);
+	}
+
 	// 1. Auto-inject system structs and bindings if group 0, 1, or 2 are not defined
 	if (
 		!processed.includes("@group(0)") &&

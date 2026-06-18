@@ -86,6 +86,8 @@ export interface SceneGeometryOptions extends StandardMaterialOptions {
 	addToScene?: boolean;
 	/** Texture applied to the mesh */
 	texture?: Texture | string;
+	/** Secondary material pass rendered immediately after this material. */
+	nextPass?: Material;
 }
 
 /**
@@ -347,7 +349,7 @@ export class Scene extends Node {
 			},
 			set knee(value: number) {
 				system.options.knee = value;
-			}
+			},
 		};
 	}
 

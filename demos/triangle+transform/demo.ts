@@ -1,8 +1,7 @@
-import { Scene, StandardMaterial } from "nano-webgpu";
+import { Scene } from "nano-webgpu";
 
 const scene = await Scene.init("#canvas");
 scene.setCamera({ position: [0, 2, 7] });
-scene.backgroundColor = "#c6c6c6";
 
 const tri = scene.buildMesh({
 	vertexFormat: ["position", "color"],
@@ -26,23 +25,10 @@ const sun = scene.addLight({
 });
 
 const canvas = scene.getCanvas();
-let time = 0;
-scene.enableDebug();
 
 scene.render(() => {
-	// Redimensiona o canvas para preencher a tela
-	if (
-		canvas.width != window.innerWidth ||
-		canvas.height != window.innerHeight
-	) {
+	if (canvas.width != window.innerWidth || canvas.height != window.innerHeight) {
 		canvas.width = window.innerWidth;
 		canvas.height = window.innerHeight;
 	}
-
-	// Tempoa acumulado para animação do seno
-	time += scene.getRenderInfo().dt;
-	// Rotação
-	tri.rotationDegrees.y += 60 * scene.getRenderInfo().dt;
-	// Posição oscilando com animação de seno
-	tri.position.y = Math.sin(time * 2) * 0.5;
 });

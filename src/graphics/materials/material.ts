@@ -63,6 +63,8 @@ export interface MaterialOptions {
 	doubleSided?: boolean;
 	/** Surface opacity level (alpha). Automatically handles transparent rendering and depth buffer updates. */
 	opacity?: number;
+	/** Secondary material pass rendered immediately after this material. */
+	nextPass?: Material;
 }
 
 /**
@@ -240,6 +242,10 @@ export abstract class Material {
 		if (options.opacity !== undefined) {
 			this.opacity = options.opacity;
 		}
+
+		if (options.nextPass !== undefined) {
+			this.nextPass = options.nextPass;
+		}
 	}
 
 	/** Hook called when any property changes. Subclasses override this to invalidate their specific GPU bind groups. */
@@ -363,16 +369,6 @@ export abstract class Material {
 			this._albedoTexture = val;
 			this.onPropertyChange();
 		}
-	}
-
-	/** Base texture proxy (alias for albedoTexture). */
-	public get texture(): Texture | null {
-		return this._albedoTexture;
-	}
-
-	/** Sets the base texture proxy (alias for albedoTexture). */
-	public set texture(val: Texture | string | null) {
-		this.albedoTexture = val;
 	}
 
 	/** Gets the normal tangent scale. */

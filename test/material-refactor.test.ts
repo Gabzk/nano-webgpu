@@ -94,8 +94,7 @@ describe("Material System Refactoring & Developer Experience", () => {
 		mat.normalScale = 1.2;
 		expect(mat.normalScale).toBe(1.2);
 	});
-
-	it("should support the direct texture getter/setter on Mesh as a proxy", () => {
+	it("should support loadTexture on Mesh as a shortcut", () => {
 		const mockContext = createMockContext();
 		const mesh = Mesh.createCube(mockContext, { size: 1.0 });
 		
@@ -104,26 +103,7 @@ describe("Material System Refactoring & Developer Experience", () => {
 			gpuTexture: { createView: vi.fn() },
 		} as unknown as Texture;
 		
-		mesh.texture = mockTexture;
-		expect(mesh.texture).toBe(mockTexture);
-		expect(mesh.material.albedoTexture).toBe(mockTexture);
-		
-		mesh.texture = null;
-		expect(mesh.texture).toBeNull();
-		expect(mesh.material.albedoTexture).toBeNull();
-	});
-
-	it("should allow getting and setting texture alias directly on Material", () => {
-		const mockContext = createMockContext();
-		const mesh = Mesh.createCube(mockContext, { size: 1.0 });
-		
-		const mockTexture = {
-			isLoaded: true,
-			gpuTexture: { createView: vi.fn() },
-		} as unknown as Texture;
-		
-		mesh.material.texture = mockTexture;
-		expect(mesh.material.texture).toBe(mockTexture);
+		mesh.loadTexture(mockTexture);
 		expect(mesh.material.albedoTexture).toBe(mockTexture);
 	});
 
@@ -153,5 +133,24 @@ describe("Material System Refactoring & Developer Experience", () => {
 		
 		// The queue writeBuffer should be called to populate Group 2 parameters
 		expect(mockContext.device.queue.writeBuffer).toHaveBeenCalled();
+	});
+
+	it("should support setting nextPass via material options", () => {
+		const mockContext = createMockContext();
+		const highlightEffect = new ShaderMaterial({ shaderCode: "" });
+		const material = new StandardMaterial({ nextPass: highlightEffect });
+		
+		expect(material.nextPass).toBe(highlightEffect);
+	});
+
+	it("should support setting nextPass via mesh options", () => {
+		const mockContext = createMockContext();
+		const highlightEffect = new ShaderMaterial({ shaderCode: "" });
+		const mesh = Mesh.createCube(mockContext, {
+			size: 1.0,
+			nextPass: highlightEffect,
+		});
+		
+		expect(mesh.material.nextPass).toBe(highlightEffect);
 	});
 });

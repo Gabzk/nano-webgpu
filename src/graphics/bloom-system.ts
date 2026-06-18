@@ -1,8 +1,8 @@
 import type { Context } from "../core/context";
 import {
-	bloomBrightPassShader,
 	bloomBlurHShader,
 	bloomBlurVShader,
+	bloomBrightPassShader,
 } from "./shaders/chunks/bloom.chunk";
 
 /**
@@ -90,7 +90,7 @@ export class BloomSystem {
 	private height = 1;
 
 	/** @internal Texture format used for bloom buffers. */
-	private readonly format: GPUTextureFormat = "rgba8unorm";
+	private readonly format: GPUTextureFormat = "rgba16float";
 
 	/**
 	 * Creates a BloomSystem and builds all internal GPU pipelines.
@@ -128,9 +128,21 @@ export class BloomSystem {
 		this.brightPassLayout = ctx.device.createBindGroupLayout({
 			label: "Bloom_BrightPass_Layout",
 			entries: [
-				{ binding: 0, visibility: GPUShaderStage.FRAGMENT, sampler: { type: "filtering" } },
-				{ binding: 1, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: "float" } },
-				{ binding: 2, visibility: GPUShaderStage.FRAGMENT, buffer: { type: "uniform" } },
+				{
+					binding: 0,
+					visibility: GPUShaderStage.FRAGMENT,
+					sampler: { type: "filtering" },
+				},
+				{
+					binding: 1,
+					visibility: GPUShaderStage.FRAGMENT,
+					texture: { sampleType: "float" },
+				},
+				{
+					binding: 2,
+					visibility: GPUShaderStage.FRAGMENT,
+					buffer: { type: "uniform" },
+				},
 			],
 		});
 
@@ -138,8 +150,16 @@ export class BloomSystem {
 		this.blurLayout = ctx.device.createBindGroupLayout({
 			label: "Bloom_Blur_Layout",
 			entries: [
-				{ binding: 0, visibility: GPUShaderStage.FRAGMENT, sampler: { type: "filtering" } },
-				{ binding: 1, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: "float" } },
+				{
+					binding: 0,
+					visibility: GPUShaderStage.FRAGMENT,
+					sampler: { type: "filtering" },
+				},
+				{
+					binding: 1,
+					visibility: GPUShaderStage.FRAGMENT,
+					texture: { sampleType: "float" },
+				},
 			],
 		});
 
@@ -162,7 +182,11 @@ export class BloomSystem {
 			label: "Bloom_BrightPass_Pipeline",
 			layout: fullscreenLayout,
 			vertex: { module: brightMod, entryPoint: "vs_main" },
-			fragment: { module: brightMod, entryPoint: "fs_main", targets: [{ format: this.format }] },
+			fragment: {
+				module: brightMod,
+				entryPoint: "fs_main",
+				targets: [{ format: this.format }],
+			},
 			primitive: { topology: "triangle-list" },
 		});
 
@@ -175,7 +199,11 @@ export class BloomSystem {
 			label: "Bloom_BlurH_Pipeline",
 			layout: blurPipelineLayout,
 			vertex: { module: blurHMod, entryPoint: "vs_main" },
-			fragment: { module: blurHMod, entryPoint: "fs_main", targets: [{ format: this.format }] },
+			fragment: {
+				module: blurHMod,
+				entryPoint: "fs_main",
+				targets: [{ format: this.format }],
+			},
 			primitive: { topology: "triangle-list" },
 		});
 
@@ -188,7 +216,11 @@ export class BloomSystem {
 			label: "Bloom_BlurV_Pipeline",
 			layout: blurPipelineLayout,
 			vertex: { module: blurVMod, entryPoint: "vs_main" },
-			fragment: { module: blurVMod, entryPoint: "fs_main", targets: [{ format: this.format }] },
+			fragment: {
+				module: blurVMod,
+				entryPoint: "fs_main",
+				targets: [{ format: this.format }],
+			},
 			primitive: { topology: "triangle-list" },
 		});
 	}
@@ -199,13 +231,15 @@ export class BloomSystem {
 			label: "Bloom_TexA",
 			size: [1, 1, 1],
 			format: this.format,
-			usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
+			usage:
+				GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
 		});
 		this.texB = ctx.device.createTexture({
 			label: "Bloom_TexB",
 			size: [1, 1, 1],
 			format: this.format,
-			usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
+			usage:
+				GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
 		});
 		this.viewA = this.texA.createView();
 		this.viewB = this.texB.createView();
@@ -220,7 +254,12 @@ export class BloomSystem {
 	 * @param height - New canvas pixel height.
 	 * @param sceneTextureView - The main scene color texture view (for the bright-pass bind group).
 	 */
-	public resize(ctx: Context, width: number, height: number, sceneTextureView: GPUTextureView): void {
+	public resize(
+		ctx: Context,
+		width: number,
+		height: number,
+		sceneTextureView: GPUTextureView,
+	): void {
 		// Quarter resolution bloom for premium look and high performance!
 		const bloomWidth = Math.max(1, Math.floor(width / 4));
 		const bloomHeight = Math.max(1, Math.floor(height / 4));
@@ -234,13 +273,15 @@ export class BloomSystem {
 			label: "Bloom_TexA",
 			size: [bloomWidth, bloomHeight, 1],
 			format: this.format,
-			usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
+			usage:
+				GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
 		});
 		this.texB = ctx.device.createTexture({
 			label: "Bloom_TexB",
 			size: [bloomWidth, bloomHeight, 1],
 			format: this.format,
-			usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
+			usage:
+				GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
 		});
 		this.viewA = this.texA.createView();
 		this.viewB = this.texB.createView();
@@ -249,7 +290,10 @@ export class BloomSystem {
 	}
 
 	/** @internal Rebuilds all bind groups after resize or scene texture change. */
-	public rebuildBindGroups(ctx: Context, sceneTextureView: GPUTextureView): void {
+	public rebuildBindGroups(
+		ctx: Context,
+		sceneTextureView: GPUTextureView,
+	): void {
 		this.brightPassBindGroup = ctx.device.createBindGroup({
 			label: "Bloom_BrightPass_BindGroup",
 			layout: this.brightPassLayout,
@@ -329,12 +373,14 @@ export class BloomSystem {
 		if (!this.options.enabled) {
 			// Clear texA to black so the post-process shader sees no bloom
 			const clearPass = commandEncoder.beginRenderPass({
-				colorAttachments: [{
-					view: this.viewA,
-					clearValue: { r: 0, g: 0, b: 0, a: 1 },
-					loadOp: "clear",
-					storeOp: "store",
-				}],
+				colorAttachments: [
+					{
+						view: this.viewA,
+						clearValue: { r: 0, g: 0, b: 0, a: 1 },
+						loadOp: "clear",
+						storeOp: "store",
+					},
+				],
 			});
 			clearPass.end();
 			return;
@@ -343,12 +389,14 @@ export class BloomSystem {
 		// ── Pass 1: Bright-pass → texA ────────────────────────────────────────
 		{
 			const pass = commandEncoder.beginRenderPass({
-				colorAttachments: [{
-					view: this.viewA,
-					clearValue: { r: 0, g: 0, b: 0, a: 1 },
-					loadOp: "clear",
-					storeOp: "store",
-				}],
+				colorAttachments: [
+					{
+						view: this.viewA,
+						clearValue: { r: 0, g: 0, b: 0, a: 1 },
+						loadOp: "clear",
+						storeOp: "store",
+					},
+				],
 			});
 			pass.setPipeline(this.brightPassPipeline);
 			pass.setBindGroup(0, this.brightPassBindGroup);
@@ -363,12 +411,14 @@ export class BloomSystem {
 			// Horizontal: A → B
 			{
 				const pass = commandEncoder.beginRenderPass({
-					colorAttachments: [{
-						view: this.viewB,
-						clearValue: { r: 0, g: 0, b: 0, a: 1 },
-						loadOp: "clear",
-						storeOp: "store",
-					}],
+					colorAttachments: [
+						{
+							view: this.viewB,
+							clearValue: { r: 0, g: 0, b: 0, a: 1 },
+							loadOp: "clear",
+							storeOp: "store",
+						},
+					],
 				});
 				pass.setPipeline(this.blurHPipeline);
 				pass.setBindGroup(0, this.blurHBindGroupA);
@@ -378,12 +428,14 @@ export class BloomSystem {
 			// Vertical: B → A
 			{
 				const pass = commandEncoder.beginRenderPass({
-					colorAttachments: [{
-						view: this.viewA,
-						clearValue: { r: 0, g: 0, b: 0, a: 1 },
-						loadOp: "clear",
-						storeOp: "store",
-					}],
+					colorAttachments: [
+						{
+							view: this.viewA,
+							clearValue: { r: 0, g: 0, b: 0, a: 1 },
+							loadOp: "clear",
+							storeOp: "store",
+						},
+					],
 				});
 				pass.setPipeline(this.blurVPipeline);
 				pass.setBindGroup(0, this.blurVBindGroupB);

@@ -32,6 +32,8 @@ export interface MeshOptions {
 	rotationDegrees?: number[] | Vec3;
 	/** Initial spatial scale multiplier or component scale vector. */
 	scale?: number | number[] | Vec3;
+	/** Secondary material pass rendered immediately after this material. */
+	nextPass?: Material;
 }
 
 /**
@@ -290,27 +292,19 @@ export class Mesh extends Node3D {
 		} else {
 			this.material = new StandardMaterial();
 		}
+
+		if (options.nextPass) {
+			this.material.nextPass = options.nextPass;
+		}
 	}
 
 	public loadTexture(texture: Texture | string) {
 		if (typeof texture === "string") {
-			texture = Texture.loadBackground(this.ctx, texture);
+			texture = Texture.loadBackground(this.ctx, texture, {
+				format: "rgba8unorm-srgb",
+			});
 		}
 		this.material.albedoTexture = texture;
-	}
-
-	/** Shorthand proxy property to get the mesh's main texture (albedoTexture). */
-	public get texture(): Texture | null {
-		return this.material.albedoTexture;
-	}
-
-	/** Shorthand proxy property to set or load the mesh's main texture (albedoTexture). */
-	public set texture(val: Texture | string | null) {
-		if (val) {
-			this.loadTexture(val);
-		} else {
-			this.material.albedoTexture = null;
-		}
 	}
 
 	/** Shorthand proxy property to get the mesh material's opacity. */

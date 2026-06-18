@@ -150,20 +150,6 @@
 </head>
 
 <body>
-    <a href="../index.html" class="back-btn">← Back to Hub</a>
-    
-    <div class="control-panel">
-        <h2>Lighting Controls</h2>
-        <div class="control-group">
-            <span class="label">Shadow Technique:</span>
-            <span id="active-technique" class="value badge csm-badge">Cascaded Shadow Map (CSM)</span>
-        </div>
-        <button id="toggle-light-btn">Switch to Standard Shadows</button>
-        <div class="info-text">
-            CSM splits the camera frustum into 4 depth cascades, maintaining shadow sharpness at close and far distances.
-        </div>
-    </div>
-
     <canvas id="canvas"></canvas>
     <script type="module" src="./demo.ts"></script>
 </body>

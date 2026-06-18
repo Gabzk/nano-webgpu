@@ -16,7 +16,7 @@ export { DebugPanel, type DebugPanelOptions } from "./debug/debug-panel";
 export { PerformanceTracker } from "./debug/performance-tracker";
 export { type VRAMEntry, VRAMTracker } from "./debug/vram-tracker";
 export { BatchManager, type InstanceBatch } from "./graphics/batch-manager";
-export { BloomSystem, type BloomOptions } from "./graphics/bloom-system";
+export { type BloomOptions, BloomSystem } from "./graphics/bloom-system";
 export { Camera, type CameraOptions } from "./graphics/camera";
 export {
 	CameraController,

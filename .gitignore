@@ -73,3 +73,5 @@ coverage
 *.sln
 *.sw?
 *.swp
+
+.antigravitycli

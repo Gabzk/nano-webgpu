@@ -211,7 +211,8 @@ class GLTFParser implements ModelParser {
 
 			// KHR_materials_emissive_strength — HDR emissive multiplier (can exceed 1.0)
 			const emissiveStrength =
-				mat.extensions?.KHR_materials_emissive_strength?.emissiveStrength ?? 1.0;
+				mat.extensions?.KHR_materials_emissive_strength?.emissiveStrength ??
+				1.0;
 			if (emissiveStrength !== 1.0) {
 				out.emissiveStrength = emissiveStrength;
 			}

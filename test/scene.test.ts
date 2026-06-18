@@ -22,6 +22,11 @@ import { Context, Scene, Camera, InputManager } from "../src/index";
 	INDIRECT: 256,
 	QUERY_RESOLVE: 512,
 };
+(globalThis as any).GPUShaderStage = {
+	VERTEX: 1,
+	FRAGMENT: 2,
+	COMPUTE: 4,
+};
 
 function createMockContext(): Context {
 	const mockDevice = {
@@ -32,6 +37,10 @@ function createMockContext(): Context {
 			destroy: vi.fn(),
 		}),
 		createBindGroup: vi.fn().mockReturnValue({}),
+		createBindGroupLayout: vi.fn().mockReturnValue({}),
+		createPipelineLayout: vi.fn().mockReturnValue({}),
+		createShaderModule: vi.fn().mockReturnValue({}),
+		createRenderPipeline: vi.fn().mockReturnValue({}),
 		queue: {
 			writeBuffer: vi.fn(),
 		},

@@ -176,7 +176,10 @@ export class Renderer {
 				{ binding: 0, resource: this.postProcessSampler },
 				{ binding: 1, resource: this.sceneTextureView },
 				{ binding: 2, resource: { buffer: this.renderSettingsBuffer } },
-				{ binding: 3, resource: this.bloom?.bloomTextureView ?? this.sceneTextureView },
+				{
+					binding: 3,
+					resource: this.bloom?.bloomTextureView ?? this.sceneTextureView,
+				},
 			],
 		});
 	}
