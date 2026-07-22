@@ -1,7 +1,7 @@
 {
 	"name": "nano-webgpu",
 	"version": "0.11.0",
-	"description": "",
+	"description": "A lightweight, fast, and ergonomic WebGPU 3D graphics library for TypeScript and JavaScript.",
 	"type": "module",
 	"main": "dist/index.js",
 	"types": "dist/index.d.ts",
@@ -11,6 +11,11 @@
 			"types": "./dist/index.d.ts"
 		}
 	},
+	"files": [
+		"dist",
+		"README.md",
+		"LICENSE"
+	],
 	"scripts": {
 		"sync-version": "node scripts/sync-version.js",
 		"dev": "pnpm run sync-version && BROWSER=google-chrome-stable vite",
@@ -21,11 +26,31 @@
 		"check": "biome check --write ./src",
 		"format": "biome format --write ./src",
 		"lint": "biome lint ./src",
-		"docs": "typedoc --out docs src/index.ts"
+		"docs": "typedoc --out docs src/index.ts",
+		"prepublishOnly": "pnpm run test:run && pnpm run build"
 	},
-	"keywords": [],
-	"author": "",
-	"license": "ISC",
+	"keywords": [
+		"webgpu",
+		"3d",
+		"graphics",
+		"rendering",
+		"typescript",
+		"pbr",
+		"canvas",
+		"gamedev",
+		"scene-graph",
+		"shaders"
+	],
+	"author": "Gabriel Alves <gabrielrodriguesalves693@gmail.com>",
+	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/Gabzk/nano-webgpu.git"
+	},
+	"bugs": {
+		"url": "https://github.com/Gabzk/nano-webgpu/issues"
+	},
+	"homepage": "https://github.com/Gabzk/nano-webgpu#readme",
 	"packageManager": "pnpm@10.30.3",
 	"devDependencies": {
 		"@biomejs/biome": "^2.4.4",
