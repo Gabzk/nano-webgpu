@@ -1,12 +1,19 @@
 # nano-webgpu
 
 [![npm version](https://img.shields.io/npm/v/nano-webgpu.svg?style=flat-square)](https://www.npmjs.com/package/nano-webgpu)
-[![license](https://img.shields.io/npm/l/nano-webgpu.svg?style=flat-square)](./LICENSE)
+[![license](https://img.shields.io/github/license/Gabzk/nano-webgpu?style=flat-square)](./LICENSE)
 [![bundle size](https://img.shields.io/bundlephobia/minzip/nano-webgpu?style=flat-square)](https://bundlephobia.com/package/nano-webgpu)
 
 > A lightweight, fast, and ergonomic 3D WebGPU graphics library for TypeScript and JavaScript.
 
-`nano-webgpu` simplifies 3D graphics rendering on the web by wrapping raw WebGPU APIs into a clean, modern, and developer-friendly scene graph interface, without compromising performance or flexibility.
+`nano-webgpu` simplifies 3D graphics rendering on the web by wrapping raw WebGPU APIs into a clean, modern, and developer-friendly scene graph interface—without compromising performance or flexibility.
+
+---
+
+## 📖 Documentation
+
+Full TypeDoc API reference, class definitions, and interfaces are available online:
+👉 **[nano-webgpu API Documentation](https://gabzk.github.io/nano-webgpu/)**
 
 ---
 
