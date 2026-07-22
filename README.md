@@ -2,7 +2,7 @@
 
 [![npm version](https://img.shields.io/npm/v/nano-webgpu.svg?style=flat-square)](https://www.npmjs.com/package/nano-webgpu)
 [![license](https://img.shields.io/github/license/Gabzk/nano-webgpu?style=flat-square)](./LICENSE)
-[![bundle size](https://img.shields.io/bundlephobia/minzip/nano-webgpu?style=flat-square)](https://bundlephobia.com/package/nano-webgpu)
+[![bundle size](https://img.shields.io/bundlejs/size/nano-webgpu?style=flat-square)](https://bundlejs.com/?q=nano-webgpu)
 
 > A lightweight, fast, and ergonomic 3D WebGPU graphics library for TypeScript and JavaScript.
 
