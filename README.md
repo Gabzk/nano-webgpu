@@ -6,7 +6,7 @@
 
 > A lightweight, fast, and ergonomic 3D WebGPU graphics library for TypeScript and JavaScript.
 
-`nano-webgpu` simplifies 3D graphics rendering on the web by wrapping raw WebGPU APIs into a clean, modern, and developer-friendly scene graph interface—without compromising performance or flexibility.
+`nano-webgpu` simplifies 3D graphics rendering on the web by wrapping raw WebGPU APIs into a clean, modern, and developer-friendly scene graph interface, without compromising performance or flexibility.
 
 ---
 
